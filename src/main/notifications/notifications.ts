@@ -4,33 +4,30 @@ import { repeat } from "lit-html/directives/repeat.js";
 import type { TemplateResult } from "lit-html";
 
 export type NotificationType = "info" | "success" | "warn" | "error";
-export type NotificationMessage = string | TemplateResult;
 
-export interface NotificationOptions {
+export interface NotificationOptions<C> {
   /**
    * Heading shown above the message.
    * - omitted -> the controller's `autoTitles` policy decides (no heading
    *   unless enabled there).
    * - `false` -> no heading, regardless of the controller policy.
-   * - string / template -> used as-is.
+   * - content -> used as-is.
    */
-  title?: NotificationMessage | false;
+  title?: C | false;
   /**
    * Icon shown to the left of the content, vertically centered.
    * - omitted -> the controller's `autoIcons` policy decides.
    * - `false` -> no icon, regardless of the controller policy.
-   * - string / template -> used as-is, slotted into light DOM (so it can be a
-   *   `TemplateResult` or, later, a framework node). For SVG, author a complete
-   *   `<svg>…</svg>` with the `html` tag — not lit's `svg` fragment tag, which
-   *   only renders inside an existing `<svg>` and would show nothing when
-   *   slotted on its own.
+   * - content -> used as-is, slotted into light DOM. With the lit adapter, use
+   *   the `html` tag with a complete `<svg>…</svg>` (not lit's `svg` fragment
+   *   tag, which only renders inside an existing `<svg>`).
    */
-  icon?: NotificationMessage | false;
-  message: NotificationMessage;
+  icon?: C | false;
+  message: C;
   duration?: number;
 }
 
-type NotificationInput = string | NotificationOptions;
+type NotificationInput<C> = string | NotificationOptions<C>;
 
 /** Returned by `info`/`success`/`warn`/`error` so callers can dismiss a specific notification. */
 export interface NotificationHandle {
@@ -88,7 +85,7 @@ function toCssVariable(key: string): string {
  * User-facing strings the controller may render but that aren't supplied per
  * notification: the close-button label and the per-severity words used as the
  * default heading and/or screen-reader prefix. Values are plain words ("Error",
- * not "Error:") — the template composes any punctuation so it can vary by locale.
+ * not "Error:") — the composed punctuation is added by the core.
  */
 export type NotificationTexts = Record<
   keyof typeof defaultNotificationTexts,
@@ -105,16 +102,22 @@ export const defaultNotificationTexts = {
 };
 
 /**
- * Optional, partial text resolver. Called at render time (so new notifications
- * pick up the current locale). Return `undefined` for any key you don't handle
- * and the en-US {@link defaultNotificationTexts} value is used instead. Adapt an
- * existing i18n library with a one-liner, e.g. `getText: (key) => t(\`notify.${key}\`)`.
+ * Optional, partial text resolver. Always returns plain strings (localized text
+ * is never framework content). Called at render time so new notifications pick
+ * up the current locale. Return `undefined` for any key you don't handle and
+ * the en-US {@link defaultNotificationTexts} value is used instead.
  */
 export type NotificationTextResolver = (
   key: keyof NotificationTexts,
 ) => string | undefined;
 
-export interface NotificationsOptions {
+export interface NotificationsOptions<C> {
+  /**
+   * The rendering adapter, which also fixes the content type `C`. Use the
+   * built-in {@link litAdapter} or {@link vanillaAdapter}, or build one with
+   * {@link createReactAdapter}.
+   */
+  adapter: RenderAdapterFactory<C>;
   theme?: Theme;
   getText?: NotificationTextResolver;
   /**
@@ -124,8 +127,7 @@ export interface NotificationsOptions {
    * - `true` -> heading for every type.
    * - array -> heading only for the listed types, e.g. `["warn", "error"]`.
    *
-   * A per-notification `title` (a string/template, or `false` to suppress)
-   * always overrides this policy.
+   * A per-notification `title` (content, or `false` to suppress) overrides it.
    */
   autoTitles?: boolean | NotificationType[];
   /**
@@ -135,7 +137,7 @@ export interface NotificationsOptions {
    * - `false` -> no default icons.
    * - array -> icon only for the listed types, e.g. `["warn", "error"]`.
    *
-   * A per-notification `icon` (a value, or `false` to suppress) overrides this.
+   * A per-notification `icon` (content, or `false` to suppress) overrides it.
    */
   autoIcons?: boolean | NotificationType[];
   /**
@@ -158,35 +160,87 @@ function roleFor(type: NotificationType): "alert" | "status" {
   return type === "error" || type === "warn" ? "alert" : "status";
 }
 
-interface Notification {
+interface Notification<C> {
   id: number;
   type: NotificationType;
-  title?: NotificationMessage | false;
-  icon?: NotificationMessage | false;
-  message: NotificationMessage;
+  title?: C | false;
+  icon?: C | false;
+  message: C;
   duration: number;
   removing: boolean;
+  // While removing, which exit is playing. Slide victims must be excluded from
+  // the FLIP shuffle (it would clobber their sideways transform); fade victims
+  // must be included (opacity doesn't conflict with FLIP, and staying in the
+  // shuffle keeps them gliding instead of snapping when the list reflows).
+  exitMode: "slide" | "fade" | null;
   // Auto-dismiss timer state (supports pause-on-hover).
   timer: number | null; // active setTimeout handle, or null while paused / none
   remaining: number; // ms left to run
   startedAt: number; // timestamp the current run began
 }
 
-interface NotificationsController {
+export interface NotificationsController<C> {
   info(message: string): NotificationHandle;
-  info(options: NotificationOptions): NotificationHandle;
+  info(options: NotificationOptions<C>): NotificationHandle;
   success(message: string): NotificationHandle;
-  success(options: NotificationOptions): NotificationHandle;
+  success(options: NotificationOptions<C>): NotificationHandle;
   warn(message: string): NotificationHandle;
-  warn(options: NotificationOptions): NotificationHandle;
+  warn(options: NotificationOptions<C>): NotificationHandle;
   error(message: string): NotificationHandle;
-  error(options: NotificationOptions): NotificationHandle;
+  error(options: NotificationOptions<C>): NotificationHandle;
   clear(): void;
 }
+
+// -------------------------------------------------------------------
+// Render seam
+// -------------------------------------------------------------------
+
+/**
+ * A fully-resolved per-notification "view model". The framework-agnostic core
+ * computes all policy (title fallback, icon mode, role, severity prefix) and
+ * hands the adapter pure data to project into DOM — the adapter contains no
+ * policy. `dismissLabel`/`severity` are always plain strings; `icon`/`title`/
+ * `message` are content of type `C`.
+ */
+export interface NotificationView<C> {
+  id: number;
+  type: NotificationType;
+  role: "alert" | "status";
+  duration: number;
+  dismissLabel: string;
+  iconMode: "custom" | "default" | "none";
+  icon: C | null;
+  severity: string | null;
+  title: C | null;
+  message: C;
+}
+
+/**
+ * The only framework-coupled surface. Core owns state, timers, the custom
+ * element, hover/dismiss delegation and animations; an adapter only projects a
+ * keyed list of views into the container it was bound to.
+ *
+ * CONTRACT: `render` must apply its changes to the DOM **synchronously** before
+ * returning. Right after calling it, the core reads hosts back by `data-id`
+ * (to start the enter transform and to measure FLIP positions). lit and vanilla
+ * are synchronous; the React adapter uses `flushSync` to honor this.
+ */
+export interface RenderAdapter<C> {
+  render(views: NotificationView<C>[]): void;
+}
+
+export type RenderAdapterFactory<C> = (context: {
+  container: HTMLElement;
+  tag: string;
+}) => RenderAdapter<C>;
 
 const HORIZONTAL_TRANSITION = "transform 700ms ease-in-out";
 const OFFSCREEN_DISTANCE = "120vw";
 const EXIT_MS = 700;
+
+// Cap-eviction exit: a quick fade in place (see remove()'s "fade" mode).
+const FADE_TRANSITION = "opacity 500ms ease";
+const FADE_MS = 500;
 
 // Fired by the shadow-DOM close button; caught (composed + bubbling) on the
 // container, which maps event.target (retargeted to the host) back to an id.
@@ -465,12 +519,13 @@ const SHADOW_HTML = `
 
 // Resolved lazily on first controller creation so importing this module never
 // touches the DOM (SSR-safe) and the element class only references HTMLElement
-// when actually running in a browser.
-let staticTagCache: ReturnType<typeof unsafeStatic> | null = null;
+// when actually running in a browser. Returns the plain tag string; adapters
+// decide how to use it.
+let tagCache: string | null = null;
 
-function ensureElementRegistered(): ReturnType<typeof unsafeStatic> {
-  if (staticTagCache) {
-    return staticTagCache;
+function ensureElementRegistered(): string {
+  if (tagCache) {
+    return tagCache;
   }
 
   class NotificationElement extends HTMLElement {
@@ -503,8 +558,8 @@ function ensureElementRegistered(): ReturnType<typeof unsafeStatic> {
         this.button?.setAttribute("aria-label", value ?? "");
       } else if (name === "duration") {
         // Feed the ring's animation-duration via a custom property. Kept off
-        // lit-html's radar (attribute, not inline style) so it never collides
-        // with the imperative slide transform written to the host's style.
+        // the renderer's radar (attribute, not inline style) so it never
+        // collides with the imperative slide transform written to the style.
         this.style.setProperty("--notif-duration", `${value ?? "0"}ms`);
       } else if (name === "type" && this.iconEl) {
         // Swap in the severity icon. Decorative only (aria-hidden), since the
@@ -526,8 +581,241 @@ function ensureElementRegistered(): ReturnType<typeof unsafeStatic> {
   }
 
   customElements.define(tag, NotificationElement);
-  staticTagCache = unsafeStatic(tag);
-  return staticTagCache;
+  tagCache = tag;
+  return tag;
+}
+
+// -------------------------------------------------------------------
+// Adapters
+// -------------------------------------------------------------------
+
+/**
+ * lit-html adapter. Content is a lit `TemplateResult` or a plain string. The
+ * keyed `repeat` is essential: an unkeyed list would let lit reuse DOM nodes by
+ * position, leaking the imperative slide-out transform onto whichever
+ * notification lands in that slot after a re-render.
+ */
+export type LitContent = string | TemplateResult;
+
+export const litAdapter: RenderAdapterFactory<LitContent> = ({
+  container,
+  tag,
+}) => {
+  const staticTag = unsafeStatic(tag);
+
+  return {
+    render(views) {
+      render(
+        html`
+          ${repeat(
+            views,
+            (view) => view.id,
+            (view) => html`
+              <${staticTag}
+                data-id=${view.id}
+                type=${view.type}
+                role=${view.role}
+                duration=${view.duration}
+                dismiss-label=${view.dismissLabel}
+                icon-mode=${view.iconMode}
+              >
+                ${
+                  view.icon !== null
+                    ? html`<span slot="icon">${view.icon}</span>`
+                    : ""
+                }
+                ${
+                  view.severity !== null
+                    ? html`<span slot="severity">${view.severity}</span>`
+                    : ""
+                }
+                ${
+                  view.title !== null
+                    ? html`<span slot="title">${view.title}</span>`
+                    : ""
+                }
+                <span slot="message">${view.message}</span>
+              </${staticTag}>
+            `,
+          )}
+        `,
+        container,
+      );
+    },
+  };
+};
+
+/**
+ * Framework-free adapter. Content is a plain string or a DOM `Node`. Does its
+ * own keyed reconciliation of the host list.
+ */
+export type VanillaContent = string | Node;
+
+function setAttrIfChanged(el: Element, name: string, value: string) {
+  // Avoid re-triggering attributeChangedCallback (e.g. re-injecting the icon)
+  // when nothing actually changed.
+  if (el.getAttribute(name) !== value) {
+    el.setAttribute(name, value);
+  }
+}
+
+function buildSlot(
+  slot: string,
+  content: VanillaContent | null,
+): HTMLElement[] {
+  if (content === null) {
+    return [];
+  }
+  const span = document.createElement("span");
+  span.setAttribute("slot", slot);
+  if (typeof content === "string") {
+    span.textContent = content;
+  } else {
+    span.appendChild(content);
+  }
+  return [span];
+}
+
+export const vanillaAdapter: RenderAdapterFactory<VanillaContent> = ({
+  container,
+  tag,
+}) => {
+  return {
+    render(views) {
+      const existing = new Map<number, HTMLElement>();
+      container
+        .querySelectorAll<HTMLElement>("[data-id]")
+        .forEach((el) => existing.set(Number(el.dataset.id), el));
+
+      const desired = new Set(views.map((view) => view.id));
+      existing.forEach((el, id) => {
+        if (!desired.has(id)) {
+          el.remove();
+        }
+      });
+
+      views.forEach((view, index) => {
+        let host = existing.get(view.id);
+        if (!host) {
+          host = document.createElement(tag);
+          host.dataset.id = String(view.id);
+        }
+
+        setAttrIfChanged(host, "type", view.type);
+        setAttrIfChanged(host, "role", view.role);
+        setAttrIfChanged(host, "duration", String(view.duration));
+        setAttrIfChanged(host, "dismiss-label", view.dismissLabel);
+        setAttrIfChanged(host, "icon-mode", view.iconMode);
+
+        // Rebuild light-DOM slotted content. The host itself is reused (keyed
+        // by id), so the shadow chrome and its running ring animation persist.
+        host.replaceChildren(
+          ...buildSlot("icon", view.icon),
+          ...buildSlot("severity", view.severity),
+          ...buildSlot("title", view.title),
+          ...buildSlot("message", view.message),
+        );
+
+        if (container.children[index] !== host) {
+          container.insertBefore(host, container.children[index] ?? null);
+        }
+      });
+    },
+  };
+};
+
+/**
+ * Minimal structural view of the React APIs the adapter needs — declared
+ * locally so this module never imports (or forces a dependency on) React.
+ * Supply the real functions when building the adapter.
+ */
+export interface ReactRuntime<Node = unknown> {
+  Fragment: unknown;
+  createElement: (
+    type: unknown,
+    props: unknown,
+    ...children: unknown[]
+  ) => Node;
+  createRoot: (container: Element) => {
+    render: (node: Node) => void;
+    unmount: () => void;
+  };
+  flushSync: (callback: () => void) => void;
+}
+
+/**
+ * React adapter, built by injecting React's `createElement`/`createRoot`/
+ * `flushSync`/`Fragment` — keeping React out of this module's dependencies.
+ * Content is whatever your React types call a node (pass the type param):
+ *
+ *   import * as React from "react";
+ *   import { createRoot } from "react-dom/client";
+ *   import { flushSync } from "react-dom";
+ *   const reactAdapter = createReactAdapter<React.ReactNode>({
+ *     Fragment: React.Fragment,
+ *     createElement: React.createElement,
+ *     createRoot,
+ *     flushSync,
+ *   });
+ *
+ * `flushSync` is required so `render` commits synchronously (see RenderAdapter).
+ */
+export function createReactAdapter<Node = unknown>(
+  react: ReactRuntime<Node>,
+): RenderAdapterFactory<Node> {
+  return ({ container, tag }) => {
+    const root = react.createRoot(container);
+
+    return {
+      render(views) {
+        const hosts = views.map((view) =>
+          react.createElement(
+            tag,
+            {
+              key: view.id,
+              "data-id": view.id,
+              type: view.type,
+              role: view.role,
+              duration: view.duration,
+              "dismiss-label": view.dismissLabel,
+              "icon-mode": view.iconMode,
+            },
+            view.icon !== null
+              ? react.createElement(
+                  "span",
+                  { key: "i", slot: "icon" },
+                  view.icon,
+                )
+              : null,
+            view.severity !== null
+              ? react.createElement(
+                  "span",
+                  { key: "s", slot: "severity" },
+                  view.severity,
+                )
+              : null,
+            view.title !== null
+              ? react.createElement(
+                  "span",
+                  { key: "t", slot: "title" },
+                  view.title,
+                )
+              : null,
+            react.createElement(
+              "span",
+              { key: "m", slot: "message" },
+              view.message,
+            ),
+          ),
+        );
+
+        // Synchronous commit so the core can read hosts back immediately.
+        react.flushSync(() => {
+          root.render(react.createElement(react.Fragment, null, ...hosts));
+        });
+      },
+    };
+  };
 }
 
 function injectContainerStyles() {
@@ -541,10 +829,10 @@ function injectContainerStyles() {
   document.head.appendChild(style);
 }
 
-export function createNotificationsController(
-  options: NotificationsOptions = {},
-): NotificationsController {
-  const { theme, getText, autoTitles, maxVisible } = options;
+export function createNotificationsController<C>(
+  options: NotificationsOptions<C>,
+): NotificationsController<C> {
+  const { adapter, theme, getText, autoTitles, maxVisible } = options;
   // Icons are on by default (they were always shown before this option existed).
   const autoIcons = options.autoIcons ?? true;
 
@@ -578,7 +866,10 @@ export function createNotificationsController(
 
   document.body.appendChild(container);
 
-  const notifications: Notification[] = [];
+  // Bind the chosen adapter to this controller's container + element tag.
+  const renderer = adapter({ container, tag });
+
+  const notifications: Notification<C>[] = [];
   let nextId = 0;
 
   // Close-button clicks arrive here as a composed, bubbling event; the event
@@ -591,6 +882,30 @@ export function createNotificationsController(
     const id = Number(host.dataset.id);
     if (!Number.isNaN(id)) {
       remove(id);
+    }
+  });
+
+  // Pause auto-dismiss while the pointer is over a notification; resume on
+  // leave. Delegated on the container (mouseover/out bubble, unlike
+  // enter/leave), so adapters needn't wire per-host listeners. pause/resume are
+  // effectively idempotent, and a stray resume immediately followed by a pause
+  // during intra-card movement recomputes ~0 elapsed, so the countdown doesn't
+  // drift.
+  container.addEventListener("mouseover", (event) => {
+    const host = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+      "[data-id]",
+    );
+    if (host) {
+      pause(Number(host.dataset.id));
+    }
+  });
+
+  container.addEventListener("mouseout", (event) => {
+    const host = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+      "[data-id]",
+    );
+    if (host) {
+      resume(Number(host.dataset.id));
     }
   });
 
@@ -616,7 +931,7 @@ export function createNotificationsController(
     return `translateX(${rtl ? "-" : ""}${OFFSCREEN_DISTANCE})`;
   }
 
-  function startTimer(notification: Notification) {
+  function startTimer(notification: Notification<C>) {
     if (notification.duration <= 0 || notification.remaining <= 0) {
       return;
     }
@@ -680,7 +995,19 @@ export function createNotificationsController(
       container
         .querySelectorAll<HTMLElement>("[data-id]")
         .forEach((element) => {
-          const oldPosition = previous.get(Number(element.dataset.id));
+          const id = Number(element.dataset.id);
+
+          // Skip notifications that are sliding out: they're gliding off-screen
+          // via their own transform, which a FLIP translateY here would stomp
+          // on. Fade-exiting ones are deliberately NOT skipped — opacity doesn't
+          // conflict with the shuffle, and keeping them in it makes them glide
+          // to their new slot instead of snapping (the "jump" while fading).
+          const notification = notifications.find((item) => item.id === id);
+          if (notification?.removing && notification.exitMode === "slide") {
+            return;
+          }
+
+          const oldPosition = previous.get(id);
 
           if (!oldPosition) {
             return;
@@ -705,100 +1032,79 @@ export function createNotificationsController(
     });
   }
 
+  // Resolve a notification into the fully-computed view model the adapter
+  // renders. All policy (title fallback, severity prefix, icon mode) lives here
+  // so adapters stay dumb.
+  function toView(notification: Notification<C>): NotificationView<C> {
+    // A visible default heading (the severity word) is shown only when the
+    // caller omitted the title AND the controller policy opts this type in.
+    const defaultTitleShown =
+      notification.title === undefined &&
+      policyEnabled(autoTitles, notification.type);
+
+    // Resolve the heading: `false` -> none; omitted -> policy default or none;
+    // otherwise the caller's value.
+    let title: C | null;
+    if (notification.title === false) {
+      title = null;
+    } else if (notification.title === undefined) {
+      title = defaultTitleShown
+        ? (text(notification.type) as unknown as C)
+        : null;
+    } else {
+      title = notification.title;
+    }
+
+    // The hidden severity prefix is redundant only when a visible default
+    // heading already states the severity. Punctuation is composed here so
+    // every adapter renders the same string.
+    const severity = defaultTitleShown ? null : `${text(notification.type)}: `;
+
+    // Resolve the icon into one of three modes:
+    // - "custom": caller supplied one -> slot it (light DOM).
+    // - "default": omitted + policy opts in -> shadow built-in for type.
+    // - "none": `false`, or omitted with the policy off.
+    const customIcon =
+      notification.icon !== undefined && notification.icon !== false
+        ? notification.icon
+        : null;
+    const iconMode: NotificationView<C>["iconMode"] =
+      customIcon !== null
+        ? "custom"
+        : notification.icon === undefined &&
+            policyEnabled(autoIcons, notification.type)
+          ? "default"
+          : "none";
+
+    return {
+      id: notification.id,
+      type: notification.type,
+      role: roleFor(notification.type),
+      duration: notification.duration,
+      dismissLabel: text("dismiss"),
+      iconMode,
+      icon: customIcon,
+      severity,
+      title,
+      message: notification.message,
+    };
+  }
+
   function update(previous?: Map<number, DOMRect>) {
-    // The list MUST be keyed. lit-html reuses DOM nodes by position for an
-    // unkeyed list, which means the imperative inline styles we set on a host
-    // (the slide-out transform in particular) would leak onto whatever
-    // notification lands in that position after a re-render. Keying by id ties
-    // each host to its notification so content, inline styles and FLIP
-    // measurements all stay consistent.
-    render(
-      html`
-        ${repeat(
-          notifications,
-          (notification) => notification.id,
-          (notification) => {
-            // A visible default heading (the severity word) is shown only when
-            // the caller omitted the title AND the controller policy opts this
-            // type in.
-            const defaultTitleShown =
-              notification.title === undefined &&
-              policyEnabled(autoTitles, notification.type);
-
-            // Resolve the heading: `false` -> none; omitted -> policy default or
-            // none; otherwise the caller's value.
-            let title: NotificationMessage | null;
-            if (notification.title === false) {
-              title = null;
-            } else if (notification.title === undefined) {
-              title = defaultTitleShown ? text(notification.type) : null;
-            } else {
-              title = notification.title;
-            }
-
-            // The hidden severity prefix is redundant only when a visible
-            // default heading already states the severity.
-            const announceSeverity = !defaultTitleShown;
-
-            // Resolve the icon into one of three modes:
-            // - "custom": caller supplied one -> slot it (light DOM).
-            // - "default": omitted + policy opts in -> shadow built-in for type.
-            // - "none": `false`, or omitted with the policy off.
-            const customIcon =
-              notification.icon !== undefined && notification.icon !== false
-                ? notification.icon
-                : null;
-            const iconMode =
-              customIcon !== null
-                ? "custom"
-                : notification.icon === undefined &&
-                    policyEnabled(autoIcons, notification.type)
-                  ? "default"
-                  : "none";
-
-            // Light-DOM content only: the fixed chrome (accent, ring, close
-            // button, layout, styles) lives in the element's shadow root.
-            return html`
-              <${tag}
-                data-id=${notification.id}
-                type=${notification.type}
-                role=${roleFor(notification.type)}
-                duration=${notification.duration}
-                dismiss-label=${text("dismiss")}
-                icon-mode=${iconMode}
-                @mouseenter=${() => pause(notification.id)}
-                @mouseleave=${() => resume(notification.id)}
-              >
-                ${
-                  customIcon !== null
-                    ? html`<span slot="icon">${customIcon}</span>`
-                    : ""
-                }
-                ${
-                  announceSeverity
-                    ? html`<span slot="severity"
-                        >${text(notification.type)}:
-                      </span>`
-                    : ""
-                }
-                ${
-                  title !== null ? html`<span slot="title">${title}</span>` : ""
-                }
-                <span slot="message">${notification.message}</span>
-              </${tag}>
-            `;
-          },
-        )}
-      `,
-      container,
-    );
+    renderer.render(notifications.map(toView));
 
     if (previous) {
       animateMovement(previous);
     }
   }
 
-  function remove(id: number) {
+  // `mode` picks the exit animation:
+  // - "slide" (default): timer/click dismissals glide off-screen sideways.
+  // - "fade": cap-evictions dissolve quickly in place. A fade is layout-neutral
+  //   (opacity only), so simultaneous evictions can't clobber one another the
+  //   way concurrent sideways slides would, and by the time the slot collapses
+  //   the element is already invisible — no blink, no jump.
+  function remove(id: number, mode: "slide" | "fade" = "slide") {
     const notification = notifications.find((item) => item.id === id);
 
     if (!notification || notification.removing) {
@@ -806,6 +1112,7 @@ export function createNotificationsController(
     }
 
     notification.removing = true;
+    notification.exitMode = mode;
 
     if (notification.timer !== null) {
       window.clearTimeout(notification.timer);
@@ -833,6 +1140,17 @@ export function createNotificationsController(
       return;
     }
 
+    if (mode === "fade") {
+      element.style.transition = FADE_TRANSITION;
+
+      requestAnimationFrame(() => {
+        element.style.opacity = "0";
+      });
+
+      window.setTimeout(drop, FADE_MS);
+      return;
+    }
+
     // The at-rest translateX(0) has already been painted in previous frames, so
     // enabling the transition and then flipping the transform in the next frame
     // animates cleanly.
@@ -853,29 +1171,35 @@ export function createNotificationsController(
     const active = notifications.filter((item) => !item.removing);
     const excess = active.length - maxVisible;
 
-    // Oldest first (array order == insertion order).
+    // Oldest first (array order == insertion order). Cap-evictions fade rather
+    // than slide — a displaced notification quietly yields its space.
     for (let i = 0; i < excess; i++) {
-      remove(active[i].id);
+      remove(active[i].id, "fade");
     }
   }
 
   function add(
     type: NotificationType,
-    input: NotificationInput,
+    input: NotificationInput<C>,
   ): NotificationHandle {
     const previous = getPositions();
 
-    const options = typeof input === "string" ? { message: input } : input;
-    const duration = options.duration ?? 7000;
+    // String shorthand: every adapter's content type includes plain strings.
+    const opts: NotificationOptions<C> =
+      typeof input === "string"
+        ? ({ message: input } as unknown as NotificationOptions<C>)
+        : input;
+    const duration = opts.duration ?? 7000;
 
-    const notification: Notification = {
+    const notification: Notification<C> = {
       id: nextId++,
       type,
-      title: options.title,
-      icon: options.icon,
-      message: options.message,
+      title: opts.title,
+      icon: opts.icon,
+      message: opts.message,
       duration,
       removing: false,
+      exitMode: null,
       timer: null,
       remaining: duration,
       startedAt: 0,
@@ -911,16 +1235,16 @@ export function createNotificationsController(
   }
 
   return {
-    info(input: NotificationInput) {
+    info(input: NotificationInput<C>) {
       return add("info", input);
     },
-    success(input: NotificationInput) {
+    success(input: NotificationInput<C>) {
       return add("success", input);
     },
-    warn(input: NotificationInput) {
+    warn(input: NotificationInput<C>) {
       return add("warn", input);
     },
-    error(input: NotificationInput) {
+    error(input: NotificationInput<C>) {
       return add("error", input);
     },
     clear() {

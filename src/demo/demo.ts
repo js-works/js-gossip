@@ -7,6 +7,7 @@ import { html, render } from "lit";
 import {
   createDialogsController,
   createNotificationsController,
+  litAdapter,
 } from "../main/index.js";
 
 import type {
@@ -51,6 +52,8 @@ const waButtonVariant = {
 } as const;
 
 const notifications = createNotificationsController({
+  adapter: litAdapter,
+  maxVisible: 4,
   autoTitles: false,
   autoIcons: true,
 });

@@ -1121,7 +1121,7 @@ const theme = createTheme({
   dangerTextColor: "white",
   dangerBackgroundColor: "#dc3146",
   successColor: "var(--ui-color-success-500, #00883c)",
-  dialogBorderRadius: "6px",
+  dialogBorderRadius: "10px",
   closeButtonBorderRadius: "100%",
   actionButtonBorderRadius: "3px",
   dialogBackgroundColor: "light-dark(white, #333)",
