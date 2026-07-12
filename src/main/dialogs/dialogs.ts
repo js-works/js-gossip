@@ -1191,15 +1191,15 @@ const successIconSvg = `
 
 const warnIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
-    <path d="M4.54.146A.5.5 0 0 1 4.893 0h6.214a.5.5 0 0 1 .353.146l4.394 4.394a.5.5 0 0 1 .146.353v6.214a.5.5 0 0 1-.146.353l-4.394 4.394a.5.5 0 0 1-.353.146H4.893a.5.5 0 0 1-.353-.146L.146 11.46A.5.5 0 0 1 0 11.107V4.893a.5.5 0 0 1 .146-.353zM5.1 1 1 5.1v5.8L5.1 15h5.8l4.1-4.1V5.1L10.9 1z"/>
+    <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
     <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
   </svg>
 `;
 
 const errorIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
-    <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
-    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+    <path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.15.15 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.2.2 0 0 1-.054.06.1.1 0 0 1-.066.017H1.146a.1.1 0 0 1-.066-.017.2.2 0 0 1-.054-.06.18.18 0 0 1 .002-.183L7.884 2.073a.15.15 0 0 1 .054-.057m1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767z"/>
+    <path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
   </svg>
 `;
 
@@ -1248,7 +1248,7 @@ const theme = {
   dangerTextColor: "white",
   dangerBackgroundColor: "#dc3146",
   successColor: "var(--ui-color-success-500, #00883c)",
-  dialogBorderRadius: "3px",
+  dialogBorderRadius: "2px",
   closeButtonBorderRadius: "100%",
   actionButtonBorderRadius: "3px",
   dialogBackgroundColor: "light-dark(white, #333)",
@@ -1288,6 +1288,7 @@ const dialogStyles = `
     box-sizing: border-box;
     padding: 0;
     overflow: auto;
+    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.25), 0 4px 10px -4px rgba(0,0,0,0.15);  
   }
 
   dialog[open].closing {
@@ -1338,11 +1339,6 @@ const dialogStyles = `
   :host([data-dialog-type="decide"]) #icon,
   :host([data-dialog-type="success"]) #icon {
     color: ${theme.primaryBackgroundColor};
-    background-color: color-mix(
-      in srgb,
-      ${theme.primaryBackgroundColor},
-      white 90%
-    );
   }
 
   :host([data-dialog-type="warn"]) #icon,
@@ -1350,17 +1346,13 @@ const dialogStyles = `
   :host([data-dialog-type="confirmCritical"]) #icon,
   :host([data-dialog-type="decideCritical"]) #icon {
     color: ${theme.dangerBackgroundColor};
-    background-color: color-mix(
-      in srgb,
-      ${theme.dangerBackgroundColor},
-      white 90%
-    );
   }
 
   .dialog-content {
     /* Chrome (titles, buttons) stays unselectable; the body and notice opt back into
        text selection below so error messages can be copied. */
     user-select: none;
+    min-width: 20em;
     font-size: 16px;
     font-family:
       -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
@@ -1370,7 +1362,7 @@ const dialogStyles = `
   .dialog-content .header {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.4em;
     padding: 1em 1.25em 0.4em 1.25em;
     width: 100%;
     box-sizing: border-box;
@@ -1401,7 +1393,7 @@ const dialogStyles = `
     flex-direction: column;
     gap: 0.5em;
     padding: 0 1.25em 0.75em 1.25em;
-    min-height: 2em;
+    min-height: 2.25em;
     line-height: 1.25em;
     user-select: text;
   }
@@ -1423,7 +1415,7 @@ const dialogStyles = `
     border: none;
     border-radius: ${theme.actionButtonBorderRadius};
     padding: 0.5em 1.5em;
-    font-weight: 400;
+    font-weight: 500;
     cursor: pointer;
   }
 
@@ -1529,7 +1521,7 @@ const dialogStyles = `
     background-color: light-dark(#f4f4f4, #3d3d3d);
     color: ${theme.textColor};
     font-size: 0.9em;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.35;
     overflow: hidden;
     max-height: 12em;
