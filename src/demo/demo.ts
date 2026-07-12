@@ -166,8 +166,11 @@ async function openByType(type: DialogType): Promise<void> {
       log(
         "Confirm critical result",
         await dialogs.confirmCritical({
+          title: "Delete user",
+          subtitle: "User: superuser",
           content:
-            "Are you really sure?\nThis will permanently delete the item.",
+            "Are you really sure that you want to delete the superuser?\n" +
+            "You cannot undo this later.",
           buttons: { confirm: "Delete" },
         }),
       );
@@ -336,7 +339,7 @@ async function runLogin(): Promise<void> {
       // Config notice, shown while the dialog is open (like a field's help text). It's
       // overridden by the reject notice below and reappears once the user edits.
       notice: {
-        message: 'Demo hint: the password is "secret".',
+        message: 'Demo hint: The password is "secret".',
       },
     });
 

@@ -1517,13 +1517,12 @@ const dialogStyles = `
   .notice {
     position: relative;
     margin: 0.7em 1.25em 0.75em 1.25em;
-    padding: 0.5em 0.5em 0.5em 1.25em;
+    padding: 0.5em 0.5em 0.5em 0.9em;
     border-radius: 2px;
     background-color: light-dark(#f4f4f4, #3d3d3d);
     color: ${theme.textColor};
-    font-size: 0.9em;
-    font-weight: 500;
-    line-height: 1.35;
+    font-size: 0.9;
+    line-height: 1.25;
     overflow: hidden;
     max-height: 12em;
     user-select: text;
@@ -1545,9 +1544,9 @@ const dialogStyles = `
     left: 0.25em;
     top: 0.25em;
     bottom: 0.25em;
-    width: 0.2em;
+    width: 0.15em;
     border-radius: 0.125em;
-    background: ${theme.primaryBackgroundColor};
+    background: transparent;
   }
 
   .notice.dismissing,
