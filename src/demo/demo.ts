@@ -40,7 +40,11 @@ function logFormResult(label: string, result: FormDialogResult): void {
   if (result.canceled) {
     log(`${label} (canceled)`, result);
   } else {
-    log(label, { action: result.action, data: result.data.toRecord() });
+    log(label, {
+      canceled: false,
+      action: result.action,
+      data: result.data.toRecord(),
+    });
   }
 }
 
@@ -260,7 +264,7 @@ async function runWizard(): Promise<void> {
       styles: formStyles,
     });
 
-    logFormResult("wizard finished", step2);
+    logFormResult("Wizard finished", step2);
   } finally {
     scope[Symbol.dispose]();
   }
@@ -381,7 +385,7 @@ async function runNoticeForm(): Promise<void> {
       message: "Some fields could not be verified.",
     },
   });
-  logFormResult("notice form result", result);
+  logFormResult("Notice form result", result);
 }
 
 // -------------------------------------------------------------------
