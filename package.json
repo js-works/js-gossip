@@ -1,0 +1,48 @@
+{
+  "name": "js-gossip",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./lingo": {
+      "types": "./dist/message-format/index.d.ts",
+      "import": "./dist/message-format/index.js"
+    },
+    "./lingo/english": {
+      "types": "./dist/lingo/english.d.ts",
+      "import": "./dist/lingo/english.js"
+    },
+    "./lingo/german": {
+      "types": "./dist/lingo/german.d.ts",
+      "import": "./dist/lingo/german.js"
+    },
+    "./lingo/xwiki": {
+      "types": "./dist/xwiki/index.d.ts",
+      "import": "./dist/wxiki/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@awesome.me/webawesome": "3.10.0",
+    "typescript": "~6.0.2",
+    "vite": "8.1.1"
+  },
+  "dependencies": {
+    "lit": "3.3.3"
+  },
+  "peerDependencies": {
+    "js-lingo": "^0.0.3"
+  }
+}

@@ -1,0 +1,115 @@
+:root {
+  color-scheme: light dark;
+
+  /* Variables the library's theme reads. Point them at Web Awesome's tokens so the
+     dialog chrome matches the rest of the demo exactly (the library itself has no
+     dependency on Web Awesome — these are just the host-provided values). */
+  --ui-color-primary-500: var(--wa-color-brand-fill-loud);
+  --ui-color-success-500: var(--wa-color-success-fill-loud);
+  --ui-surface: var(--wa-color-brand-on-loud);
+  --ui-text: var(--wa-color-neutral-on-normal);
+
+  /* -------------------------------------------------------------------
+     "Dense & sharp" retheme of Web Awesome — demo only, all --wa-* tokens.
+     A handful of scale tokens do most of the work: smaller type (so the
+     components no longer need size="s"), tighter spacing, and less rounding.
+     Tweak these numbers to taste.
+     ------------------------------------------------------------------- */
+  --wa-font-size-scale: 1; /* scales all WA component */
+  --wa-space-scale: 0.85; /* tighter internal spacing / gaps */
+  --wa-border-radius-scale: 0.5; /* sharper corners (radius-m 6px → 3px) */
+
+  /* The generous block padding is the main source of the "big button" feel. */
+  --wa-form-control-padding-block: 0.45em;
+  --wa-form-control-padding-inline: 0.85em;
+  /* Buttons get 3px (set on :root so it inherits into the dialog's shadow root,
+     where its wa-buttons render); inputs are overridden to 1px below. */
+  --wa-form-control-border-radius: 3px;
+
+  --page-bg: light-dark(#f6f7f9, #14161a);
+  --page-fg: light-dark(#1f2430, #e7e9ee);
+  --card-bg: light-dark(#ffffff, #1e2126);
+  --border: light-dark(#e3e5ea, #2b2f36);
+
+   --wa-focus-ring-offset: -1px;
+   --wa-focus-ring-width: 3px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Near-square text fields; wa-input lives in the light DOM everywhere (the dialog
+   slots its form content), so this element-scoped override reaches them all while
+   buttons keep the 3px from :root above. */
+wa-input {
+  --wa-form-control-border-radius: 1px;
+}
+
+body {
+  margin: 0;
+  padding: 2rem 1.5rem;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+}
+
+.page {
+  display: flex;
+  gap: 2em;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0.5rem 0 2rem;
+}
+
+header {
+  margin-bottom: 2rem;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.95rem;
+}
+
+section {
+  margin-bottom: 1.75rem;
+}
+
+h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+  margin: 0 0 0.6rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.results {
+  min-width: 25em; 
+}
+
+pre#log {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 1rem 1rem 1rem;
+  height: 30rem;
+  overflow: auto;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
