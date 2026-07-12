@@ -1931,13 +1931,21 @@ class Dialog extends HTMLElement {
   // placeholder, the first real dialog, and every in-scope swap alike.
   #growIn(): void {
     const box = this.#dialog;
-    box.animate(
-      [
-        { transform: "scale(0)", opacity: 0 },
-        { transform: "scale(1)", opacity: 1 },
-      ],
-      { duration: DIALOG_ANIM_MS, easing: "cubic-bezier(0.2, 0, 0, 1)" },
-    );
+    // The spinner placeholder drops in from slightly above and settles; real dialogs
+    // (and in-scope swaps) grow in from nothing as before.
+    const keyframes = this.#spinnerOnly
+      ? [
+          { transform: "translateY(-3em)", opacity: 0 },
+          { transform: "translateY(0)", opacity: 1 },
+        ]
+      : [
+          { transform: "scale(0)", opacity: 0 },
+          { transform: "scale(1)", opacity: 1 },
+        ];
+    box.animate(keyframes, {
+      duration: DIALOG_ANIM_MS,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+    });
     // Clear the finished swap fade-out (fill: forwards) only after grow-in is on top of
     // the animation stack, so removing its held value causes no one-frame flash.
     this.#exitAnim?.cancel();
