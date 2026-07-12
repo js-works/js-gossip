@@ -1526,9 +1526,10 @@ const dialogStyles = `
     margin: 0.7em 1.25em 0.75em 1.25em;
     padding: 0.5em 0.5em 0.5em 1.25em;
     border-radius: 2px;
-    background-color: light-dark(#f0f0f0, #3d3d3d);
+    background-color: light-dark(#f4f4f4, #3d3d3d);
     color: ${theme.textColor};
     font-size: 0.9em;
+    font-weight: 600;
     line-height: 1.35;
     overflow: hidden;
     max-height: 12em;
@@ -1580,10 +1581,7 @@ const dialogStyles = `
   /* Error notices also get a faint danger-tinted background (the other types keep the
      neutral notice background and signal type through the accent bar alone). */
   .notice[data-notice-type="error"] {
-    background-color: light-dark(
-      color-mix(in srgb, ${theme.dangerBackgroundColor}, white 87%),
-      color-mix(in srgb, ${theme.dangerBackgroundColor}, #3d3d3d 88%)
-    );
+    color: ${theme.dangerBackgroundColor};
   }
 
   /* The reject notice, when it follows the config notice, is pulled up with a negative
