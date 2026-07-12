@@ -114,10 +114,10 @@ export type NotificationTextResolver = (
 export interface NotificationsOptions<C> {
   /**
    * The rendering adapter, which also fixes the content type `C`. Use the
-   * built-in {@link litAdapter} or {@link vanillaAdapter}, or build one with
+   * built-in {@link litNotificationAdapter} or {@link vanillaAdapter}, or build one with
    * {@link createReactAdapter}.
    */
-  adapter: RenderAdapterFactory<C>;
+  adapter: NotificationAdapterFatory<C>;
   theme?: Theme;
   getText?: NotificationTextResolver;
   /**
@@ -225,14 +225,14 @@ export interface NotificationView<C> {
  * (to start the enter transform and to measure FLIP positions). lit and vanilla
  * are synchronous; the React adapter uses `flushSync` to honor this.
  */
-export interface RenderAdapter<C> {
+export interface NotificationAdapter<C> {
   render(views: NotificationView<C>[]): void;
 }
 
-export type RenderAdapterFactory<C> = (context: {
+export type NotificationAdapterFatory<C> = (context: {
   container: HTMLElement;
   tag: string;
-}) => RenderAdapter<C>;
+}) => NotificationAdapter<C>;
 
 const HORIZONTAL_TRANSITION = "transform 700ms ease-in-out";
 const OFFSCREEN_DISTANCE = "120vw";
@@ -597,7 +597,7 @@ function ensureElementRegistered(): string {
  */
 export type LitContent = string | TemplateResult;
 
-export const litAdapter: RenderAdapterFactory<LitContent> = ({
+export const litNotificationAdapter: NotificationAdapterFatory<LitContent> = ({
   container,
   tag,
 }) => {
@@ -676,7 +676,7 @@ function buildSlot(
   return [span];
 }
 
-export const vanillaAdapter: RenderAdapterFactory<VanillaContent> = ({
+export const vanillaAdapter: NotificationAdapterFatory<VanillaContent> = ({
   container,
   tag,
 }) => {
@@ -762,7 +762,7 @@ export interface ReactRuntime<Node = unknown> {
  */
 export function createReactAdapter<Node = unknown>(
   react: ReactRuntime<Node>,
-): RenderAdapterFactory<Node> {
+): NotificationAdapterFatory<Node> {
   return ({ container, tag }) => {
     const root = react.createRoot(container);
 

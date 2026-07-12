@@ -1,9 +1,5 @@
-import { LitElement, css, html, nothing, render, svg, unsafeCSS } from "lit";
-import type { CSSResult, TemplateResult } from "lit";
-
 // Ensure Symbol.dispose exists before any scope's [Symbol.dispose] is created (needed
 // for `using` and for disposing a scope). Harmless if the runtime already provides it.
-// Lives here, in the library, so consumers get it without a separate polyfill import.
 (Symbol as { dispose?: symbol }).dispose ??= Symbol.for("Symbol.dispose");
 
 export { createDialogsController };
@@ -52,8 +48,27 @@ export type {
 // # Public types
 // -------------------------------------------------------------------
 
-type Renderable = TemplateResult | Node | string | number | null | undefined;
-type Styles = CSSResult | string;
+// Content the caller hands in (title, body, icon, notice message, and the values a render
+// override returns). `C` is the caller's framework content type — a Lit TemplateResult, a
+// React node, etc. — normally inferred from the configured `adapter`. `string` is always
+// allowed: plain text needs no framework and the core turns it into a text node directly.
+// There is deliberately no `Node` member — content flows through your framework, not raw
+// DOM. `C` defaults to `never`, so an unconfigured controller is text-only; to hand in
+// anything structured you declare a content type. That includes DOM nodes: handing in
+// Nodes IS a content-type choice, so set `C = Node` (the core then inserts them directly,
+// no adapter needed — see insertContent). A `never` default is meaningful here precisely
+// because `Node` is not in the base union; leaving `C` with no default is worse, as TS
+// silently falls back to the `object` constraint and reopens the loose-object hole.
+type Renderable<C extends object = never> = C | string | null | undefined;
+
+// The dialog element can't be generic (custom elements have no type parameter), so it and
+// the internal plumbing below reuse the public types at `Renderable<any>` / ContentAdapter
+// <any> rather than a separate erased type. `any` (not `object`) is deliberate: it's
+// assignable in both directions, so a `Renderable<C>` flows in and out of the element with
+// no casts. The public API stays fully typed on `C`; only this leaf plumbing is erased.
+
+// Caller-supplied CSS for a dialog: a plain CSS string, scoped per-instance by the core.
+type Styles = string;
 
 type DialogType =
   | "info"
@@ -71,7 +86,7 @@ type ActionButtonType = "primary" | "secondary" | "danger" | "success";
 
 /** Descriptor passed to a custom action-button renderer. */
 interface ActionButtonRender {
-  text: Renderable;
+  text: string;
   variant: ActionButtonType;
   loading: boolean;
   onClick: () => void;
@@ -83,28 +98,37 @@ interface CloseButtonRender {
 }
 
 /** Descriptor passed to a custom notice renderer. */
-interface NoticeRender {
+interface NoticeRender<C extends object = never> {
   variant: "info" | "success" | "warn" | "error";
-  message: Renderable;
+  message: Renderable<C>;
 }
 
 /**
  * Optional per-part render overrides. Each is all-or-nothing: when provided, the library
- * renders nothing of its own for that part and uses the returned Renderable instead (so
- * the caller can drop in their design system's components, e.g. Web Awesome). A custom
- * part supplies its own states/animation from the descriptor — e.g. a custom action button
- * shows its own loading state, and a custom notice provides its own enter/leave animation.
+ * renders nothing of its own for that part and inserts the returned Renderable instead
+ * (so the caller can drop in their design system's components). A custom part supplies
+ * its own states/animation from the descriptor — e.g. a custom action button shows its
+ * own loading state, and a custom notice provides its own enter/leave animation.
+ *
+ * Overrides return `Renderable<C>`: a Node/string directly, or framework content when an
+ * `adapter` is configured (their returns are checked against the same `C` as content).
  */
-interface DialogRenderOverrides {
-  actionButton?(button: ActionButtonRender): Renderable;
-  closeButton?(close: CloseButtonRender): Renderable;
-  notice?(notice: NoticeRender): Renderable;
+interface DialogRenderOverrides<C extends object = never> {
+  actionButton?(button: ActionButtonRender): Renderable<C>;
+  closeButton?(close: CloseButtonRender): Renderable<C>;
+  notice?(notice: NoticeRender<C>): Renderable<C>;
 }
 
-interface DialogsControllerConfig {
+interface DialogsControllerConfig<C extends object = never> {
   getText?(textKey: keyof DialogTexts): string | null;
-  getDialogIcon?(dialogType: DialogType): Renderable | null;
-  render?: DialogRenderOverrides;
+  getDialogIcon?(dialogType: DialogType): Renderable<C> | null;
+  render?: DialogRenderOverrides<C>;
+  /**
+   * Turns opaque framework content (e.g. a Lit TemplateResult) into a Node, and is the
+   * source `C` is inferred from: pass `litDialogAdapter` and every `content`/`title`/
+   * override-return on this controller is typed to that framework's content.
+   */
+  adapter?: ContentAdapter<C>;
 }
 
 /** Caller overrides for button labels, keyed by button role. */
@@ -123,21 +147,21 @@ interface DialogButtonLabels {
  * life of the dialog, and a transient one raised on a form reject (like error text),
  * which appears below it and clears itself when the user edits the form.
  */
-interface DialogNotice {
+interface DialogNotice<C extends object = never> {
   type?: "info" | "success" | "warn" | "error"; // default "info"
-  message: Renderable;
+  message: Renderable<C>;
 }
 
-interface BaseDialogConfig {
-  title?: Renderable;
-  subtitle?: Renderable;
-  intro?: Renderable;
-  content?: Renderable;
-  outro?: Renderable;
+interface BaseDialogConfig<C extends object = never> {
+  title?: Renderable<C>;
+  subtitle?: Renderable<C>;
+  intro?: Renderable<C>;
+  content?: Renderable<C>;
+  outro?: Renderable<C>;
   styles?: Styles;
   buttons?: DialogButtonLabels;
   /** Initial notice. Forms can also raise one on a rejected attempt (see form()). */
-  notice?: DialogNotice | Renderable | null;
+  notice?: DialogNotice<C> | Renderable<C> | null;
   /**
    * Abort this dialog. When the signal aborts, the dialog closes immediately and the
    * call resolves `{ canceled: true, aborted: true }`. Combined with any scope-level
@@ -146,38 +170,54 @@ interface BaseDialogConfig {
   abortSignal?: AbortSignal;
 }
 
-interface InfoDialogConfig extends BaseDialogConfig {}
-interface SuccessDialogConfig extends BaseDialogConfig {}
-interface WarnDialogConfig extends BaseDialogConfig {}
-interface ErrorDialogConfig extends BaseDialogConfig {}
-interface ConfirmDialogConfig extends BaseDialogConfig {}
-interface DecideDialogConfig extends BaseDialogConfig {}
-interface FormDialogConfig extends BaseDialogConfig {}
+interface InfoDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
+interface SuccessDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
+interface WarnDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
+interface ErrorDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
+interface ConfirmDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
+interface DecideDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
+interface FormDialogConfig<
+  C extends object = never,
+> extends BaseDialogConfig<C> {}
 
-interface DialogsFunctions {
-  info(config: InfoDialogConfig): Promise<InfoDialogResult>;
-  success(config: SuccessDialogConfig): Promise<SuccessDialogResult>;
-  warn(config: WarnDialogConfig): Promise<WarnDialogResult>;
-  error(config: ErrorDialogConfig): Promise<ErrorDialogResult>;
-  confirm(config: ConfirmDialogConfig): Promise<ConfirmDialogResult>;
-  confirmCritical(config: ConfirmDialogConfig): Promise<ConfirmDialogResult>;
-  decide(config: DecideDialogConfig): Promise<DecideDialogResult>;
-  decideCritical(config: DecideDialogConfig): Promise<DecideDialogResult>;
-  form(config: FormDialogConfig): Promise<FormDialogResult>;
-  formCritical(config: FormDialogConfig): Promise<FormDialogResult>;
-  formAttempts(config: FormDialogConfig): FormInteraction;
-  formCriticalAttempts(config: FormDialogConfig): FormInteraction;
+interface DialogsFunctions<C extends object = never> {
+  info(config: InfoDialogConfig<C>): Promise<InfoDialogResult>;
+  success(config: SuccessDialogConfig<C>): Promise<SuccessDialogResult>;
+  warn(config: WarnDialogConfig<C>): Promise<WarnDialogResult>;
+  error(config: ErrorDialogConfig<C>): Promise<ErrorDialogResult>;
+  confirm(config: ConfirmDialogConfig<C>): Promise<ConfirmDialogResult>;
+  confirmCritical(config: ConfirmDialogConfig<C>): Promise<ConfirmDialogResult>;
+  decide(config: DecideDialogConfig<C>): Promise<DecideDialogResult>;
+  decideCritical(config: DecideDialogConfig<C>): Promise<DecideDialogResult>;
+  form(config: FormDialogConfig<C>): Promise<FormDialogResult>;
+  formCritical(config: FormDialogConfig<C>): Promise<FormDialogResult>;
+  formAttempts(config: FormDialogConfig<C>): FormInteraction<C>;
+  formCriticalAttempts(config: FormDialogConfig<C>): FormInteraction<C>;
 }
 
-interface DialogsController extends DialogsFunctions {
+interface DialogsController<
+  C extends object = never,
+> extends DialogsFunctions<C> {
   /**
    * Open a scope whose dialogs share one modal surface (the backdrop stays up for the
    * whole scope). An optional `signal` aborts every dialog opened in the scope.
    */
-  open(signal?: AbortSignal): DialogScope;
+  open(signal?: AbortSignal): DialogScope<C>;
 }
 
-interface DialogScope extends DialogsFunctions {
+interface DialogScope<C extends object = never> extends DialogsFunctions<C> {
   [Symbol.dispose](): void;
 }
 
@@ -206,7 +246,7 @@ type DecideDialogResult = DialogResult<"confirm" | "decline">;
 type FormDialogResult = DialogResult<"confirm", FormDialogData>;
 
 /** One submission of a form dialog while iterating for retry (see formAttempts()). */
-interface FormAttempt {
+interface FormAttempt<C extends object = never> {
   readonly data: FormDialogData;
   /** Accept the submission: resolve the dialog and close it. */
   accept(): void;
@@ -214,7 +254,7 @@ interface FormAttempt {
    * Reject it: keep the dialog open (values preserved) and show an error notice with the
    * given message. A reject is always an error, so only the message is configurable.
    */
-  reject(message: Renderable): void;
+  reject(message: Renderable<C>): void;
 }
 
 /**
@@ -223,14 +263,104 @@ interface FormAttempt {
  * to the final result once the loop ends. After the loop, read `result` to see whether
  * the form was confirmed or canceled.
  */
-type FormInteraction = Promise<FormDialogResult> &
-  AsyncIterable<FormAttempt> & {
+type FormInteraction<C extends object = never> = Promise<FormDialogResult> &
+  AsyncIterable<FormAttempt<C>> & {
     /** The final result once settled (confirmed or canceled); undefined while pending. */
     readonly result: FormDialogResult | undefined;
   };
 
 /** Any result finish() can produce, before narrowing to a specific dialog's result. */
 type AnyDialogResult = DialogResult<any> | DialogResult<any, unknown>;
+
+// -------------------------------------------------------------------
+// # DOM helpers (the tiny "h" hyperscript used to build chrome)
+// -------------------------------------------------------------------
+
+// Recursive: a child may be an array of children, which appendChildren flattens.
+type Child = Node | string | number | boolean | null | undefined | Child[];
+type Attrs = Record<string, unknown>;
+
+// Build an element. Props: `class` sets className; `on*` function props add listeners
+// (onClick -> "click"); `true` sets a boolean attribute; other values set attributes.
+// Children: Nodes are appended, strings/numbers become text nodes, arrays are flattened,
+// null/false/undefined are skipped. No parsing, so nothing here is an injection surface.
+function h<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props?: Attrs | null,
+  ...children: Child[]
+): HTMLElementTagNameMap[K] {
+  const el = document.createElement(tag);
+  if (props) {
+    for (const key in props) {
+      const value = props[key];
+      if (value == null || value === false) continue;
+      if (key === "class") {
+        el.className = String(value);
+      } else if (key.startsWith("on") && typeof value === "function") {
+        el.addEventListener(key.slice(2).toLowerCase(), value as EventListener);
+      } else if (value === true) {
+        el.setAttribute(key, "");
+      } else {
+        el.setAttribute(key, String(value));
+      }
+    }
+  }
+  appendChildren(el, children);
+  return el;
+}
+
+function appendChildren(parent: Node, children: Child[]): void {
+  for (const child of children) {
+    if (child == null || child === false || child === true) continue;
+    if (Array.isArray(child)) {
+      appendChildren(parent, child);
+    } else if (child instanceof Node) {
+      parent.appendChild(child);
+    } else {
+      parent.appendChild(document.createTextNode(String(child)));
+    }
+  }
+}
+
+// A content adapter turns an opaque framework value of type `C` (a Lit TemplateResult, a
+// React node, …) into a real DOM Node. Because `C` is threaded through the public API,
+// only a `C` ever reaches the adapter — the core handles Node/string/number itself — so
+// the adapter always converts and never returns null. Pass one per controller via
+// `adapter`; it's the source `C` is inferred from.
+export type ContentAdapter<C> = (value: C) => Node;
+
+// Coerce content to a Node for insertion. This is the C-erased internal seam: Nodes and
+// primitives are handled directly; any other object is framework content and must go
+// through the adapter. Reaching an object with no adapter can only happen via an untyped
+// (`as any`) bypass of the public API, so we fail loudly rather than render "[object
+// Object]" — which was the whole class of bug this seam exists to prevent.
+function insertContent(
+  value: Renderable<any>,
+  adapter?: ContentAdapter<any> | null,
+): Node {
+  if (value instanceof Node) return value;
+  if (value == null) return document.createTextNode("");
+  if (typeof value === "object") {
+    if (adapter) return adapter(value);
+    throw new TypeError(
+      "Dialog content is a non-Node object but no content adapter is configured. " +
+        "Pass `adapter` (e.g. litDialogAdapter) to the controller, or use a Node or string.",
+    );
+  }
+  return document.createTextNode(String(value)); // primitives only
+}
+
+// Parse a static SVG markup string into a fresh element (safe: it's our own markup, and
+// a fresh node is produced each call so the same icon can appear in multiple dialogs).
+function parseSvg(markup: string): SVGElement {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = markup.trim();
+  return tpl.content.firstElementChild as SVGElement;
+}
+
+function doubleRaf(fn: () => void): void {
+  requestAnimationFrame(() => requestAnimationFrame(fn));
+}
 
 // -------------------------------------------------------------------
 // # FormDialogData
@@ -454,16 +584,23 @@ interface DialogButtonView {
 
 interface ResolvedNotice {
   type: "info" | "success" | "warn" | "error";
-  message: Renderable;
+  message: Renderable<any>;
 }
 
 function isDialogNotice(
-  value: DialogNotice | Renderable,
-): value is DialogNotice {
-  return value != null && typeof value === "object" && "message" in value;
+  value: DialogNotice<any> | Renderable<any>,
+): value is DialogNotice<any> {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    !(value instanceof Node) &&
+    "message" in value
+  );
 }
 
-function resolveNotice(notice: DialogNotice | Renderable): ResolvedNotice {
+function resolveNotice(
+  notice: DialogNotice<any> | Renderable<any>,
+): ResolvedNotice {
   if (isDialogNotice(notice)) {
     return { type: notice.type ?? "info", message: notice.message };
   }
@@ -491,36 +628,45 @@ function deepActiveElement(): HTMLElement | null {
   return el;
 }
 
-// Render a value, turning "\n" in a plain string into <br> line breaks. Non-string
-// Renderables (TemplateResult, Node, …) pass through untouched.
-function withLineBreaks(value: Renderable): Renderable {
+// Turn "\n" in a plain string into a fragment of text + <br>. Non-string Renderables
+// (Node, number, …) pass through insertContent untouched.
+function withLineBreaks(
+  value: Renderable<any>,
+  adapter?: ContentAdapter<any> | null,
+): Node {
   if (typeof value !== "string" || !value.includes("\n")) {
-    return value;
+    return insertContent(value, adapter);
   }
   const lines = value
     .trim()
     .split(/\r?\n|\r/)
     .map((line) => line.trim());
 
-  return html`${lines.map((line, i) => (i === 0 ? line : html`<br />${line}`))}`;
+  const frag = document.createDocumentFragment();
+  lines.forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement("br"));
+    frag.appendChild(document.createTextNode(line));
+  });
+  return frag;
 }
 
 interface DialogView {
   id: string;
   dialogType: DialogType;
   styles: string | null;
-  icon: Renderable | null;
-  title: Renderable;
-  subtitle: Renderable;
-  intro: Renderable;
-  content: Renderable;
-  outro: Renderable;
+  icon: Renderable<any>;
+  title: Renderable<any>;
+  subtitle: Renderable<any>;
+  intro: Renderable<any>;
+  content: Renderable<any>;
+  outro: Renderable<any>;
   notice: ResolvedNotice | null;
   hasForm: boolean;
   buttons: DialogButtonView[];
   /** Index of the button triggered by Enter, or null (e.g. critical dialogs). */
   defaultButtonIndex: number | null;
-  render: DialogRenderOverrides | undefined;
+  render: DialogRenderOverrides<any> | undefined;
+  adapter: ContentAdapter<any> | undefined;
   onClose: () => void;
   onCancel: () => void;
 }
@@ -530,7 +676,7 @@ interface DialogHandle {
   close(): Promise<void>;
   /** Toggle the inline spinner on the given action button. */
   setButtonLoading(index: number, loading: boolean): void;
-  /** Raise the transient (reject) notice, overriding the config notice until cleared. */
+  /** Raise the transient (reject) notice, shown below the config notice. */
   raiseNotice(notice: ResolvedNotice): void;
   /** The form element rendered inside the dialog, if any. */
   getForm(): HTMLFormElement | null;
@@ -542,14 +688,14 @@ const BUTTON_SPINNER_DELAY_MS = 150;
 // A minimal single-consumer async queue: form submits are pushed in; the caller's
 // `for await` pulls them out. `end()` completes the iteration (on accept or cancel).
 interface AttemptQueue {
-  push(attempt: FormAttempt): void;
+  push(attempt: FormAttempt<any>): void;
   end(): void;
-  iterator(): AsyncIterator<FormAttempt>;
+  iterator(): AsyncIterator<FormAttempt<any>>;
 }
 
 function createAttemptQueue(): AttemptQueue {
-  const buffer: FormAttempt[] = [];
-  let waiting: ((r: IteratorResult<FormAttempt>) => void) | null = null;
+  const buffer: FormAttempt<any>[] = [];
+  let waiting: ((r: IteratorResult<FormAttempt<any>>) => void) | null = null;
   let ended = false;
 
   return {
@@ -580,7 +726,7 @@ function createAttemptQueue(): AttemptQueue {
           if (ended) {
             return Promise.resolve({ value: undefined, done: true });
           }
-          return new Promise<IteratorResult<FormAttempt>>((resolve) => {
+          return new Promise<IteratorResult<FormAttempt<any>>>((resolve) => {
             waiting = resolve;
           });
         },
@@ -604,14 +750,16 @@ interface FormFlow {
 // # Controller
 // -------------------------------------------------------------------
 
-function createDialogsController(
-  config: DialogsControllerConfig,
-): DialogsController {
-  const open = (signal?: AbortSignal): DialogScope =>
+function createDialogsController<C extends object = never>(
+  config: DialogsControllerConfig<C>,
+): DialogsController<C> {
+  const open = (signal?: AbortSignal): DialogScope<C> =>
     createDialogScope(config, signal);
 
   // Direct (non-scoped) calls open a throwaway scope and dispose it once resolved.
-  const oneShot = <R>(run: (scope: DialogScope) => Promise<R>): Promise<R> => {
+  const oneShot = <R>(
+    run: (scope: DialogScope<C>) => Promise<R>,
+  ): Promise<R> => {
     const scope = open();
     return run(scope).finally(() => scope[Symbol.dispose]());
   };
@@ -619,8 +767,8 @@ function createDialogsController(
   // Forms return a FormInteraction (Promise + async-iterable). We must return that
   // object as-is (so `for await` works), and dispose the scope once it settles.
   const oneShotForm = (
-    run: (scope: DialogScope) => FormInteraction,
-  ): FormInteraction => {
+    run: (scope: DialogScope<C>) => FormInteraction<C>,
+  ): FormInteraction<C> => {
     const scope = open();
     const interaction = run(scope);
     void interaction.finally(() => scope[Symbol.dispose]());
@@ -651,23 +799,22 @@ function createDialogsController(
 interface OpenDialogSpec {
   dialogType: DialogType;
   defaultTitle: TextKey;
-  config: BaseDialogConfig;
+  config: BaseDialogConfig<any>;
   buttons: ButtonConfig[];
   allowsForm: boolean;
 }
 
-// Monotonic, collision-free per-scope id (Date.now() collided for scopes opened within
-// the same millisecond, and the value is used as a DOM element id).
+// Monotonic, collision-free per-scope id (used as a DOM element id).
 let dialogInstanceCounter = 0;
 
-function createDialogScope(
-  config: DialogsControllerConfig,
+function createDialogScope<C extends object = never>(
+  config: DialogsControllerConfig<C>,
   scopeSignal?: AbortSignal,
-): DialogScope {
+): DialogScope<C> {
   const dialogId = `internal-dialog-${++dialogInstanceCounter}`;
 
-  // One element for the whole scope: it's reused across every dialog so showModal()
-  // stays active and the modal backdrop never drops between dialogs.
+  // One element for the whole scope: it's reused across every dialog so the modal stays
+  // open and the backdrop never drops between dialogs.
   let handle: DialogHandle | null = null;
   let realDialogShown = false;
 
@@ -709,7 +856,7 @@ function createDialogScope(
     return config.getText?.(textKey) ?? defaultDialogTexts[textKey];
   }
 
-  function iconFor(dialogType: DialogType): Renderable | null {
+  function iconFor(dialogType: DialogType): Renderable<any> {
     if (config.getDialogIcon) {
       return config.getDialogIcon(dialogType) ?? null;
     }
@@ -729,11 +876,7 @@ function createDialogScope(
   }
 
   function getStyles(spec: OpenDialogSpec): string | null {
-    const s = spec.config.styles;
-    if (!s) {
-      return null;
-    }
-    return typeof s === "string" ? s : s.cssText;
+    return spec.config.styles ?? null;
   }
 
   function actionFor(id: symbol): "ok" | "confirm" | "decline" | null {
@@ -868,6 +1011,7 @@ function createDialogScope(
       // there's no default so a destructive action can't be confirmed by accident.
       defaultButtonIndex: spec.dialogType.endsWith("Critical") ? null : 0,
       render: config.render,
+      adapter: config.adapter,
       onClose: closeAsCancel,
       onCancel: closeAsCancel,
     };
@@ -902,7 +1046,7 @@ function createDialogScope(
   // Form dialogs return a FormInteraction: awaiting it auto-accepts the first valid
   // submit; `for await` intercepts each submit so the caller can accept() or reject()
   // (the latter keeping the same dialog open and showing a notice).
-  function openForm(spec: OpenDialogSpec): FormInteraction {
+  function openForm(spec: OpenDialogSpec): FormInteraction<any> {
     const queue = createAttemptQueue();
     const cleanup = new AbortController();
     let iterating = false;
@@ -950,7 +1094,7 @@ function createDialogScope(
 
     showDialog(spec, () => {}, formFlow, cleanup.signal);
 
-    const interaction = resultPromise as FormInteraction;
+    const interaction = resultPromise as FormInteraction<any>;
     Object.defineProperty(interaction, Symbol.asyncIterator, {
       value: () => {
         iterating = true;
@@ -981,7 +1125,7 @@ function createDialogScope(
 
   const spec = (
     dialogType: DialogType,
-    config: BaseDialogConfig,
+    config: BaseDialogConfig<any>,
   ): OpenDialogSpec => ({
     dialogType,
     defaultTitle:
@@ -1025,68 +1169,62 @@ function createDialogScope(
 // # Icons
 // -------------------------------------------------------------------
 
-const closeIcon = svg`
+const closeIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
     <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
   </svg>
 `;
 
-const infoIcon = svg`
+const infoIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
     <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
     <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
   </svg>
 `;
 
-const successIcon = svg`
+const successIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
     <path d="M3 14.5A1.5 1.5 0 0 1 1.5 13V3A1.5 1.5 0 0 1 3 1.5h8a.5.5 0 0 1 0 1H3a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5V8a.5.5 0 0 1 1 0v5a1.5 1.5 0 0 1-1.5 1.5z"/>
     <path d="m8.354 10.354 7-7a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0"/>
   </svg>
 `;
 
-const warnIcon = svg`
+const warnIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
     <path d="M4.54.146A.5.5 0 0 1 4.893 0h6.214a.5.5 0 0 1 .353.146l4.394 4.394a.5.5 0 0 1 .146.353v6.214a.5.5 0 0 1-.146.353l-4.394 4.394a.5.5 0 0 1-.353.146H4.893a.5.5 0 0 1-.353-.146L.146 11.46A.5.5 0 0 1 0 11.107V4.893a.5.5 0 0 1 .146-.353zM5.1 1 1 5.1v5.8L5.1 15h5.8l4.1-4.1V5.1L10.9 1z"/>
     <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
   </svg>
 `;
 
-const errorIcon = svg`
+const errorIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
     <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
     <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
   </svg>
 `;
 
-const confirmIcon = svg`
+const confirmIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
     <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
     <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
   </svg>
 `;
 
-const placeholderSpinner = html`<div
-  class="dialog-spinner"
-  role="status"
-  aria-label="Loading"
-></div>`;
-
-function defaultDialogIcon(dialogType: DialogType): Renderable | null {
+function defaultDialogIcon(dialogType: DialogType): Renderable<any> {
   switch (dialogType) {
     case "info":
-      return infoIcon;
+      return parseSvg(infoIconSvg);
     case "success":
-      return successIcon;
+      return parseSvg(successIconSvg);
     case "warn":
-      return warnIcon;
+      return parseSvg(warnIconSvg);
     case "error":
-      return errorIcon;
+      return parseSvg(errorIconSvg);
     case "confirm":
     case "confirmCritical":
     case "decide":
     case "decideCritical":
-      return confirmIcon;
+      return parseSvg(confirmIconSvg);
     case "form":
     case "formCritical":
       return null;
@@ -1097,22 +1235,11 @@ function defaultDialogIcon(dialogType: DialogType): Renderable | null {
 // # Styles
 // -------------------------------------------------------------------
 
-function createTheme<T extends Record<string, string>>(themeObj: T) {
-  const result = {} as Record<keyof T, CSSResult>;
-
-  for (const key in themeObj) {
-    result[key] = unsafeCSS(themeObj[key]);
-  }
-
-  return Object.freeze(result);
-}
-
-const theme = createTheme({
+// Plain string tokens (interpolated into the CSS text below). Read from host CSS
+// variables where useful, with built-in fallbacks so the library renders without a host
+// design system. The fallbacks match Web Awesome's default palette.
+const theme = {
   textColor: "light-dark(black, white)",
-  // The primary/secondary colors read from host CSS variables but fall back to
-  // built-in values so the library renders colors without a host design system.
-  // The fallbacks match Web Awesome's default palette (brand=blue-50, danger=red-50,
-  // success=green-50; the "loud" fills used for filled buttons).
   primaryTextColor: "var(--ui-surface, #ffffff)",
   primaryBackgroundColor: "var(--ui-color-primary-500, #0071ec)",
   secondaryTextColor: "var(--ui-text, #1f2430)",
@@ -1121,27 +1248,24 @@ const theme = createTheme({
   dangerTextColor: "white",
   dangerBackgroundColor: "#dc3146",
   successColor: "var(--ui-color-success-500, #00883c)",
-  dialogBorderRadius: "10px",
+  dialogBorderRadius: "3px",
   closeButtonBorderRadius: "100%",
   actionButtonBorderRadius: "3px",
   dialogBackgroundColor: "light-dark(white, #333)",
-});
+} as const;
 
-// Duration of the notice appear/disappear (collapse) animation. Change this one
-// value to try different speeds — it drives both the CSS transition and the JS
-// timer that removes the element after the collapse finishes.
+// Duration of the notice appear/disappear (collapse) animation. Drives both the CSS
+// transition and the JS timer that removes the element after the collapse finishes.
 const NOTICE_ANIM_MS = 350;
 
-// Duration of the dialog grow-in (entrance) and fade-out (close) animations. Single
-// knob for both; drives the WAAPI grow-in, the CSS close/backdrop animations, and
-// (with a margin) the close-animation fallback timeout.
+// Duration of the dialog grow-in (entrance) and fade-out (close) animations.
 const DIALOG_ANIM_MS = 200;
 
 // Duration of the quick fade-out when swapping one on-screen dialog for the next within
 // a scope (the backdrop stays up; only the box content changes, then grows back in).
 const SWAP_OUT_MS = 140;
 
-const dialogStyles = css`
+const dialogStyles = `
   dialog {
     outline: none;
     position: fixed;
@@ -1164,22 +1288,22 @@ const dialogStyles = css`
     box-sizing: border-box;
     padding: 0;
     overflow: auto;
+  }
 
-    &[open].closing {
-      animation: dialog-fade-out ${DIALOG_ANIM_MS}ms ease-in-out;
-    }
+  dialog[open].closing {
+    animation: dialog-fade-out ${DIALOG_ANIM_MS}ms ease-in-out;
+  }
 
-    &[open]::backdrop {
-      background-color: rgba(0, 0, 0, 0.5);
-    }
+  dialog[open]::backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
 
-    &[open]:not(.closing)::backdrop {
-      animation: backdrop-fade-in ${DIALOG_ANIM_MS}ms ease-in-out;
-    }
+  dialog[open]:not(.closing)::backdrop {
+    animation: backdrop-fade-in ${DIALOG_ANIM_MS}ms ease-in-out;
+  }
 
-    &[open].closing::backdrop {
-      animation: backdrop-fade-out ${DIALOG_ANIM_MS}ms ease-in-out;
-    }
+  dialog[open].closing::backdrop {
+    animation: backdrop-fade-out ${DIALOG_ANIM_MS}ms ease-in-out;
   }
 
   /* Form dialogs get a bit more room so labelled fields aren't cramped. */
@@ -1201,19 +1325,12 @@ const dialogStyles = css`
   }
 
   /* Render the glyph as a block box sized to 1em. As an inline element the SVG picks up
-     baseline/descender space, which shaved a pixel off one edge — that was the clipping,
-     not the padding. */
+     baseline/descender space, which shaved a pixel off one edge. */
   ::slotted([slot="icon"]) svg,
   #icon svg {
     display: block;
     width: 1em;
     height: 1em;
-  }
-
-  /* The icon is slotted (wrapped in a <span slot="icon">); collapse that wrapper so the
-     SVG is the direct, cleanly-sized flex child of #icon and the circle stays round. */
-  ::slotted([slot="icon"]) {
-    display: contents;
   }
 
   :host([data-dialog-type="info"]) #icon,
@@ -1248,56 +1365,56 @@ const dialogStyles = css`
     font-family:
       -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
       sans-serif;
+  }
 
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 0.5em;
-      padding: 1em 1.25em 0.4em 1.25em;
-      width: 100%;
-      box-sizing: border-box;
+  .dialog-content .header {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 1em 1.25em 0.4em 1.25em;
+    width: 100%;
+    box-sizing: border-box;
+  }
 
-      .titles {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        padding: 0.25em 0 0 0;
+  .dialog-content .header .titles {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0.25em 0 0 0;
+  }
 
-        .title {
-          display: block;
-          font-size: 1.1em;
-          font-weight: 600;
-        }
+  .dialog-content .header .titles .title {
+    display: block;
+    font-size: 1.1em;
+    font-weight: 600;
+  }
 
-        .subtitle {
-          display: block;
-          font-size: 0.85em;
-          line-height: 0.85em;
-          padding: 0 1px;
-        }
-      }
-    }
+  .dialog-content .header .titles .subtitle {
+    display: block;
+    font-size: 0.85em;
+    line-height: 0.85em;
+    padding: 0 1px;
+  }
 
-    .body {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5em;
-      padding: 0 1.25em 0.75em 1.25em;
-      min-height: 2em;
-      line-height: 1.25em;
-      user-select: text;
-    }
+  .dialog-content .body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    padding: 0 1.25em 0.75em 1.25em;
+    min-height: 2em;
+    line-height: 1.25em;
+    user-select: text;
+  }
 
-    .footer {
-      padding: 0.75em;
-      user-select: none;
+  .dialog-content .footer {
+    padding: 0.75em;
+    user-select: none;
+  }
 
-      .action-buttons {
-        display: flex;
-        flex-direction: row-reverse;
-        gap: 0.4em;
-      }
-    }
+  .dialog-content .footer .action-buttons {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 0.4em;
   }
 
   .action-button {
@@ -1308,109 +1425,75 @@ const dialogStyles = css`
     padding: 0.5em 1.5em;
     font-weight: 400;
     cursor: pointer;
+  }
 
-    .spinner {
-      display: none;
-    }
+  .action-button .spinner {
+    display: none;
+  }
 
-    &.loading {
-      .spinner {
-        display: block;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(0deg);
-        width: 1.5em;
-        height: 1.5em;
-        border: 3px solid color-mix(in srgb, currentColor 20%, transparent);
-        border-top: 3px solid currentColor;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        overflow: hidden;
-        box-sizing: border-box;
-      }
+  .action-button.loading .spinner {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(0deg);
+    width: 1.5em;
+    height: 1.5em;
+    border: 3px solid color-mix(in srgb, currentColor 20%, transparent);
+    border-top: 3px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
 
-      .button-text {
-        visibility: hidden;
-      }
-    }
+  .action-button.loading .button-text {
+    visibility: hidden;
+  }
 
-    &[data-type="primary"] {
-      color: ${theme.primaryTextColor};
-      background-color: ${theme.primaryBackgroundColor};
+  .action-button[data-type="primary"] {
+    color: ${theme.primaryTextColor};
+    background-color: ${theme.primaryBackgroundColor};
+  }
+  .action-button[data-type="primary"]:hover {
+    background-color: color-mix(in srgb, ${theme.primaryBackgroundColor}, black 10%);
+  }
+  .action-button[data-type="primary"]:active {
+    background-color: color-mix(in srgb, ${theme.primaryBackgroundColor}, black 20%);
+  }
 
-      &:hover {
-        background-color: color-mix(
-          in srgb,
-          ${theme.primaryBackgroundColor},
-          black 10%
-        );
-      }
+  .action-button[data-type="secondary"] {
+    color: ${theme.secondaryTextColor};
+    background-color: ${theme.secondaryBackgroundColor};
+    border: 1px solid ${theme.secondaryBorderColor};
+  }
+  .action-button[data-type="secondary"]:hover {
+    background-color: color-mix(in srgb, ${theme.secondaryBackgroundColor}, black 5%);
+  }
+  .action-button[data-type="secondary"]:active {
+    background-color: color-mix(in srgb, ${theme.secondaryBackgroundColor}, black 10%);
+  }
 
-      &:active {
-        background-color: color-mix(
-          in srgb,
-          ${theme.primaryBackgroundColor},
-          black 20%
-        );
-      }
-    }
+  .action-button[data-type="danger"] {
+    color: ${theme.dangerTextColor};
+    background-color: ${theme.dangerBackgroundColor};
+  }
+  .action-button[data-type="danger"]:hover {
+    background-color: color-mix(in srgb, ${theme.dangerBackgroundColor}, black 15%);
+  }
+  .action-button[data-type="danger"]:active {
+    background-color: color-mix(in srgb, ${theme.dangerBackgroundColor}, black 40%);
+  }
 
-    &[data-type="secondary"] {
-      color: ${theme.secondaryTextColor};
-      background-color: ${theme.secondaryBackgroundColor};
-      border: 1px solid ${theme.secondaryBorderColor};
-
-      &:hover {
-        background-color: color-mix(
-          in srgb,
-          ${theme.secondaryBackgroundColor},
-          black 5%
-        );
-      }
-
-      &:active {
-        background-color: color-mix(
-          in srgb,
-          ${theme.secondaryBackgroundColor},
-          black 10%
-        );
-      }
-    }
-
-    &[data-type="danger"] {
-      color: ${theme.dangerTextColor};
-      background-color: ${theme.dangerBackgroundColor};
-
-      &:hover {
-        background-color: color-mix(
-          in srgb,
-          ${theme.dangerBackgroundColor},
-          black 15%
-        );
-      }
-
-      &:active {
-        background-color: color-mix(
-          in srgb,
-          ${theme.dangerBackgroundColor},
-          black 40%
-        );
-      }
-    }
-
-    &[data-type="success"] {
-      color: white;
-      background-color: ${theme.successColor};
-
-      &:hover {
-        background-color: color-mix(in srgb, ${theme.successColor}, black 10%);
-      }
-
-      &:active {
-        background-color: color-mix(in srgb, ${theme.successColor}, black 20%);
-      }
-    }
+  .action-button[data-type="success"] {
+    color: white;
+    background-color: ${theme.successColor};
+  }
+  .action-button[data-type="success"]:hover {
+    background-color: color-mix(in srgb, ${theme.successColor}, black 10%);
+  }
+  .action-button[data-type="success"]:active {
+    background-color: color-mix(in srgb, ${theme.successColor}, black 20%);
   }
 
   .close-button {
@@ -1424,20 +1507,18 @@ const dialogStyles = css`
     background-color: transparent;
     cursor: pointer;
     padding: 0.3em;
-
-    &:hover {
-      background-color: light-dark(
-        color-mix(in srgb, white, black 7%),
-        color-mix(in srgb, black, white 7%)
-      );
-    }
-
-    &:active {
-      background-color: light-dark(
-        color-mix(in srgb, #f0f0f0, black 10%),
-        color-mix(in srgb, #f0f0f0, white 10%)
-      );
-    }
+  }
+  .close-button:hover {
+    background-color: light-dark(
+      color-mix(in srgb, white, black 7%),
+      color-mix(in srgb, black, white 7%)
+    );
+  }
+  .close-button:active {
+    background-color: light-dark(
+      color-mix(in srgb, #f0f0f0, black 10%),
+      color-mix(in srgb, #f0f0f0, white 10%)
+    );
   }
 
   .notice {
@@ -1445,7 +1526,7 @@ const dialogStyles = css`
     margin: 0.7em 1.25em 0.75em 1.25em;
     padding: 0.5em 0.5em 0.5em 1.25em;
     border-radius: 2px;
-    background-color: light-dark(#f4f4f4, #3d3d3d);
+    background-color: light-dark(#f0f0f0, #3d3d3d);
     color: ${theme.textColor};
     font-size: 0.9em;
     line-height: 1.35;
@@ -1460,106 +1541,85 @@ const dialogStyles = css`
       margin-bottom ${NOTICE_ANIM_MS}ms ease,
       padding-top ${NOTICE_ANIM_MS}ms ease,
       padding-bottom ${NOTICE_ANIM_MS}ms ease;
+  }
 
-    /* Rounded accent bar floating inside the notice; its color conveys the type.
-       The background/text stay neutral so the notice reads calm anywhere. */
-    &::before {
-      content: "";
-      position: absolute;
-      left: 0.25em;
-      top: 0.25em;
-      bottom: 0.25em;
-      width: 0.2em;
-      border-radius: 0.125em;
-      background: ${theme.primaryBackgroundColor};
-    }
+  /* Rounded accent bar floating inside the notice; its color conveys the type.
+     The background/text stay neutral so the notice reads calm anywhere. */
+  .notice::before {
+    content: "";
+    position: absolute;
+    left: 0.25em;
+    top: 0.25em;
+    bottom: 0.25em;
+    width: 0.2em;
+    border-radius: 0.125em;
+    background: ${theme.primaryBackgroundColor};
+  }
 
-    &.dismissing,
-    &.entering {
-      max-height: 0;
-      opacity: 0;
-      margin-top: 0;
-      margin-bottom: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-    }
+  .notice.dismissing,
+  .notice.entering {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 
-    /* info uses the default bar color (primary); the rest override just the bar. */
-    &[data-notice-type="success"]::before {
-      background: ${theme.successColor};
-    }
+  /* info uses the default bar color (primary); the rest override just the bar. */
+  .notice[data-notice-type="success"]::before {
+    background: ${theme.successColor};
+  }
+  .notice[data-notice-type="warn"]::before {
+    background: light-dark(#f08c00, #f7a53b);
+  }
+  .notice[data-notice-type="error"]::before {
+    background: ${theme.dangerBackgroundColor};
+  }
 
-    &[data-notice-type="warn"]::before {
-      background: light-dark(#f08c00, #f7a53b);
-    }
-
-    &[data-notice-type="error"]::before {
-      background: ${theme.dangerBackgroundColor};
-    }
-
-    /* Error notices also get a faint danger-tinted background (the other types keep the
-       neutral notice background and signal type through the accent bar alone). */
-    &[data-notice-type="error"] {
-      background-color: light-dark(
-        color-mix(in srgb, ${theme.dangerBackgroundColor}, white 94%),
-        color-mix(in srgb, ${theme.dangerBackgroundColor}, #3d3d3d 88%)
-      );
-    }
+  /* Error notices also get a faint danger-tinted background (the other types keep the
+     neutral notice background and signal type through the accent bar alone). */
+  .notice[data-notice-type="error"] {
+    background-color: light-dark(
+      color-mix(in srgb, ${theme.dangerBackgroundColor}, white 87%),
+      color-mix(in srgb, ${theme.dangerBackgroundColor}, #3d3d3d 88%)
+    );
   }
 
   /* The reject notice, when it follows the config notice, is pulled up with a negative
-     top margin so the gap between the two stays small (the config notice keeps its normal
-     0.75em bottom margin — collapsing with the -0.45em leaves a 0.3em gap). Crucially the
-     gap now belongs to the *reject* notice: as it dismisses, its top margin animates back
-     to 0 in step with its collapse, so the whole gap closes with the notice and the config
-     notice above never moves. */
+     top margin so the gap between the two stays small. The gap belongs to the *reject*
+     notice: as it dismisses, its top margin animates back to 0 in step with its collapse,
+     so the whole gap closes with the notice and the config notice above never moves. */
   .notice + .notice {
     margin-top: -0.45em;
   }
-
   .notice + .notice.entering,
   .notice + .notice.dismissing {
     margin-top: 0;
   }
 
   @keyframes dialog-fade-out {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
+    from { opacity: 1; }
+    to { opacity: 0; }
   }
 
   @keyframes backdrop-fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   @keyframes backdrop-fade-out {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
+    from { opacity: 1; }
+    to { opacity: 0; }
   }
 
   @keyframes spin {
-    from {
-      transform: translate(-50%, -50%) rotate(0deg);
-    }
-    to {
-      transform: translate(-50%, -50%) rotate(360deg);
-    }
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
   }
 `;
 
-const placeholderStyles = css`
+const placeholderStyles = `
   :host {
     display: contents;
   }
@@ -1572,25 +1632,24 @@ const placeholderStyles = css`
     display: flex;
     align-items: center;
     justify-content: center;
-    color: ${theme.primaryBackgroundColor};
   }
 
   .dialog-spinner {
     width: 2.2em;
     height: 2.2em;
     border: 3px solid color-mix(in srgb, currentColor 20%, transparent);
-    border-top: 3px solid currentColor;
+    border-top: 3px solid #444;
     border-radius: 50%;
     animation: spin-plain 1s linear infinite;
     box-sizing: border-box;
   }
 
   @keyframes spin-plain {
-    to {
-      transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
   }
 `;
+
+const STYLE_TEXT = dialogStyles + placeholderStyles;
 
 // -------------------------------------------------------------------
 // # Scroll lock
@@ -1664,11 +1723,11 @@ let scopeInstanceCounter = 0;
 // -------------------------------------------------------------------
 
 /**
- * The presentational dialog element: renders the native `<dialog>` shell and projects
- * caller content through named slots — `icon`, `title`, `subtitle`, `intro`, `content`,
- * `outro`. The notice and action buttons are library-owned chrome rendered in the shadow
- * root, since they carry wired behavior (loading spinner, validate/submit, the notice
- * state machine) that isn't expressible as plain slotted markup.
+ * The presentational dialog element: a native `<dialog>` shell in a shadow root, with
+ * caller content projected through named slots — `icon`, `title`, `subtitle`, `intro`,
+ * `content`, `outro`. The notice and action buttons are library-owned chrome built in
+ * the shadow root, since they carry wired behavior (loading spinner, validate/submit,
+ * the notice state machine) that isn't expressible as plain slotted markup.
  *
  * A single `<dialog>` node is reused across a scope: it grows in on first show and, for
  * each subsequent view, fades the current box out and grows the new one back in without
@@ -1681,54 +1740,63 @@ let scopeInstanceCounter = 0;
  * Exported for reuse/subclassing but intentionally NOT `customElements.define`d — the
  * library registers a subclass lazily (see `dialogElementTag`).
  */
-class Dialog extends LitElement {
-  static styles = [dialogStyles, placeholderStyles];
-
+class Dialog extends HTMLElement {
   /** Unique per instance; used both as the host class and to scope caller `styles`. */
   readonly scopeClass = `__internal-dialog-${resolvedTagNumber}-${++scopeInstanceCounter}__`;
+
+  #dialog!: HTMLDialogElement;
 
   #spinnerOnly = false;
   #closing = false;
   #scrollLocked = false;
-
-  // Set when a new view has just been applied to an already-open dialog: updated() then
-  // grows the new box in. Holds the swap's fade-out animation so it can be cleared once
-  // the grow-in is on top (avoids a one-frame flash from its `fill: forwards`).
-  #pendingGrowIn = false;
   #exitAnim: Animation | null = null;
 
-  // chrome inputs (set by setView; a bare-slot consumer could set these directly)
-  #buttons: DialogButtonView[] = [];
+  // Rebuilt each view; kept for targeted mutation between views.
+  #contentEl: HTMLElement | null = null; // .dialog-content
+  #footerEl: HTMLElement | null = null; // insertion anchor for notices
+  #buttonEls: HTMLElement[] = [];
+  #buttonViews: DialogButtonView[] = [];
+
   #defaultButtonIndex: number | null = null;
   #hasForm = false;
-  #hasIcon = false;
-  #renderOverrides: DialogRenderOverrides | undefined;
+  #renderOverrides: DialogRenderOverrides<any> | undefined;
+  #adapter: ContentAdapter<any> | undefined;
   #onClose: () => void = () => {};
   #onCancel: () => void = () => {};
 
   // notice state: the config notice (#baseNotice) is always shown while the dialog is
   // open; a reject raises a transient error notice shown *in addition*, below it.
-  // #shownTransient is the transient currently in the DOM — it lags #transientNotice
-  // during the collapse animation.
   #baseNotice: ResolvedNotice | null = null;
   #transientNotice: ResolvedNotice | null = null;
-  #shownTransient: ResolvedNotice | null = null;
-  #noticeDismissing = false;
-  #noticeEntering = false;
+  #transientEl: HTMLElement | null = null;
   #noticeDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
-  #initialFocusDone = false;
   #focusBeforeBusy: HTMLElement | null = null;
   #loading = new Set<number>();
   #styleEl: HTMLStyleElement | null = null;
 
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: "open" });
+    root.appendChild(h("style", null, STYLE_TEXT));
+
+    // A single, stable <dialog> node reused across the scope, so showModal() state and
+    // the `cancel` listener survive every content swap.
+    this.#dialog = h("dialog", {
+      onkeydown: this.#onKeyDown,
+    }) as HTMLDialogElement;
+    this.#dialog.addEventListener("cancel", (ev) => {
+      ev.preventDefault();
+      this.#onCancel();
+    });
+    root.appendChild(this.#dialog);
+  }
+
   connectedCallback(): void {
-    super.connectedCallback();
     this.classList.add(this.scopeClass);
   }
 
   disconnectedCallback(): void {
-    super.disconnectedCallback();
     if (this.#scrollLocked) {
       this.#scrollLocked = false;
       unlockBackgroundScroll();
@@ -1741,20 +1809,28 @@ class Dialog extends LitElement {
 
   showSpinnerOnly(): void {
     this.#spinnerOnly = true;
-    this.requestUpdate();
+    this.#dialog.classList.add("spinner-dialog");
+    this.#dialog.setAttribute("aria-label", "Loading");
+    this.#dialog.removeAttribute("aria-labelledby");
+    this.#dialog.removeAttribute("aria-describedby");
+    this.#dialog.replaceChildren(
+      h("div", {
+        class: "dialog-spinner",
+        role: "status",
+        "aria-label": "Loading",
+      }),
+    );
+    this.#show();
   }
 
   // Set the dialog's view. If a dialog is already on screen (the spinner placeholder, or
   // the previous dialog in a scope), fade the current box out, then swap the new view in
   // and grow it back in — the <dialog> stays open, so the modal backdrop never drops.
-  // On a fresh element, firstUpdated() will showModal() + grow it in.
+  // NOT for the spinner -> first-real handoff: fully fading the spinner out first leaves
+  // a visible gap, so there we swap and grow the real dialog straight in.
   setView(view: DialogView): void {
-    const dialog = this.#dialogEl;
-    // Real -> real swap within a scope: fade the current box out, then grow the new one
-    // in. NOT for the spinner -> first-real handoff — fully fading the spinner out first
-    // leaves a visible gap, so there we swap the content and grow the real dialog
-    // straight in (grow-in starts on the same frame, so there's no empty beat).
-    if (dialog?.open && !this.#spinnerOnly) {
+    const dialog = this.#dialog;
+    if (dialog.open && !this.#spinnerOnly) {
       const exit = dialog.animate(
         [
           { opacity: 1, transform: "scale(1)" },
@@ -1764,22 +1840,22 @@ class Dialog extends LitElement {
       );
       this.#exitAnim = exit;
       exit.onfinish = () => {
-        this.#pendingGrowIn = true; // updated() runs #growIn after the swap renders
         this.#applyView(view);
+        this.#growIn();
       };
     } else {
-      // Fresh element: firstUpdated() grows it in. Spinner already open: request grow-in
-      // here, since firstUpdated already ran for the spinner placeholder.
-      if (dialog?.open) {
-        this.#pendingGrowIn = true;
-      }
+      const wasOpen = dialog.open; // spinner placeholder already showing
       this.#applyView(view);
+      if (wasOpen) {
+        this.#growIn();
+      } else {
+        this.#show();
+      }
     }
   }
 
   raiseNotice(notice: ResolvedNotice): void {
-    this.#transientNotice = notice;
-    this.#refreshNotice();
+    this.#setTransientNotice(notice);
   }
 
   setButtonLoading(index: number, loading: boolean): void {
@@ -1799,29 +1875,44 @@ class Dialog extends LitElement {
     } else if (wasBusy && !nowBusy) {
       const toRestore = this.#focusBeforeBusy;
       this.#focusBeforeBusy = null;
-      void this.updateComplete.then(() => {
+      requestAnimationFrame(() => {
         if (toRestore?.isConnected) {
           toRestore.focus();
         }
       });
     }
-    this.requestUpdate();
+
+    // Reflect the loading state on the button. Default buttons toggle a class (node
+    // identity preserved, so focus survives); override buttons must be re-rendered
+    // since their loading state is internal.
+    const el = this.#buttonEls[index];
+    if (el) {
+      if (this.#renderOverrides?.actionButton) {
+        const next = this.#renderButton(this.#buttonViews[index], index);
+        el.replaceWith(next);
+        this.#buttonEls[index] = next;
+      } else {
+        el.classList.toggle("loading", loading);
+      }
+    }
+
+    if (this.#contentEl) {
+      this.#contentEl.inert = nowBusy;
+    }
   }
 
-  // The form is slotted light DOM, so query the host rather than the shadow root.
   getForm(): HTMLFormElement | null {
     return this.querySelector("form");
   }
 
   async closeDialog(): Promise<void> {
-    const dialog = this.#dialogEl;
+    const dialog = this.#dialog;
     if (!dialog || this.#closing) {
       this.remove();
       return;
     }
     this.#closing = true;
-    this.requestUpdate();
-    await this.updateComplete;
+    dialog.classList.add("closing");
 
     await Promise.race([
       new Promise<void>((res) =>
@@ -1836,37 +1927,72 @@ class Dialog extends LitElement {
 
   // ---- internals ----
 
-  get #dialogEl(): HTMLDialogElement | null {
-    return (this.renderRoot as ShadowRoot).querySelector("dialog");
+  // Show the dialog for the first time: open the modal, lock scroll, grow it in, focus.
+  #show(): void {
+    if (this.#dialog.open) return;
+    this.#dialog.showModal();
+    this.#scrollLocked = true;
+    lockBackgroundScroll();
+    this.#growIn();
+    this.#focusInitial();
   }
 
-  // Apply a view to the element: set chrome, project content into the slots (light DOM),
-  // inject the caller's scoped styles, and reset per-view focus state (needed because the
-  // element is reused across a scope).
+  // The single entrance animation: grow the box in from nothing. Used for the spinner
+  // placeholder, the first real dialog, and every in-scope swap alike.
+  #growIn(): void {
+    const box = this.#dialog;
+    box.animate(
+      [
+        { transform: "scale(0)", opacity: 0 },
+        { transform: "scale(1)", opacity: 1 },
+      ],
+      { duration: DIALOG_ANIM_MS, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    );
+    // Clear the finished swap fade-out (fill: forwards) only after grow-in is on top of
+    // the animation stack, so removing its held value causes no one-frame flash.
+    this.#exitAnim?.cancel();
+    this.#exitAnim = null;
+  }
+
+  // Apply a view: reset per-view state, project caller content into light-DOM slots, and
+  // (re)build the shadow chrome. The stable <dialog> keeps its identity; only its single
+  // child (the .dialog-content) is replaced.
   #applyView(view: DialogView): void {
     this.#spinnerOnly = false;
+    this.#dialog.classList.remove("spinner-dialog");
+    this.#dialog.setAttribute("aria-labelledby", "dialog-title");
+    this.#dialog.setAttribute("aria-describedby", "dialog-body");
+    this.#dialog.removeAttribute("aria-label");
 
     this.setAttribute("data-dialog-type", view.dialogType);
-    this.#buttons = view.buttons;
     this.#defaultButtonIndex = view.defaultButtonIndex;
     this.#hasForm = view.hasForm;
-    this.#hasIcon = view.icon != null;
+    this.#buttonViews = view.buttons;
     this.#renderOverrides = view.render;
+    this.#adapter = view.adapter;
     this.#onClose = view.onClose;
     this.#onCancel = view.onCancel;
     this.#baseNotice = view.notice;
+
+    // Reset transient-notice state (the old node lived in the content we're replacing).
+    if (this.#noticeDismissTimer != null) {
+      clearTimeout(this.#noticeDismissTimer);
+      this.#noticeDismissTimer = null;
+    }
     this.#transientNotice = null;
+    this.#transientEl = null;
     this.#loading.clear();
-    this.#initialFocusDone = false; // re-focus for the new view
     this.#focusBeforeBusy = null;
 
     this.#applyCallerStyles(view.styles);
-    this.#refreshNotice();
 
-    // Project caller content through the named slots (light DOM), managed by its own
-    // lit render root, independent of the shadow chrome below.
-    render(this.#contentTemplate(view), this);
-    this.requestUpdate();
+    // Light DOM (projected through the slots) and shadow chrome.
+    this.replaceChildren(...this.#buildSlotted(view));
+    this.#dialog.replaceChildren(this.#buildContent(view));
+
+    if (this.#dialog.open) {
+      this.#focusInitial();
+    }
   }
 
   // Scope the caller's (unscoped) CSS under this instance's class via CSS nesting, so
@@ -1888,81 +2014,209 @@ class Dialog extends LitElement {
     this.#styleEl.textContent = `.${this.scopeClass} { ${cssText} }`;
   }
 
-  #contentTemplate(view: DialogView): TemplateResult {
-    const content = view.hasForm
-      ? html`<form
-          class="content"
-          slot="content"
-          @submit=${(ev: Event) => ev.preventDefault()}
-        >
-          ${view.content}
-        </form>`
-      : html`<div class="content" slot="content">
-          ${withLineBreaks(view.content)}
-        </div>`;
-
-    return html`
-      ${view.icon != null ? html`<span slot="icon">${view.icon}</span>` : null}
-      <span slot="title">${withLineBreaks(view.title)}</span>
-      ${view.subtitle != null
-        ? html`<span slot="subtitle">${withLineBreaks(view.subtitle)}</span>`
-        : null}
-      ${view.intro != null
-        ? html`<div slot="intro">${withLineBreaks(view.intro)}</div>`
-        : null}
-      ${content}
-      ${view.outro != null
-        ? html`<div slot="outro">${withLineBreaks(view.outro)}</div>`
-        : null}
-    `;
+  // Coerce caller/override content to a Node using this dialog's adapter (if any).
+  // #node is the plain seam; #lines additionally turns "\n" in strings into <br>s.
+  #node(value: Renderable<any>): Node {
+    return insertContent(value, this.#adapter);
+  }
+  #lines(value: Renderable<any>): Node {
+    return withLineBreaks(value, this.#adapter);
   }
 
-  // Drives only the transient (reject) notice's enter/collapse animation. The base
-  // config notice renders statically in #renderChrome and isn't tracked here.
-  #refreshNotice(): void {
-    const next = this.#transientNotice;
-    const prev = this.#shownTransient;
-    if (next === prev) {
-      return;
+  // Build the light-DOM elements projected through the named slots.
+  #buildSlotted(view: DialogView): Node[] {
+    const els: Node[] = [];
+    if (view.icon != null) {
+      els.push(h("span", { slot: "icon" }, this.#node(view.icon)));
+    }
+    els.push(h("span", { slot: "title" }, this.#lines(view.title)));
+    if (view.subtitle != null) {
+      els.push(h("span", { slot: "subtitle" }, this.#lines(view.subtitle)));
+    }
+    if (view.intro != null) {
+      els.push(h("div", { slot: "intro" }, this.#lines(view.intro)));
+    }
+    els.push(
+      view.hasForm
+        ? h(
+            "form",
+            {
+              class: "content",
+              slot: "content",
+              onsubmit: (ev: Event) => ev.preventDefault(),
+            },
+            this.#node(view.content),
+          )
+        : h(
+            "div",
+            { class: "content", slot: "content" },
+            this.#lines(view.content),
+          ),
+    );
+    if (view.outro != null) {
+      els.push(h("div", { slot: "outro" }, this.#lines(view.outro)));
+    }
+    return els;
+  }
+
+  // Build the shadow chrome (.dialog-content) and store references for later mutation.
+  #buildContent(view: DialogView): HTMLElement {
+    const r = this.#renderOverrides;
+
+    const closeBtn = r?.closeButton
+      ? this.#node(r.closeButton({ onClose: this.#onClose }))
+      : h(
+          "button",
+          { class: "close-button", type: "button", onclick: this.#onClose },
+          parseSvg(closeIconSvg),
+        );
+
+    const header = h(
+      "div",
+      { class: "header" },
+      view.icon != null
+        ? h("div", { id: "icon" }, h("slot", { name: "icon" }))
+        : null,
+      h(
+        "div",
+        { class: "titles" },
+        h(
+          "span",
+          { class: "title", id: "dialog-title" },
+          h("slot", { name: "title" }),
+        ),
+        h("span", { class: "subtitle" }, h("slot", { name: "subtitle" })),
+      ),
+      closeBtn,
+    );
+
+    const body = h(
+      "div",
+      {
+        class: "body",
+        id: "dialog-body",
+        oninput: this.#dismissTransientNotice,
+      },
+      h("slot", { name: "intro" }),
+      h("slot", { name: "content" }),
+      h("slot", { name: "outro" }),
+    );
+
+    this.#buttonEls = view.buttons.map((b, i) => this.#renderButton(b, i));
+    const footer = h(
+      "div",
+      { class: "footer" },
+      h("div", { class: "action-buttons" }, this.#buttonEls),
+    );
+    this.#footerEl = footer;
+
+    const content = h("div", { class: "dialog-content" }, header, body, footer);
+    this.#contentEl = content;
+
+    // The config notice sits between body and footer; the transient notice (if raised)
+    // is later inserted right before the footer, i.e. directly after this one.
+    if (this.#baseNotice) {
+      content.insertBefore(
+        this.#renderNoticeNode(this.#baseNotice, false),
+        footer,
+      );
     }
 
+    return content;
+  }
+
+  #renderButton(b: DialogButtonView, i: number): HTMLElement {
+    const loading = this.#loading.has(i);
+    const onClick = () => {
+      this.#dismissTransientNotice();
+      b.onClick();
+    };
+    if (this.#renderOverrides?.actionButton) {
+      const node = this.#renderOverrides.actionButton({
+        text: b.text,
+        variant: b.type,
+        loading,
+        onClick,
+      });
+      // Overrides return a Renderable; wrap non-elements so we always hold an element
+      // reference to replace on loading changes.
+      return node instanceof HTMLElement
+        ? node
+        : h("span", null, this.#node(node));
+    }
+    return h(
+      "button",
+      {
+        class: `action-button${loading ? " loading" : ""}`,
+        "data-type": b.type,
+        type: "button",
+        onclick: onClick,
+      },
+      h("span", { class: "spinner" }),
+      h("span", { class: "button-text" }, b.text),
+    );
+  }
+
+  // Render a notice element. The transient (reject) notice is `animated` — it carries the
+  // enter/collapse classes and role="alert"; the persistent config notice is static with
+  // role="status". Both honor the caller's custom-notice render override.
+  #renderNoticeNode(
+    notice: ResolvedNotice,
+    animated: boolean,
+    entering = false,
+  ): HTMLElement {
+    const r = this.#renderOverrides;
+    if (r?.notice) {
+      const node = r.notice({ variant: notice.type, message: notice.message });
+      return node instanceof HTMLElement
+        ? node
+        : h("div", null, this.#node(node));
+    }
+    const cls = animated ? `notice${entering ? " entering" : ""}` : "notice";
+    return h(
+      "div",
+      {
+        class: cls,
+        "data-notice-type": notice.type,
+        role: animated ? "alert" : "status",
+      },
+      this.#node(notice.message),
+    );
+  }
+
+  // Raise (or update / dismiss) the transient notice. Creating it adds the `entering`
+  // class then removes it on the next frames so the CSS transition plays; dismissing adds
+  // `dismissing` and removes the node once the collapse finishes.
+  #setTransientNotice(notice: ResolvedNotice | null): void {
     if (this.#noticeDismissTimer != null) {
       clearTimeout(this.#noticeDismissTimer);
       this.#noticeDismissTimer = null;
     }
 
-    if (prev == null) {
-      this.#shownTransient = next;
-      this.#noticeDismissing = false;
-      if (this.#dialogEl?.open ?? false) {
-        this.#noticeEntering = true;
-        this.requestUpdate();
-        void this.updateComplete.then(() => {
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => {
-              this.#noticeEntering = false;
-              this.requestUpdate();
-            }),
-          );
-        });
-      } else {
-        this.#noticeEntering = false;
-        this.requestUpdate();
+    if (notice) {
+      this.#transientNotice = notice;
+      if (this.#transientEl) {
+        // Consecutive rejects: replace the node in place (no re-enter animation).
+        const next = this.#renderNoticeNode(notice, true, false);
+        this.#transientEl.replaceWith(next);
+        this.#transientEl = next;
+      } else if (this.#contentEl && this.#footerEl) {
+        const el = this.#renderNoticeNode(notice, true, true);
+        this.#contentEl.insertBefore(el, this.#footerEl);
+        this.#transientEl = el;
+        doubleRaf(() => el.classList.remove("entering"));
       }
-    } else if (next == null) {
-      this.#noticeDismissing = true;
-      this.requestUpdate();
-      this.#noticeDismissTimer = setTimeout(() => {
-        this.#shownTransient = null;
-        this.#noticeDismissing = false;
-        this.#noticeDismissTimer = null;
-        this.requestUpdate();
-      }, NOTICE_ANIM_MS);
     } else {
-      this.#noticeEntering = false;
-      this.#noticeDismissing = false;
-      this.#shownTransient = next;
-      this.requestUpdate();
+      this.#transientNotice = null;
+      const el = this.#transientEl;
+      if (el) {
+        el.classList.add("dismissing");
+        this.#noticeDismissTimer = setTimeout(() => {
+          el.remove();
+          if (this.#transientEl === el) this.#transientEl = null;
+          this.#noticeDismissTimer = null;
+        }, NOTICE_ANIM_MS);
+      }
     }
   }
 
@@ -1970,64 +2224,13 @@ class Dialog extends LitElement {
     if (this.#transientNotice == null) {
       return;
     }
-    this.#transientNotice = null;
-    this.#refreshNotice();
+    this.#setTransientNotice(null);
   };
-
-  protected firstUpdated(): void {
-    const dialog = this.#dialogEl;
-    if (dialog && !dialog.open) {
-      dialog.showModal();
-      this.#scrollLocked = true;
-      lockBackgroundScroll();
-      this.#growIn();
-    }
-    dialog?.addEventListener("cancel", (ev) => {
-      ev.preventDefault();
-      this.#onCancel();
-    });
-  }
-
-  protected updated(): void {
-    if (this.#pendingGrowIn) {
-      this.#pendingGrowIn = false;
-      this.#growIn();
-    }
-
-    if (
-      !this.#initialFocusDone &&
-      !this.#spinnerOnly &&
-      (this.#dialogEl?.open ?? false)
-    ) {
-      this.#initialFocusDone = true;
-      this.#focusInitial();
-    }
-  }
-
-  // The single entrance animation: grow the box in from nothing. Used for the spinner
-  // placeholder, the first real dialog, and every in-scope swap alike.
-  #growIn(): void {
-    const box = this.#dialogEl;
-    if (!box) {
-      return;
-    }
-    box.animate(
-      [
-        { transform: "scale(0)", opacity: 0 },
-        { transform: "scale(1)", opacity: 1 },
-      ],
-      { duration: DIALOG_ANIM_MS, easing: "cubic-bezier(0.2, 0, 0, 1)" },
-    );
-    // Clear the finished swap fade-out (fill: forwards) only after grow-in is on top of
-    // the animation stack, so removing its held value causes no one-frame flash.
-    this.#exitAnim?.cancel();
-    this.#exitAnim = null;
-  }
 
   // On open, focus sensibly: an explicit [autofocus] in slotted content wins; else the
   // first form field; else the default button (or, for critical dialogs with no default,
   // the last button — Cancel — so nothing destructive is primed). Content is light DOM,
-  // so those queries hit the host; only the button lookup hits the shadow root.
+  // so those queries hit the host; the button lookup uses the stored refs.
   #focusInitial(): void {
     const autofocus = this.querySelector<HTMLElement>("[autofocus]");
     if (autofocus) {
@@ -2045,18 +2248,16 @@ class Dialog extends LitElement {
         return;
       }
     }
-    const buttons = (
-      this.renderRoot as ShadowRoot
-    ).querySelectorAll<HTMLElement>(".action-buttons > *");
+    const buttons = this.#buttonEls;
     if (buttons.length === 0) {
       return;
     }
     const index = this.#defaultButtonIndex ?? buttons.length - 1;
-
-    if (buttons[index]) {
+    const button = buttons[index];
+    if (button) {
       try {
         // Using try because of a bug in WebAwesome.
-        requestAnimationFrame(() => buttons[index]?.focus());
+        requestAnimationFrame(() => button.focus());
       } catch {}
     }
   }
@@ -2082,8 +2283,7 @@ class Dialog extends LitElement {
     // accept a native <input>/<select> (either directly, or revealed at the top of an
     // open-shadow custom control's composed path), or any custom element (tag contains
     // "-") that sits inside the dialog's form. <textarea> (newline) and buttons
-    // (self-activating) are intentionally excluded. This keeps the library agnostic to
-    // any specific component library.
+    // (self-activating) are intentionally excluded.
     const deepTag = (ev.composedPath()[0] as HTMLElement | null)?.tagName ?? "";
     const retarget = ev.target as HTMLElement | null;
     const inField =
@@ -2099,7 +2299,7 @@ class Dialog extends LitElement {
     if (index == null) {
       return;
     }
-    const button = this.#buttons[index];
+    const button = this.#buttonViews[index];
     if (!button) {
       return;
     }
@@ -2107,142 +2307,6 @@ class Dialog extends LitElement {
     this.#dismissTransientNotice();
     button.onClick();
   };
-
-  protected render(): TemplateResult {
-    const showingSpinner = this.#spinnerOnly;
-    const classes = [
-      showingSpinner ? "spinner-dialog" : "",
-      this.#closing ? "closing" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    // A single, stable <dialog> node: only its class and inner chrome change between the
-    // spinner placeholder and the real dialog, so showModal() state and the `cancel`
-    // listener survive the spinner -> dialog swap. The title/body are the dialog's
-    // accessible name/description (ids resolve within this instance's shadow root).
-    return html`
-      <dialog
-        class=${classes}
-        @keydown=${this.#onKeyDown}
-        aria-labelledby=${showingSpinner ? nothing : "dialog-title"}
-        aria-describedby=${showingSpinner ? nothing : "dialog-body"}
-        aria-label=${showingSpinner ? "Loading" : nothing}
-      >
-        ${showingSpinner ? placeholderSpinner : this.#renderChrome()}
-      </dialog>
-    `;
-  }
-
-  // The shadow chrome: wrappers + named slots for content, plus the library-owned notice
-  // and action buttons. Slotted content is projected from the host's light DOM.
-  #renderChrome(): TemplateResult {
-    const r = this.#renderOverrides;
-
-    return html`
-      <div class="dialog-content" ?inert=${this.#loading.size > 0}>
-        <div class="header">
-          ${this.#hasIcon
-            ? html`<div id="icon"><slot name="icon"></slot></div>`
-            : null}
-          <div class="titles">
-            <span class="title" id="dialog-title"
-              ><slot name="title"></slot
-            ></span>
-            <span class="subtitle"><slot name="subtitle"></slot></span>
-          </div>
-          ${r?.closeButton
-            ? r.closeButton({ onClose: this.#onClose })
-            : html`<button
-                class="close-button"
-                type="button"
-                @click=${this.#onClose}
-              >
-                ${closeIcon}
-              </button>`}
-        </div>
-        <div
-          class="body"
-          id="dialog-body"
-          @input=${this.#dismissTransientNotice}
-        >
-          <slot name="intro"></slot>
-          <slot name="content"></slot>
-          <slot name="outro"></slot>
-        </div>
-        ${this.#baseNotice
-          ? this.#renderNotice(this.#baseNotice, r, false)
-          : null}
-        ${this.#shownTransient
-          ? this.#renderNotice(this.#shownTransient, r, true)
-          : null}
-        <div class="footer">
-          <div class="action-buttons">
-            ${this.#buttons.map((b, i) => this.#renderActionButton(b, i, r))}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  // The persistent config notice: no enter/collapse animation, and a polite `status`
-  // role rather than `alert`, since it's standing context (like help text), not an
-  // interruption. Honors the same custom-notice render override as the transient one.
-  // Render a notice. The transient (reject) notice is `animated` — it carries the
-  // enter/collapse classes and role="alert"; the persistent config notice is static
-  // with role="status". Both honor the caller's custom-notice render override.
-  #renderNotice(
-    notice: ResolvedNotice,
-    r: DialogRenderOverrides | undefined,
-    animated: boolean,
-  ): Renderable {
-    if (r?.notice) {
-      return r.notice({ variant: notice.type, message: notice.message });
-    }
-    const cls = animated
-      ? `notice ${this.#noticeDismissing ? "dismissing" : ""} ${
-          this.#noticeEntering ? "entering" : ""
-        }`
-      : "notice";
-    return html`<div
-      class=${cls}
-      data-notice-type=${notice.type}
-      role=${animated ? "alert" : "status"}
-    >
-      ${notice.message}
-    </div>`;
-  }
-
-  #renderActionButton(
-    b: DialogButtonView,
-    i: number,
-    r: DialogRenderOverrides | undefined,
-  ): Renderable {
-    const loading = this.#loading.has(i);
-    const onClick = () => {
-      this.#dismissTransientNotice();
-      b.onClick();
-    };
-    if (r?.actionButton) {
-      return r.actionButton({
-        text: b.text,
-        variant: b.type,
-        loading,
-        onClick,
-      });
-    }
-    return html`
-      <button
-        class="action-button ${loading ? "loading" : ""}"
-        data-type=${b.type}
-        type="button"
-        @click=${onClick}
-      >
-        <span class="spinner"></span>
-        <span class="button-text">${b.text}</span>
-      </button>
-    `;
-  }
 }
 
 export { Dialog };
@@ -2279,3 +2343,31 @@ function mountSpinnerDialog(id: string): DialogHandle {
   el.showSpinnerOnly();
   return handleFor(el);
 }
+
+// -------------------------------------------------------------------
+// # Notes on the framework seam (Lit / React as an option, not the core)
+// -------------------------------------------------------------------
+//
+// The core is now vanilla DOM. There are exactly two places framework content flows in,
+// and both funnel through `insertContent` (via the element's #node / #lines helpers):
+//   1) caller content (title/body/icon/notice message) — see #buildSlotted / notices;
+//   2) the return value of a render override (actionButton/closeButton/notice).
+//
+// To offer Lit (or React) as an option, define a ContentAdapter<C> where that framework
+// already lives (so the core stays import-free) and pass it as `adapter`. `C` is inferred
+// from the adapter, so every content field and override return is then typed to it:
+//
+//   // lit-adapter.ts
+//   import { render, type TemplateResult } from "lit-html";
+//   import type { ContentAdapter } from "./dialogs";
+//   export const litDialogAdapter: ContentAdapter<TemplateResult> = (value) => {
+//     const frag = document.createDocumentFragment();   // only a TemplateResult reaches
+//     render(value, frag);                              // here — no guard, no null
+//     return frag;
+//   };
+//
+//   // app setup — C is inferred as TemplateResult
+//   createDialogsController({ adapter: litDialogAdapter, render: { … } });
+//
+// Everything else — the modal, animations, focus, forms, notice state machine — is
+// framework-free and stays put. That is the whole adapter surface.

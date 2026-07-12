@@ -7,7 +7,8 @@ import { html, render } from "lit";
 import {
   createDialogsController,
   createNotificationsController,
-  litAdapter,
+  litNotificationAdapter,
+  litDialogAdapter,
 } from "../main/index.js";
 
 import type {
@@ -52,7 +53,7 @@ const waButtonVariant = {
 } as const;
 
 const notifications = createNotificationsController({
-  adapter: litAdapter,
+  adapter: litNotificationAdapter,
   maxVisible: 4,
   autoTitles: false,
   autoIcons: true,
@@ -63,6 +64,7 @@ const notifications = createNotificationsController({
 // render override swaps the built-in action buttons for original <wa-button>s
 // (with WA's own loading spinner); the close button stays the library default.
 const dialogs = createDialogsController({
+  adapter: litDialogAdapter,
   render: {
     actionButton: ({ text, variant, loading, onClick }) => html`
       <wa-button
