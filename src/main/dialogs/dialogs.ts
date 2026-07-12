@@ -120,15 +120,16 @@ interface DialogRenderOverrides<C extends object = never> {
 }
 
 interface DialogsControllerConfig<C extends object = never> {
-  getText?(textKey: keyof DialogTexts): string | null;
-  getDialogIcon?(dialogType: DialogType): Renderable<C> | null;
-  render?: DialogRenderOverrides<C>;
   /**
    * Turns opaque framework content (e.g. a Lit TemplateResult) into a Node, and is the
    * source `C` is inferred from: pass `litDialogAdapter` and every `content`/`title`/
    * override-return on this controller is typed to that framework's content.
    */
   adapter?: ContentAdapter<C>;
+  getText?(textKey: keyof DialogTexts): string | null;
+  getDialogIcon?(dialogType: DialogType): Renderable<C> | null;
+  autoIcons?: boolean;
+  render?: DialogRenderOverrides<C>;
 }
 
 /** Caller overrides for button labels, keyed by button role. */
@@ -860,7 +861,7 @@ function createDialogScope<C extends object = never>(
     if (config.getDialogIcon) {
       return config.getDialogIcon(dialogType) ?? null;
     }
-    return defaultDialogIcon(dialogType);
+    return config.autoIcons ? defaultDialogIcon(dialogType) : null;
   }
 
   function resolveButtons(spec: OpenDialogSpec): ButtonConfig[] {
@@ -1248,7 +1249,7 @@ const theme = {
   dangerTextColor: "white",
   dangerBackgroundColor: "#dc3146",
   successColor: "var(--ui-color-success-500, #00883c)",
-  dialogBorderRadius: "2px",
+  dialogBorderRadius: "4px",
   closeButtonBorderRadius: "100%",
   actionButtonBorderRadius: "3px",
   dialogBackgroundColor: "light-dark(white, #333)",

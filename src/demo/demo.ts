@@ -65,6 +65,7 @@ const notifications = createNotificationsController({
 // (with WA's own loading spinner); the close button stays the library default.
 const dialogs = createDialogsController({
   adapter: litDialogAdapter,
+  autoIcons: false,
   render: {
     actionButton: ({ text, variant, loading, onClick }) => html`
       <wa-button
