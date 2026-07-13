@@ -518,7 +518,7 @@ const SHADOW_STYLES = `
 :host {
   position: relative;
   box-sizing: border-box;
-  width: min(450px, calc(100vw - 40px));
+  width: min(400px, calc(100vw - 40px));
   padding: 14px 18px 14px 22px;
   background: var(--background, #ffffff);
   color: var(--text, #111827);
@@ -1418,13 +1418,21 @@ function applyPlacement(container: HTMLElement, placement: Placement) {
   s.bottom = vertical === "bottom" ? "20px" : "auto";
 
   if (horizontal === "center") {
+    // Center is symmetric, so use physical left/right — and CLEAR the logical
+    // insets. Mixing them is a trap: inset-inline-start resolves to `left` in
+    // LTR and, being assigned after `left` here, its "auto" would override the
+    // "50%" and defeat the centering entirely.
+    s.insetInlineStart = "";
+    s.insetInlineEnd = "";
     s.left = "50%";
+    s.right = "auto";
     s.transform = "translateX(-50%)";
-    s.insetInlineStart = "auto";
-    s.insetInlineEnd = "auto";
     s.alignItems = "center";
   } else {
-    s.left = "auto";
+    // Corners use logical insets (RTL-aware); clear the physical ones so they
+    // don't linger and conflict.
+    s.left = "";
+    s.right = "";
     s.transform = "none";
     s.insetInlineEnd = horizontal === "end" ? "20px" : "auto";
     s.insetInlineStart = horizontal === "start" ? "20px" : "auto";
@@ -2078,7 +2086,7 @@ export function createNotificationsController<C>(
     }
 
     const previous = getPositions();
-    const duration = opts.duration ?? (type === "loading" ? 0 : 7000);
+    const duration = opts.duration ?? (type === "loading" ? 0 : 5000);
 
     const notification: Notification<C> = {
       id: nextId++,

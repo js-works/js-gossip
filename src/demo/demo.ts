@@ -62,6 +62,7 @@ const notifications = createNotificationsController({
   autoTitles: false,
   autoIcons: true,
   appearance: "light",
+  placement: "bottom-center",
   overflow: "queue",
 });
 
