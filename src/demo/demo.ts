@@ -61,6 +61,8 @@ const notifications = createNotificationsController({
   maxVisible: 4,
   autoTitles: false,
   autoIcons: true,
+  appearance: "light",
+  overflow: "queue",
 });
 
 // A single controller for the whole page. getText / getDialogIcon are optional;
@@ -218,13 +220,19 @@ function humanize(type: string): string {
 }
 
 // A demo trigger button; uniform grayish look, clicks wired in the template below.
-const notifier = (type: NotificationType) => html`
+const notifier = (type: Exclude<NotificationType, "loading">) => html`
   <wa-button
     appearance="filled"
     variant="neutral"
     @click=${() =>
       void notifications[type]({
         message: "Notification sent at " + new Date().toLocaleTimeString(),
+        actions: [
+          {
+            label: "Click me",
+            onClick: () => alert("Woohoo"),
+          },
+        ],
       })}
   >
     ${humanize(type)}
