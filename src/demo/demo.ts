@@ -17,7 +17,6 @@ import type {
 // tokens the demo's CSS points the dialog's --ui-* variables at; the component
 // imports register the custom elements this demo uses.
 import "@awesome.me/webawesome/dist/styles/webawesome.css";
-import "@awesome.me/webawesome/dist/components/button/button.js";
 import "@awesome.me/webawesome/dist/components/input/input.js";
 import "@awesome.me/webawesome/dist/components/checkbox/checkbox.js";
 
@@ -44,14 +43,6 @@ function logFormResult(label: string, result: FormDialogResult): void {
   }
 }
 
-// Map the library's semantic button variants onto Web Awesome's.
-const waButtonVariant = {
-  primary: "brand",
-  secondary: "neutral",
-  danger: "danger",
-  success: "success",
-} as const;
-
 const toasts = createToastController({
   adapter: litToastAdapter,
   maxVisible: 4,
@@ -63,24 +54,11 @@ const toasts = createToastController({
 });
 
 // A single controller for the whole page. getText / getDialogIcon are optional;
-// omitting them uses the library's built-in English texts and default icons. The
-// render override swaps the built-in action buttons for original <wa-button>s
-// (with WA's own loading spinner); the close button stays the library default.
+// omitting them uses the library's built-in English texts and default icons, and the
+// library's own (native) action buttons.
 const dialogs = createDialogsController({
   adapter: litDialogAdapter,
-  autoIcons: false,
-  render: {
-    actionButton: ({ text, variant, loading, onClick }) => html`
-      <wa-button
-        appearance=${variant === "secondary" ? "filled" : "accent"}
-        variant=${waButtonVariant[variant]}
-        ?loading=${loading}
-        @click=${onClick}
-      >
-        ${text}
-      </wa-button>
-    `,
-  },
+  autoIcons: true,
 });
 
 // Example form content, now using Web Awesome form controls. They're form-associated
@@ -384,7 +362,6 @@ async function runNoticeForm(): Promise<void> {
     content: formContent(),
     styles: formStyles,
     notice: {
-      type: "warn",
       message: "Some fields could not be verified.",
     },
   });

@@ -10,6 +10,7 @@ import { defaultDialogTheme } from "./theme.js";
 // baking values straight into the generated stylesheet; see dialogs/theme.ts.)
 const theme = {
   textColor: `var(--dialog-text, ${defaultDialogTheme.text})`,
+  dividerColor: `var(--dialog-divider, ${defaultDialogTheme.divider})`,
   primaryTextColor: `var(--dialog-primary-text, ${defaultDialogTheme.primaryText})`,
   primaryBackgroundColor: `var(--dialog-primary-background, ${defaultDialogTheme.primaryBackground})`,
   secondaryTextColor: `var(--dialog-secondary-text, ${defaultDialogTheme.secondaryText})`,
@@ -22,6 +23,8 @@ const theme = {
   closeButtonBorderRadius: `var(--dialog-close-radius, ${defaultDialogTheme.closeRadius})`,
   actionButtonBorderRadius: `var(--dialog-action-radius, ${defaultDialogTheme.actionRadius})`,
   dialogBackgroundColor: `var(--dialog-background, ${defaultDialogTheme.background})`,
+  buttonTransition: `var(--dialog-button-transition, ${defaultDialogTheme.buttonTransition})`,
+  buttonActiveScale: `var(--dialog-button-active-scale, ${defaultDialogTheme.buttonActiveScale})`,
 } as const;
 
 // Duration of the notice appear/disappear (collapse) animation. Drives both the CSS
@@ -54,7 +57,10 @@ const dialogStyles = `
        being pulled up by a self-offset. */
     inset: 0;
     width: fit-content;
-    max-width: calc(100dvw - 4em);
+    /* Cap the line length so a long single-line message wraps to a few lines instead of
+       stretching the dialog very wide — a calmer width/height ratio. Still shrinks to fit
+       the viewport on small screens. */
+    max-width: min(calc(100dvw - 4em), 34em);
     height: fit-content;
     max-height: calc(100dvh - 4em);
     margin-inline: auto;
@@ -75,7 +81,7 @@ const dialogStyles = `
   }
 
   dialog[open]::backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.4);
   }
 
   dialog[open]:not(.closing)::backdrop {
@@ -93,15 +99,12 @@ const dialogStyles = `
   }
 
   #icon {
+    flex: none;
     display: flex;
-    justify-content: center;
     align-items: center;
-    align-self: center;
-    aspect-ratio: 1 / 1;
-    border-radius: 50%;
-    font-size: 180%;
-    padding: 3px;
-    line-height: 0;
+    justify-content: center;
+    font-size: 1.35em;
+    line-height: 1;
   }
 
   /* Render the glyph as a block box sized to 1em. As an inline element the SVG picks up
@@ -141,44 +144,48 @@ const dialogStyles = `
   .dialog-content .header {
     display: flex;
     align-items: center;
-    gap: 0.4em;
-    padding: 1em 1.25em 0.4em 1.25em;
-    width: 100%;
-    box-sizing: border-box;
+    gap: 0.75em;
+    padding: 1.25em 1.5em 0.75em;
   }
 
+  /* Grows to fill the row so the close button is pushed to the far edge; min-width: 0
+     lets long titles wrap/ellipsize instead of overflowing. */
   .dialog-content .header .titles {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    width: 100%;
-    padding: 0.25em 0 0 0;
   }
 
   .dialog-content .header .titles .title {
-    display: block;
     font-size: 1.1em;
     font-weight: 600;
+    line-height: 1.25;
   }
 
   .dialog-content .header .titles .subtitle {
-    display: block;
-    font-size: 0.85em;
-    line-height: 0.85em;
-    padding: 0 1px;
+    font-size: 0.95em;
+    line-height: 1.25;
+    margin-top: -0.1em;
+    opacity: 0.8;
   }
 
   .dialog-content .body {
     display: flex;
     flex-direction: column;
     gap: 0.5em;
-    padding: 0 1.25em 0.75em 1.25em;
-    min-height: 2.25em;
+    padding: 0 1.5em 1.1em 1.5em;
+    min-height: 1.75em;
     line-height: 1.25em;
     user-select: text;
+    /* Even out line lengths for the short message blocks; progressively enhanced —
+       browsers without support fall back to normal wrapping. */
+    text-wrap: balance;
   }
 
   .dialog-content .footer {
-    padding: 0.75em;
+    padding: 0.6em 1.5em;
+    border-top: 1px solid ${theme.dividerColor};
     user-select: none;
   }
 
@@ -190,12 +197,30 @@ const dialogStyles = `
 
   .action-button {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     outline: none;
     border: none;
     border-radius: ${theme.actionButtonBorderRadius};
-    padding: 0.5em 1.5em;
+    padding: 0.65em 1.5em;
+    /* A stack that ships a Medium (500) face, so the weight below is visible (unlike
+       Helvetica/Arial, which only have 400 + 700). */
+    font-family:
+      system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
     font-weight: 500;
+    /* Pin the line-height so the label box doesn't inherit the host page's line-height
+       (which crosses the shadow boundary) — keeps the button snug and centering exact. */
+    line-height: 1;
     cursor: pointer;
+    transition:
+      background-color ${theme.buttonTransition},
+      border-color ${theme.buttonTransition},
+      transform ${theme.buttonTransition};
+  }
+
+  .action-button:active {
+    transform: scale(${theme.buttonActiveScale});
   }
 
   .action-button .spinner {
@@ -292,15 +317,19 @@ const dialogStyles = `
     );
   }
 
+  /* Notice = icon + message in a bordered box. Base styling is the neutral *config*
+     notice: light-gray border, blackish text + info icon, no fill. */
   .notice {
-    position: relative;
-    margin: 0.7em 1.25em 0.75em 1.25em;
-    padding: 0.5em 0.5em 0.5em 0.9em;
-    border-radius: 2px;
-    background-color: light-dark(#f4f4f4, #3d3d3d);
+    display: flex;
+    align-items: center;
+    gap: 0.65em;
+    margin: 0.7em 1.5em 0.75em 1.5em;
+    padding: 0.45em 0.65em;
+    border-radius: 4px;
+    border: 1px solid color-mix(in srgb, ${theme.textColor} 13%, transparent);
     color: ${theme.textColor};
-    font-size: 0.9;
-    line-height: 1.25;
+    font-size: 0.9em;
+    line-height: 1.35;
     overflow: hidden;
     max-height: 12em;
     user-select: text;
@@ -311,20 +340,41 @@ const dialogStyles = `
       margin-top ${NOTICE_ANIM_MS}ms ease,
       margin-bottom ${NOTICE_ANIM_MS}ms ease,
       padding-top ${NOTICE_ANIM_MS}ms ease,
-      padding-bottom ${NOTICE_ANIM_MS}ms ease;
+      padding-bottom ${NOTICE_ANIM_MS}ms ease,
+      border-top-width ${NOTICE_ANIM_MS}ms ease,
+      border-bottom-width ${NOTICE_ANIM_MS}ms ease;
   }
 
-  /* Rounded accent bar floating inside the notice; its color conveys the type.
-     The background/text stay neutral so the notice reads calm anywhere. */
-  .notice::before {
-    content: "";
-    position: absolute;
-    left: 0.25em;
-    top: 0.25em;
-    bottom: 0.25em;
-    width: 0.15em;
-    border-radius: 0.125em;
-    background: transparent;
+  /* Leading icon (info for the config notice, error for the reject notice); it tints
+     with the notice's own color via currentColor. */
+  .notice-icon {
+    flex: none;
+    display: flex;
+    align-items: center;
+    font-size: 1.15em;
+    line-height: 1;
+  }
+
+  .notice-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .notice-title {
+    font-weight: 600;
+    line-height: 1.15;
+  }
+  .notice-message {
+    line-height: 1.25;
+  }
+  .notice-icon svg {
+    display: block;
+    width: 1em;
+    height: 1em;
+    /* These glyphs draw to the edge of their 16×16 viewBox; the SVG viewport would
+       otherwise shave that outer edge at this small size. */
+    overflow: visible;
   }
 
   .notice.dismissing,
@@ -335,23 +385,16 @@ const dialogStyles = `
     margin-bottom: 0;
     padding-top: 0;
     padding-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
   }
 
-  /* info uses the default bar color (primary); the rest override just the bar. */
-  .notice[data-notice-type="success"]::before {
-    background: ${theme.successColor};
-  }
-  .notice[data-notice-type="warn"]::before {
-    background: light-dark(#f08c00, #f7a53b);
-  }
-  .notice[data-notice-type="error"]::before {
-    background: ${theme.dangerBackgroundColor};
-  }
-
-  /* Error notices also get a faint danger-tinted background (the other types keep the
-     neutral notice background and signal type through the accent bar alone). */
-  .notice[data-notice-type="error"] {
+  /* Reject notice: red icon + text on a light-red fill with a light-red border, all
+     derived from the danger colour so they track the theme. */
+  .notice-error {
     color: ${theme.dangerBackgroundColor};
+    background-color: color-mix(in srgb, ${theme.dangerBackgroundColor} 5%, transparent);
+    border-color: color-mix(in srgb, ${theme.dangerBackgroundColor} 17%, transparent);
   }
 
   /* The reject notice, when it follows the config notice, is pulled up with a negative

@@ -44,6 +44,8 @@ export interface CloseButtonRender {
 /** Descriptor passed to a custom notice renderer. */
 export interface NoticeRender<C extends object = never> {
   variant: Severity;
+  /** The configured heading, or undefined for a message-only notice. */
+  title: Renderable<C> | undefined;
   message: Renderable<C>;
 }
 
@@ -98,13 +100,20 @@ export interface DialogButtonLabels {
  * which appears below it and clears itself when the user edits the form.
  */
 export interface DialogNotice<C extends object = never> {
-  type?: Severity; // default "info"
+  /** Optional heading shown above the message. Omit for a message-only notice. */
+  title?: Renderable<C>;
   message: Renderable<C>;
 }
 
 export interface BaseDialogConfig<C extends object = never> {
   title?: Renderable<C>;
   subtitle?: Renderable<C>;
+  /**
+   * Header icon. `true` shows the built-in icon for this dialog type, `false` hides it,
+   * content supplies a custom icon; omit to defer to the controller's `autoIcons` /
+   * `getDialogIcon` policy.
+   */
+  icon?: Renderable<C> | boolean;
   intro?: Renderable<C>;
   content?: Renderable<C>;
   outro?: Renderable<C>;
@@ -211,9 +220,9 @@ export interface FormAttempt<C extends object = never> {
   accept(): void;
   /**
    * Reject it: keep the dialog open (values preserved) and show an error notice with the
-   * given message. A reject is always an error, so only the message is configurable.
+   * given message, and an optional heading. A reject is always styled as an error.
    */
-  reject(message: Renderable<C>): void;
+  reject(message: Renderable<C>, title?: Renderable<C>): void;
 }
 
 /**

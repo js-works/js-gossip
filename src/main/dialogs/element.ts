@@ -10,6 +10,7 @@ import {
   h,
   parseSvg,
 } from "../internal/dom.js";
+import { errorIconSvg, infoIconSvg } from "../internal/icons.js";
 import { insertContent, withLineBreaks } from "./content.js";
 import { closeIconSvg } from "./icons.js";
 import {
@@ -564,20 +565,37 @@ class Dialog extends DialogElementBase {
   ): HTMLElement {
     const r = this.#renderOverrides;
     if (r?.notice) {
-      const node = r.notice({ variant: notice.type, message: notice.message });
+      const node = r.notice({
+        variant: notice.type,
+        title: notice.title,
+        message: notice.message,
+      });
       return node instanceof HTMLElement
         ? node
         : h("div", null, this.#node(node));
     }
-    const cls = animated ? `notice${entering ? " entering" : ""}` : "notice";
+    // `animated` marks the transient reject notice: red, with the exclamation-triangle
+    // icon. Otherwise it's the config notice, rendered neutral (info icon) regardless of
+    // its configured `type`.
+    const cls = animated
+      ? `notice notice-error${entering ? " entering" : ""}`
+      : "notice";
     return h(
       "div",
-      {
-        class: cls,
-        "data-notice-type": notice.type,
-        role: animated ? "alert" : "status",
-      },
-      this.#node(notice.message),
+      { class: cls, role: animated ? "alert" : "status" },
+      h(
+        "span",
+        { class: "notice-icon" },
+        parseSvg(animated ? errorIconSvg : infoIconSvg),
+      ),
+      h(
+        "div",
+        { class: "notice-body" },
+        notice.title != null
+          ? h("div", { class: "notice-title" }, this.#node(notice.title))
+          : null,
+        h("div", { class: "notice-message" }, this.#node(notice.message)),
+      ),
     );
   }
 

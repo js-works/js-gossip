@@ -244,7 +244,16 @@ function createDialogScope<C extends object = never>(
     return config.getText?.(textKey) ?? defaultDialogTexts[textKey];
   }
 
-  function iconFor(dialogType: DialogType): Renderable<any> {
+  function iconFor(
+    dialogType: DialogType,
+    dialogConfig: BaseDialogConfig<any>,
+  ): Renderable<any> {
+    // A per-dialog `icon` wins over the controller policy: true -> the built-in icon for
+    // the type, false -> none, content -> that content; undefined -> fall back to policy.
+    const perDialog = dialogConfig.icon;
+    if (perDialog === true) return defaultDialogIcon(dialogType);
+    if (perDialog === false) return null;
+    if (perDialog !== undefined) return perDialog;
     if (config.getDialogIcon) {
       return config.getDialogIcon(dialogType) ?? null;
     }
@@ -387,7 +396,7 @@ function createDialogScope<C extends object = never>(
       themeVars,
       dialogType: spec.dialogType,
       styles: getStyles(spec),
-      icon: iconFor(spec.dialogType),
+      icon: iconFor(spec.dialogType, spec.config),
       title: cfg.title ?? getText(spec.defaultTitle),
       subtitle: cfg.subtitle,
       intro: cfg.intro,
@@ -464,9 +473,9 @@ function createDialogScope<C extends object = never>(
             accept() {
               settle({ canceled: false, action: "confirm", data });
             },
-            reject(message) {
+            reject(message, title) {
               stopSpinner();
-              dialogHandle.raiseNotice({ type: "error", message });
+              dialogHandle.raiseNotice({ type: "error", title, message });
             },
           });
         } else {

@@ -4,7 +4,7 @@
   /* Variables the library's theme reads. Point them at Web Awesome's tokens so the
      dialog chrome matches the rest of the demo exactly (the library itself has no
      dependency on Web Awesome — these are just the host-provided values). */
-  --ui-color-primary-500: var(--wa-color-brand-fill-loud);
+  --ui-color-primary-500: #0078D4;
   --ui-color-success-500: var(--wa-color-success-fill-loud);
   --ui-surface: var(--wa-color-brand-on-loud);
   --ui-text: var(--wa-color-neutral-on-normal);
@@ -105,6 +105,7 @@ h2 {
   -webkit-appearance: none;
   font: inherit;
   font-size: 0.9rem;
+  font-weight: 500;
   line-height: 1.2;
   color: var(--page-fg);
   background: transparent;
@@ -127,7 +128,7 @@ h2 {
 }
 
 .demo-btn:focus-visible {
-  outline: 2px solid var(--wa-color-brand-fill-loud, #0071ec);
+  outline: 2px solid var(--wa-color-brand-fill-loud, #0078D4);
   outline-offset: 1px;
 }
 

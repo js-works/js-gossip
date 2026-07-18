@@ -3,12 +3,7 @@
 // -------------------------------------------------------------------
 
 import { parseSvg } from "../internal/dom.js";
-import {
-  errorIconSvg,
-  infoIconSvg,
-  successIconSvg,
-  warnIconSvg,
-} from "../internal/icons.js";
+import { infoIconSvg, successIconSvg } from "../internal/icons.js";
 import type { Renderable } from "./content.js";
 import type { DialogType } from "./types.js";
 
@@ -20,8 +15,18 @@ export const closeIconSvg = `
 
 const confirmIconSvg = `
   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
-    <path d="M6.95.435c.58-.58 1.52-.58 2.1 0l6.515 6.516c.58.58.58 1.519 0 2.098L9.05 15.565c-.58.58-1.519.58-2.098 0L.435 9.05a1.48 1.48 0 0 1 0-2.098zm1.4.7a.495.495 0 0 0-.7 0L1.134 7.65a.495.495 0 0 0 0 .7l6.516 6.516a.495.495 0 0 0 .7 0l6.516-6.516a.495.495 0 0 0 0-.7L8.35 1.134z"/>
+    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
     <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
+  </svg>
+`;
+
+// Exclamation-octagon, used for the warn and error dialogs (and the reject notice).
+// Defined here (not in internal/icons.js) so the toast warn/error icons are unaffected.
+// fill="currentColor" so it tints with the dialog's severity color.
+export const alertIconSvg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16">
+    <path d="M4.54.146A.5.5 0 0 1 4.893 0h6.214a.5.5 0 0 1 .353.146l4.394 4.394a.5.5 0 0 1 .146.353v6.214a.5.5 0 0 1-.146.353l-4.394 4.394a.5.5 0 0 1-.353.146H4.893a.5.5 0 0 1-.353-.146L.146 11.46A.5.5 0 0 1 0 11.107V4.893a.5.5 0 0 1 .146-.353zM5.1 1 1 5.1v5.8L5.1 15h5.8l4.1-4.1V5.1L10.9 1z"/>
+    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
   </svg>
 `;
 
@@ -32,9 +37,8 @@ export function defaultDialogIcon(dialogType: DialogType): Renderable<any> {
     case "success":
       return parseSvg(successIconSvg);
     case "warn":
-      return parseSvg(warnIconSvg);
     case "error":
-      return parseSvg(errorIconSvg);
+      return parseSvg(alertIconSvg);
     case "confirm":
     case "confirmCritical":
     case "decide":

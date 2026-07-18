@@ -14,6 +14,8 @@ export interface DialogTheme {
   background: string;
   text: string;
   radius: string;
+  /** Colour of the divider line between the body and the footer. */
+  divider: string;
   primaryText: string;
   primaryBackground: string;
   secondaryText: string;
@@ -25,6 +27,10 @@ export interface DialogTheme {
   successAccent: string;
   closeRadius: string;
   actionRadius: string;
+  /** Transition (duration + easing) for action-button hover/press state changes. */
+  buttonTransition: string;
+  /** Scale an action button shrinks to while pressed, e.g. "0.97"; set "1" to disable. */
+  buttonActiveScale: string;
 }
 
 /**
@@ -35,16 +41,19 @@ export const defaultDialogTheme: DialogTheme = {
   background: "light-dark(white, #333)",
   text: "light-dark(black, white)",
   radius: "4px",
+  divider: "light-dark(#e5e7eb, rgba(255, 255, 255, 0.12))",
   primaryText: "var(--ui-surface, #ffffff)",
-  primaryBackground: "var(--ui-color-primary-500, #0071ec)",
+  primaryBackground: "var(--ui-color-primary-500, #0078D4)",
   secondaryText: "var(--ui-text, #1f2430)",
   secondaryBackground: "white",
   secondaryBorder: "#b0b0b0",
   dangerText: "white",
-  dangerBackground: "#dc3146",
+  dangerBackground: "#D03B3B",
   successAccent: "var(--ui-color-success-500, #00883c)",
   closeRadius: "100%",
   actionRadius: "3px",
+  buttonTransition: "120ms ease",
+  buttonActiveScale: "1",
 };
 
 /** Merge partial tokens over {@link defaultDialogTheme} to produce a full DialogTheme. */

@@ -21,6 +21,7 @@ export interface DialogButtonView {
 
 export interface ResolvedNotice {
   type: Severity;
+  title: Renderable<any> | undefined;
   message: Renderable<any>;
 }
 
@@ -38,10 +39,13 @@ export function isDialogNotice(
 export function resolveNotice(
   notice: DialogNotice<any> | Renderable<any>,
 ): ResolvedNotice {
+  // Config notices are always neutral ("info"); only the transient reject notice, built
+  // directly with type "error" in the controller, is severity-coloured. A title is shown
+  // only when the caller configures one — there is no default.
   if (isDialogNotice(notice)) {
-    return { type: notice.type ?? "info", message: notice.message };
+    return { type: "info", title: notice.title, message: notice.message };
   }
-  return { type: "info", message: notice };
+  return { type: "info", title: undefined, message: notice };
 }
 
 export interface DialogView {
