@@ -10,8 +10,8 @@
       "import": "./dist/index.js"
     },
     "./lingo": {
-      "types": "./dist/message-format/index.d.ts",
-      "import": "./dist/message-format/index.js"
+      "types": "./dist/lingo/index.d.ts",
+      "import": "./dist/lingo/index.js"
     },
     "./lingo/english": {
       "types": "./dist/lingo/english.d.ts",
@@ -23,7 +23,7 @@
     },
     "./lingo/xwiki": {
       "types": "./dist/xwiki/index.d.ts",
-      "import": "./dist/wxiki/index.js"
+      "import": "./dist/xwiki/index.js"
     }
   },
   "files": [
@@ -31,11 +31,19 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "typecheck": "tsc",
+    "build": "tsc && rm -rf dist && tsc -p tsconfig.build.json",
+    "build:release": "npm run build && node scripts/pack-source.mts",
+    "preview": "vite preview",
+    "loc": "sloc src/main",
+    "loc:src": "sloc . --exclude 'node_modules|coverage|dist|\\.test\\.|\\.config\\.'",
+    "loc:json": "sloc src/main --format json"
   },
   "devDependencies": {
     "@awesome.me/webawesome": "3.10.0",
+    "@types/archiver": "7.0.0",
+    "archiver": "7.0.1",
+    "sloc": "0.3.2",
     "typescript": "7.0.2",
     "vite": "8.1.1"
   },

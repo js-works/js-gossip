@@ -98,6 +98,39 @@ h2 {
   gap: 0.5rem;
 }
 
+/* Native trigger buttons on the demo page (the dialogs' own buttons are separate).
+   Outline appearance: transparent fill, neutral border, subtle hover/active fill. */
+.demo-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  color: var(--page-fg);
+  background: transparent;
+  border: 1px solid light-dark(#c3c7cf, #3a3f47);
+  border-radius: 3px;
+  padding: 0.4em 0.9em;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.demo-btn:hover {
+  background: light-dark(rgba(0, 0, 0, 0.04), rgba(255, 255, 255, 0.06));
+  border-color: light-dark(#9aa0aa, #565c66);
+}
+
+.demo-btn:active {
+  background: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.1));
+}
+
+.demo-btn:focus-visible {
+  outline: 2px solid var(--wa-color-brand-fill-loud, #0071ec);
+  outline-offset: 1px;
+}
+
 .results {
   min-width: 25em; 
 }

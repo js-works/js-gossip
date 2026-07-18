@@ -1,5 +1,5 @@
 import { allTexts, bundleTexts } from "js-lingo";
-import { dialogTexts, notificationTexts } from "./index.js";
+import { dialogTexts, toastTexts } from "./index.js";
 
 export { germanTexts };
 
@@ -21,12 +21,13 @@ const germanTexts = bundleTexts({
       titleForm: "Eingabe",
       titleFormCritical: "Eingabe",
     }),
-    allTexts(notificationTexts, {
+    allTexts(toastTexts, {
       dismiss: "Benachrichtigung ausblenden",
       info: "Information",
       success: "Erfolg",
       warn: "Warnung",
       error: "Fehler",
+      loading: "Wird geladen",
     }),
   ],
 });

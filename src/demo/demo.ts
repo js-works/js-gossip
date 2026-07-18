@@ -1,20 +1,16 @@
-// Ensure Symbol.dispose exists before any scope is created (needed for `using`
-// and for the scope's [Symbol.dispose] method). Harmless if already present.
-(Symbol as { dispose?: symbol }).dispose ??= Symbol.for("Symbol.dispose");
-
 import { html, render } from "lit";
 
 import {
   createDialogsController,
-  createNotificationsController,
-  litNotificationAdapter,
+  createToastController,
+  litToastAdapter,
   litDialogAdapter,
 } from "../main/index.js";
 
 import type {
   DialogType,
   FormDialogResult,
-  NotificationType,
+  ToastType,
 } from "../main/index.js";
 
 // Web Awesome (installed via npm). The theme stylesheet defines the --wa-* design
@@ -56,14 +52,14 @@ const waButtonVariant = {
   success: "success",
 } as const;
 
-const notifications = createNotificationsController({
-  adapter: litNotificationAdapter,
+const toasts = createToastController({
+  adapter: litToastAdapter,
   maxVisible: 4,
   autoTitles: false,
   autoIcons: true,
   appearance: "light",
-  placement: "bottom-center",
-  overflow: "queue",
+  placement: "top-end",
+  overflow: "evict",
 });
 
 // A single controller for the whole page. getText / getDialogIcon are optional;
@@ -221,13 +217,12 @@ function humanize(type: string): string {
 }
 
 // A demo trigger button; uniform grayish look, clicks wired in the template below.
-const notifier = (type: Exclude<NotificationType, "loading">) => html`
-  <wa-button
-    appearance="filled"
-    variant="neutral"
+const notifier = (type: Exclude<ToastType, "loading">) => html`
+  <button
+    class="demo-btn"
     @click=${() =>
-      void notifications[type]({
-        message: "Notification sent at " + new Date().toLocaleTimeString(),
+      void toasts[type]({
+        message: "Toast sent at " + new Date().toLocaleTimeString(),
         actions: [
           {
             label: "Click me",
@@ -237,18 +232,14 @@ const notifier = (type: Exclude<NotificationType, "loading">) => html`
       })}
   >
     ${humanize(type)}
-  </wa-button>
+  </button>
 `;
 
-// A demo trigger button; uniform grayish look, clicks wired in the template below.
+// A demo trigger button; native <button> with the outline look from demo.css.
 const trigger = (type: DialogType) => html`
-  <wa-button
-    appearance="filled"
-    variant="neutral"
-    @click=${() => void openByType(type)}
-  >
+  <button class="demo-btn" @click=${() => void openByType(type)}>
     ${humanize(type)}
-  </wa-button>
+  </button>
 `;
 
 // Scope demo: two dialogs sharing one surface, torn down at the end.
@@ -278,7 +269,7 @@ async function runWizard(): Promise<void> {
 
     logFormResult("Wizard finished", step2);
   } finally {
-    scope[Symbol.dispose]();
+    scope.close();
   }
 }
 
@@ -308,7 +299,7 @@ async function runSlow(): Promise<void> {
     });
     log("slow open result", result);
   } finally {
-    scope[Symbol.dispose]();
+    scope.close();
   }
 }
 
@@ -382,7 +373,7 @@ async function runLogin(): Promise<void> {
       });
     }
   } finally {
-    session[Symbol.dispose]();
+    session.close();
   }
 }
 
@@ -408,7 +399,7 @@ const page = html`
   <main class="page">
     <div>
       <section>
-        <h2>Notifications</h2>
+        <h2>Toasts</h2>
         <div class="row">
           ${notifier("info")} ${notifier("success")} ${notifier("warn")}
           ${notifier("error")}
@@ -439,40 +430,24 @@ const page = html`
       <section>
         <h2>Scope (sequential dialogs sharing one surface)</h2>
         <div class="row">
-          <wa-button
-            appearance="filled"
-            variant="neutral"
-            @click=${() => void runWizard()}
-          >
+          <button class="demo-btn" @click=${() => void runWizard()}>
             Run 2-step wizard
-          </wa-button>
-          <wa-button
-            appearance="filled"
-            variant="neutral"
-            @click=${() => void runSlow()}
-          >
+          </button>
+          <button class="demo-btn" @click=${() => void runSlow()}>
             Slow open (shows spinner placeholder)
-          </wa-button>
+          </button>
         </div>
       </section>
 
       <section>
         <h2>Form retry with notice</h2>
         <div class="row">
-          <wa-button
-            appearance="filled"
-            variant="neutral"
-            @click=${() => void runLogin()}
-          >
+          <button class="demo-btn" @click=${() => void runLogin()}>
             Login (retry until password is "secret")
-          </wa-button>
-          <wa-button
-            appearance="filled"
-            variant="neutral"
-            @click=${() => void runNoticeForm()}
-          >
+          </button>
+          <button class="demo-btn" @click=${() => void runNoticeForm()}>
             Form with initial notice
-          </wa-button>
+          </button>
         </div>
       </section>
     </div>
