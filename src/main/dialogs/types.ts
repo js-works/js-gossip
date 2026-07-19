@@ -2,7 +2,6 @@
 // # Public types
 // -------------------------------------------------------------------
 
-import type { Severity } from "../internal/severity.js";
 import type { DialogTheme } from "./theme.js";
 import type { ContentAdapter, Renderable } from "./content.js";
 import type { DialogTexts } from "./texts.js";
@@ -41,10 +40,9 @@ export interface CloseButtonRender {
   onClose: () => void;
 }
 
-/** Descriptor passed to a custom notice renderer. */
-export interface NoticeRender<C extends object = never> {
-  variant: Severity;
-  /** The configured heading, or undefined for a message-only notice. */
+/** Descriptor passed to a custom reject-message renderer (see FormAttempt.reject). */
+export interface RejectMessageRender<C extends object = never> {
+  /** The configured heading, or undefined for a message-only reject message. */
   title: Renderable<C> | undefined;
   message: Renderable<C>;
 }
@@ -54,7 +52,7 @@ export interface NoticeRender<C extends object = never> {
  * renders nothing of its own for that part and inserts the returned Renderable instead
  * (so the caller can drop in their design system's components). A custom part supplies
  * its own states/animation from the descriptor — e.g. a custom action button shows its
- * own loading state, and a custom notice provides its own enter/leave animation.
+ * own loading state, and a custom reject message provides its own enter/leave animation.
  *
  * Overrides return `Renderable<C>`: a Node/string directly, or framework content when an
  * `adapter` is configured (their returns are checked against the same `C` as content).
@@ -62,7 +60,7 @@ export interface NoticeRender<C extends object = never> {
 export interface DialogRenderOverrides<C extends object = never> {
   actionButton?(button: ActionButtonRender): Renderable<C>;
   closeButton?(close: CloseButtonRender): Renderable<C>;
-  notice?(notice: NoticeRender<C>): Renderable<C>;
+  rejectMessage?(message: RejectMessageRender<C>): Renderable<C>;
 }
 
 export interface DialogsControllerConfig<C extends object = never> {
@@ -93,18 +91,6 @@ export interface DialogButtonLabels {
   no?: string;
 }
 
-/**
- * A notice shown between the content and the buttons. A dialog can show two at once: a
- * persistent one set via config (like a form field's help text), which stays for the
- * life of the dialog, and a transient one raised on a form reject (like error text),
- * which appears below it and clears itself when the user edits the form.
- */
-export interface DialogNotice<C extends object = never> {
-  /** Optional heading shown above the message. Omit for a message-only notice. */
-  title?: Renderable<C>;
-  message: Renderable<C>;
-}
-
 export interface BaseDialogConfig<C extends object = never> {
   title?: Renderable<C>;
   subtitle?: Renderable<C>;
@@ -119,8 +105,6 @@ export interface BaseDialogConfig<C extends object = never> {
   outro?: Renderable<C>;
   styles?: Styles;
   buttons?: DialogButtonLabels;
-  /** Initial notice. Forms can also raise one on a rejected attempt (see form()). */
-  notice?: DialogNotice<C> | Renderable<C> | null;
   /**
    * Abort this dialog. When the signal aborts, the dialog closes immediately and the
    * call resolves `{ canceled: true, aborted: true }`. Combined with any scope-level
@@ -219,17 +203,17 @@ export interface FormAttempt<C extends object = never> {
   /** Accept the submission: resolve the dialog and close it. */
   accept(): void;
   /**
-   * Reject it: keep the dialog open (values preserved) and show an error notice with the
-   * given message, and an optional heading. A reject is always styled as an error.
+   * Reject it: keep the dialog open (values preserved) and show a reject message with
+   * this text, and an optional heading. A reject is always styled as an error.
    */
   reject(message: Renderable<C>, title?: Renderable<C>): void;
 }
 
 /**
  * Returned by formAttempts()/formCriticalAttempts(). `for await` it to intercept each
- * submit and accept/reject (retry with a notice); it is also awaitable, which resolves
- * to the final result once the loop ends. After the loop, read `result` to see whether
- * the form was confirmed or canceled.
+ * submit and accept/reject (retry with a reject message); it is also awaitable, which
+ * resolves to the final result once the loop ends. After the loop, read `result` to see
+ * whether the form was confirmed or canceled.
  */
 export type FormInteraction<C extends object = never> = Promise<FormDialogResult> &
   AsyncIterable<FormAttempt<C>> & {

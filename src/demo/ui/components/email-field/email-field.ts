@@ -3,9 +3,10 @@ import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
+import { emailIcon } from "./icons/email.icon.js";
 
-@customElement("ui-input-field")
-export class UiInputField extends LitElement {
+@customElement("ui-email-field")
+export class UiEmailField extends LitElement {
   static formAssociated = true;
 
   #internals: ElementInternals;
@@ -17,8 +18,10 @@ export class UiInputField extends LitElement {
   @property()
   accessor value = "";
 
+  // Default to "off": autocomplete's native default ("on") is rarely what a form
+  // actually wants.
   @property()
-  accessor type: HTMLInputElement["type"] = "text";
+  accessor autocomplete = "off";
 
   @property({ type: Boolean })
   accessor disabled = false;
@@ -36,15 +39,7 @@ export class UiInputField extends LitElement {
   accessor maxlength: number | undefined = undefined;
 
   @property()
-  accessor pattern = "";
-
-  @property()
   accessor placeholder = "";
-
-  // Default to "off": autocomplete's native default ("on") is rarely what a form
-  // actually wants.
-  @property()
-  accessor autocomplete = "off";
 
   constructor() {
     super();
@@ -59,20 +54,44 @@ export class UiInputField extends LitElement {
     defaultTheme,
     css`
       :host {
+        display: block;
+      }
+
+      /* The border lives on the wrapper, surrounding both the input and the icon;
+         the input itself stays borderless so the two read as one control. */
+      .wrapper {
         display: flex;
+        align-items: center;
+        border: 1px solid var(--ui-color-gray-600, #999);
+        border-radius: var(--ui-radius-sm, 0.25rem);
+        box-sizing: border-box;
       }
 
       input {
         flex-grow: 1;
+        min-width: 0;
+        padding: 0.5rem;
         font-family: var(--ui-font-sans, inherit);
         font-size: inherit;
-        padding: 0.5rem;
-        border: 1px solid var(--ui-color-gray-600, #999);
-        border-radius: var(--ui-radius-sm, 0.25rem);
+        border: none;
+        background: transparent;
       }
 
-      :host([invalid]) input {
-        border-color: var(--ui-color-danger-500, red);
+      input:focus {
+        outline: none;
+      }
+
+      .icon {
+        flex: none;
+        display: flex;
+        align-items: center;
+        padding-inline-end: 0.5rem;
+        font-size: 1em;
+        color: inherit;
+      }
+
+      :host([invalid]) .wrapper {
+        border-color: var(--ui-color-danger-500, crimson);
       }
     `,
   ];
@@ -91,8 +110,7 @@ export class UiInputField extends LitElement {
     if (
       changed.has("required") ||
       changed.has("minlength") ||
-      changed.has("maxlength") ||
-      changed.has("pattern")
+      changed.has("maxlength")
     ) {
       this.#syncValidity();
     }
@@ -102,37 +120,19 @@ export class UiInputField extends LitElement {
     this.#internals.setFormValue(this.disabled ? null : this.value);
   }
 
+  // Delegates to the internal <input type="email">'s own ValidityState, so the
+  // browser's native email-format check (typeMismatch) is reused rather than
+  // reimplemented.
   #syncValidity() {
-    if (!this.#input) return;
-
-    const flags: ValidityStateFlags = {};
-    let message = "";
-
-    if (this.required && !this.value) {
-      flags.valueMissing = true;
-      message = "This field is required.";
+    if (!this.#input) {
+      return;
     }
 
-    if (this.minlength !== undefined && this.value.length < this.minlength) {
-      flags.tooShort = true;
-      message = `Minimum length is ${this.minlength}.`;
-    }
-
-    if (this.maxlength !== undefined && this.value.length > this.maxlength) {
-      flags.tooLong = true;
-      message = `Maximum length is ${this.maxlength}.`;
-    }
-
-    if (
-      this.pattern &&
-      this.value &&
-      !new RegExp(this.pattern).test(this.value)
-    ) {
-      flags.patternMismatch = true;
-      message = "Invalid format.";
-    }
-
-    this.#internals.setValidity(flags, message, this.#input);
+    this.#internals.setValidity(
+      this.#input.validity,
+      this.#input.validationMessage,
+      this.#input,
+    );
 
     this.toggleAttribute("invalid", !this.#internals.validity.valid);
   }
@@ -215,22 +215,24 @@ export class UiInputField extends LitElement {
 
   render() {
     return html`
-      <input
-        .value=${this.value}
-        name=${this.name}
-        type=${this.type}
-        placeholder=${this.placeholder}
-        autocomplete=${this.autocomplete}
-        spellcheck=${this.spellcheck}
-        ?disabled=${this.disabled}
-        ?required=${this.required}
-        ?readonly=${this.readonly}
-        minlength=${this.minlength ?? ""}
-        maxlength=${this.maxlength ?? ""}
-        pattern=${this.pattern}
-        @input=${this.#onInput}
-        @change=${this.#onChange}
-      />
+      <div class="wrapper">
+        <input
+          .value=${this.value}
+          name=${this.name}
+          type="email"
+          placeholder=${this.placeholder}
+          autocomplete=${this.autocomplete}
+          spellcheck=${this.spellcheck}
+          ?disabled=${this.disabled}
+          ?required=${this.required}
+          ?readonly=${this.readonly}
+          minlength=${this.minlength ?? ""}
+          maxlength=${this.maxlength ?? ""}
+          @input=${this.#onInput}
+          @change=${this.#onChange}
+        />
+        <span class="icon">${emailIcon}</span>
+      </div>
     `;
   }
 }

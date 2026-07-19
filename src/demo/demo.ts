@@ -16,6 +16,7 @@ import type {
 // Custom form-associated fields — used only in the login demo below, to show the
 // library working with a third-party (Lit-based) custom element's inputs.
 import "./ui/components/text-field/text-field.js";
+import "./ui/components/email-field/email-field.js";
 import "./ui/components/password-field/password-field.js";
 
 // Assigned after the page template is rendered into #app (bottom of this file).
@@ -59,30 +60,21 @@ const dialogs = createDialogsController({
   autoIcons: true,
 });
 
-// Example form content, plain native form controls. Native inputs are natively
-// form-associated, so the dialog's `new FormData(form)` reads them normally. `name`
-// is required so you can see validation block the confirm button.
+// Example form content, using the demo's own custom form-associated fields (see
+// src/demo/ui/components). `name` is required so you can see validation block the
+// confirm button.
 const formContent = () => html`
   <label class="field">
     Name
-    <input
-      name="name"
-      placeholder="Jane Doe"
-      required
-      autocomplete="off"
-      spellcheck="false"
-      autofocus
-    />
+    <ui-input-field name="name" placeholder="Jane Doe" required autofocus>
+    </ui-input-field>
   </label>
   <label class="field">
     Email
-    <input
+    <ui-email-field
       name="email"
-      type="email"
       placeholder="jane@example.com"
-      autocomplete="off"
-      spellcheck="false"
-    />
+    ></ui-email-field>
   </label>
   <label class="field field-checkbox">
     <input type="checkbox" name="subscribe" value="yes" />
@@ -90,23 +82,12 @@ const formContent = () => html`
   </label>
 `;
 
-// The dialog wraps slotted content in a `.content` element; this lays the fields out
-// in a column and gives the native inputs the same look as the rest of the demo.
+// The dialog wraps slotted content in a `.content` element; this just lays the fields
+// out in a column. The custom field components bring their own styling; only the
+// native checkbox (no custom counterpart) needs anything here.
 const formStyles = `
   .content { display: flex; flex-direction: column; gap: 1rem; }
   .field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
-  .field input:not([type="checkbox"]) {
-    font: inherit;
-    padding: 0.45em 0.7em;
-    border: 1px solid light-dark(#c3c7cf, #3a3f47);
-    border-radius: 4px;
-    background: light-dark(#ffffff, #1e2126);
-    color: inherit;
-  }
-  .field input:focus-visible {
-    outline: 2px solid var(--ui-color-primary-500);
-    outline-offset: 1px;
-  }
   .field-checkbox { flex-direction: row; align-items: center; gap: 0.5rem; }
 `;
 
@@ -301,7 +282,8 @@ async function runSlow(): Promise<void> {
 
 // Login with retry: the form is an async-iterable "interaction". Each iteration is
 // a submit attempt; the caller does async work and then accept()s or reject()s it.
-// reject() keeps the *same* dialog open (entered values preserved) and shows a notice.
+// reject() keeps the *same* dialog open (entered values preserved) and shows a reject
+// message.
 // Awaiting the interaction after the loop yields the final result (accepted or canceled).
 async function runLogin(): Promise<void> {
   const session = dialogs.open();
@@ -311,13 +293,12 @@ async function runLogin(): Promise<void> {
       content: html`
         <label class="field">
           Email
-          <ui-input-field
+          <ui-email-field
             name="email"
-            type="email"
             required
             value="jane.doe@gmail.com"
             autofocus
-          ></ui-input-field>
+          ></ui-email-field>
         </label>
         <label class="field">
           Password
@@ -330,11 +311,6 @@ async function runLogin(): Promise<void> {
       `,
       styles: formStyles,
       buttons: { confirm: "Sign in" },
-      // Config notice, shown while the dialog is open (like a field's help text). It's
-      // overridden by the reject notice below and reappears once the user edits.
-      notice: {
-        message: 'Demo hint: The password is "secret".',
-      },
     });
 
     for await (const attempt of login) {
@@ -374,24 +350,12 @@ async function runLogin(): Promise<void> {
   }
 }
 
-// A plain (awaited) form that simply opens with a notice already showing.
-async function runNoticeForm(): Promise<void> {
-  const result = await dialogs.form({
-    intro: "Please review the highlighted note.",
-    content: formContent(),
-    styles: formStyles,
-    notice: {
-      message: "Some fields could not be verified.",
-    },
-  });
-  logFormResult("Notice form result", result);
-}
-
 // -------------------------------------------------------------------
 // Page template — the whole demo UI lives here; index.html only hosts #app.
 // -------------------------------------------------------------------
 
 const page = html`
+  <input id="suggestion-input" />
   <main class="page">
     <div>
       <section>
@@ -436,13 +400,10 @@ const page = html`
       </section>
 
       <section>
-        <h2>Form retry with notice</h2>
+        <h2>Form retry with reject message</h2>
         <div class="row">
           <button class="demo-btn" @click=${() => void runLogin()}>
             Login (retry until password is "secret")
-          </button>
-          <button class="demo-btn" @click=${() => void runNoticeForm()}>
-            Form with initial notice
           </button>
         </div>
       </section>

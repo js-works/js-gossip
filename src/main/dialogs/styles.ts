@@ -27,9 +27,9 @@ const theme = {
   buttonActiveScale: `var(--dialog-button-active-scale, ${defaultDialogTheme.buttonActiveScale})`,
 } as const;
 
-// Duration of the notice appear/disappear (collapse) animation. Drives both the CSS
-// transition and the JS timer that removes the element after the collapse finishes.
-export const NOTICE_ANIM_MS = 350;
+// Duration of the reject message appear/disappear (collapse) animation. Drives both the
+// CSS transition and the JS timer that removes the element after the collapse finishes.
+export const REJECT_MESSAGE_ANIM_MS = 350;
 
 // Duration of the dialog grow-in (entrance) and fade-out (close) animations.
 export const DIALOG_ANIM_MS = 200;
@@ -134,8 +134,8 @@ const dialogStyles = `
   }
 
   .dialog-content {
-    /* Chrome (titles, buttons) stays unselectable; the body and notice opt back into
-       text selection below so error messages can be copied. */
+    /* Chrome (titles, buttons) stays unselectable; the body and reject message opt back
+       into text selection below so error messages can be copied. */
     user-select: none;
     min-width: 20em;
     font-size: 16px;
@@ -147,7 +147,7 @@ const dialogStyles = `
   .dialog-content .header {
     display: flex;
     align-items: center;
-    gap: 0.75em;
+    gap: 0.6em;
     padding: 1.25em 1.5em 0.75em;
   }
 
@@ -187,7 +187,6 @@ const dialogStyles = `
   }
 
   .dialog-content .footer {
-    padding: 0.6em 1.5em;
     border-top: 1px solid ${theme.dividerColor};
     user-select: none;
   }
@@ -196,6 +195,7 @@ const dialogStyles = `
     display: flex;
     flex-direction: row-reverse;
     gap: 0.4em;
+    padding: 0.6em 1.5em;
   }
 
   .action-button {
@@ -320,112 +320,70 @@ const dialogStyles = `
     );
   }
 
-  /* Notice = icon + message in a bordered box. Base styling is the neutral *config*
-     notice: light-gray border, blackish text + info icon, no fill. */
-  .notice {
+  /* Reject message (see FormAttempt.reject): lives inside the footer (see element.ts
+     #setRejectMessage), as its first child — flush against the footer's top border
+     (the divider line) with no gap, and edge-to-edge across the dialog with no rounding.
+     Flat fill, normal text color, reddish icon. */
+  .reject-message {
     display: flex;
     align-items: center;
-    gap: 0.65em;
-    margin: 0.7em 1.5em 0.75em 1.5em;
-    padding: 0.45em 0.65em;
-    border-radius: 4px;
-    border: 1px solid color-mix(in srgb, ${theme.textColor} 13%, transparent);
+    gap: 0.85em;
+    margin: 0;
+    padding: 0.6em 1.5em;
+    border: none;
+    border-radius: 0;
     color: ${theme.textColor};
-    font-size: 0.9em;
+    background-color: #f8f8f8;
+    font-size: 0.85em;
     line-height: 1.35;
     overflow: hidden;
     max-height: 12em;
     user-select: text;
 
     transition:
-      max-height ${NOTICE_ANIM_MS}ms ease,
-      opacity ${NOTICE_ANIM_MS}ms ease,
-      margin-top ${NOTICE_ANIM_MS}ms ease,
-      margin-bottom ${NOTICE_ANIM_MS}ms ease,
-      padding-top ${NOTICE_ANIM_MS}ms ease,
-      padding-bottom ${NOTICE_ANIM_MS}ms ease,
-      border-top-width ${NOTICE_ANIM_MS}ms ease,
-      border-bottom-width ${NOTICE_ANIM_MS}ms ease;
+      max-height ${REJECT_MESSAGE_ANIM_MS}ms ease,
+      opacity ${REJECT_MESSAGE_ANIM_MS}ms ease,
+      padding-top ${REJECT_MESSAGE_ANIM_MS}ms ease,
+      padding-bottom ${REJECT_MESSAGE_ANIM_MS}ms ease;
   }
 
-  /* Leading icon (info for the config notice, error for the reject notice); it tints
-     with the notice's own color via currentColor. */
-  .notice-icon {
+  .reject-message .reject-message-icon {
     flex: none;
     display: flex;
     align-items: center;
-    font-size: 1.15em;
+    font-size: 1.4em;
     line-height: 1;
+    color: ${theme.dangerBackgroundColor};
   }
 
-  .notice-body {
+  .reject-message-body {
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 1px;
   }
-  .notice-title {
+  .reject-message-title {
     font-weight: 600;
     line-height: 1.15;
   }
-  .notice-message {
+  .reject-message-text {
     line-height: 1.25;
   }
-  .notice-icon svg {
+  .reject-message-icon svg {
     display: block;
     width: 1em;
     height: 1em;
-    /* These glyphs draw to the edge of their 16×16 viewBox; the SVG viewport would
+    /* This glyph draws to the edge of its 16×16 viewBox; the SVG viewport would
        otherwise shave that outer edge at this small size. */
     overflow: visible;
   }
 
-  .notice.dismissing,
-  .notice.entering {
+  .reject-message.dismissing,
+  .reject-message.entering {
     max-height: 0;
     opacity: 0;
-    margin-top: 0;
-    margin-bottom: 0;
     padding-top: 0;
     padding-bottom: 0;
-    border-top-width: 0;
-    border-bottom-width: 0;
-  }
-
-  /* Reject notice: black icon + text on a neutral fill, with a lighter gray
-     border than the base (config) notice; extra margin-top for breathing room
-     above it (overridden below when it follows the config notice). */
-  .notice-error {
-    margin-top: 1.5em;
-    color: #000;
-    background-color: light-dark(#ececec, #444);
-    border-color: color-mix(in srgb, ${theme.textColor} 7%, transparent);
-  }
-
-  /* The reject notice, when it follows the config notice, is pulled up with a negative
-     top margin so the gap between the two stays small. The gap belongs to the *reject*
-     notice: as it dismisses, its top margin animates back to 0 in step with its collapse,
-     so the whole gap closes with the notice and the config notice above never moves. */
-  .notice + .notice {
-    margin-top: -0.45em;
-  }
-  .notice + .notice.entering,
-  .notice + .notice.dismissing {
-    margin-top: 0;
-  }
-
-  /* The reject notice still wants extra gap above it even when it follows the config
-     notice — just less than its standalone margin-top, and less negative than a
-     plain second notice would get. These two rules match with the same specificity
-     as the ones above (same selector shape, one more class each); source order
-     applies each pair correctly, and the entering/dismissing pair (3 classes) beats
-     both resting-state pairs (2 classes) so the collapse animation stays untouched. */
-  .notice + .notice-error {
-    margin-top: 0.125em;
-  }
-  .notice + .notice-error.entering,
-  .notice + .notice-error.dismissing {
-    margin-top: 0;
   }
 
   @keyframes dialog-fade-out {

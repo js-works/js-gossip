@@ -26,7 +26,6 @@ import { FormDialogData } from "./form-data.js";
 import { defaultDialogIcon } from "./icons.js";
 import { BUTTON_SPINNER_DELAY_MS, SPINNER_DIALOG_DELAY_MS } from "./styles.js";
 import { defaultDialogTexts } from "./texts.js";
-import { resolveNotice } from "./view.js";
 import type { Renderable } from "./content.js";
 import type { TextKey } from "./texts.js";
 import type { DialogButtonView, DialogHandle, DialogView } from "./view.js";
@@ -402,7 +401,6 @@ function createDialogScope<C extends object = never>(
       intro: cfg.intro,
       content: cfg.content,
       outro: cfg.outro,
-      notice: cfg.notice != null ? resolveNotice(cfg.notice) : null,
       hasForm: spec.allowsForm,
       buttons: buttonViews,
       // Enter triggers the primary (first) button — except on critical dialogs, where
@@ -443,7 +441,7 @@ function createDialogScope<C extends object = never>(
 
   // Form dialogs return a FormInteraction: awaiting it auto-accepts the first valid
   // submit; `for await` intercepts each submit so the caller can accept() or reject()
-  // (the latter keeping the same dialog open and showing a notice).
+  // (the latter keeping the same dialog open and showing a reject message).
   function openForm(spec: OpenDialogSpec): FormInteraction<any> {
     const queue = createAttemptQueue();
     const cleanup = new AbortController();
@@ -475,7 +473,7 @@ function createDialogScope<C extends object = never>(
             },
             reject(message, title) {
               stopSpinner();
-              dialogHandle.raiseNotice({ type: "error", title, message });
+              dialogHandle.raiseRejectMessage({ title, message });
             },
           });
         } else {

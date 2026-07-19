@@ -10,13 +10,12 @@ import {
   h,
   parseSvg,
 } from "../internal/dom.js";
-import { errorIconSvg, infoIconSvg } from "../internal/icons.js";
 import { insertContent, withLineBreaks } from "./content.js";
-import { closeIconSvg } from "./icons.js";
+import { closeIconSvg, rejectIconSvg } from "./icons.js";
 import {
   CLOSE_ANIMATION_FALLBACK_MS,
   DIALOG_ANIM_MS,
-  NOTICE_ANIM_MS,
+  REJECT_MESSAGE_ANIM_MS,
   STYLE_TEXT,
   SWAP_OUT_MS,
 } from "./styles.js";
@@ -26,7 +25,7 @@ import type {
   DialogButtonView,
   DialogHandle,
   DialogView,
-  ResolvedNotice,
+  ResolvedRejectMessage,
 } from "./view.js";
 
 // -------------------------------------------------------------------
@@ -107,9 +106,10 @@ const DialogElementBase: typeof HTMLElement =
 /**
  * The presentational dialog element: a native `<dialog>` shell in a shadow root, with
  * caller content projected through named slots — `icon`, `title`, `subtitle`, `intro`,
- * `content`, `outro`. The notice and action buttons are library-owned chrome built in
- * the shadow root, since they carry wired behavior (loading spinner, validate/submit,
- * the notice state machine) that isn't expressible as plain slotted markup.
+ * `content`, `outro`. The reject message and action buttons are library-owned chrome
+ * built in the shadow root, since they carry wired behavior (loading spinner,
+ * validate/submit, the reject-message state machine) that isn't expressible as plain
+ * slotted markup.
  *
  * A single `<dialog>` node is reused across a scope: it grows in on first show and, for
  * each subsequent view, fades the current box out and grows the new one back in without
@@ -135,7 +135,7 @@ class Dialog extends DialogElementBase {
 
   // Rebuilt each view; kept for targeted mutation between views.
   #contentEl: HTMLElement | null = null; // .dialog-content
-  #footerEl: HTMLElement | null = null; // insertion anchor for notices
+  #footerEl: HTMLElement | null = null; // insertion anchor for the reject message
   #buttonEls: HTMLElement[] = [];
   #buttonViews: DialogButtonView[] = [];
 
@@ -146,12 +146,10 @@ class Dialog extends DialogElementBase {
   #onClose: () => void = () => {};
   #onCancel: () => void = () => {};
 
-  // notice state: the config notice (#baseNotice) is always shown while the dialog is
-  // open; a reject raises a transient error notice shown *in addition*, below it.
-  #baseNotice: ResolvedNotice | null = null;
-  #transientNotice: ResolvedNotice | null = null;
-  #transientEl: HTMLElement | null = null;
-  #noticeDismissTimer: ReturnType<typeof setTimeout> | null = null;
+  // The reject message, raised via raiseRejectMessage() (see FormAttempt.reject).
+  #rejectMessage: ResolvedRejectMessage | null = null;
+  #rejectMessageEl: HTMLElement | null = null;
+  #rejectMessageDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   #focusBeforeBusy: HTMLElement | null = null;
   #loading = new Set<number>();
@@ -236,8 +234,8 @@ class Dialog extends DialogElementBase {
     }
   }
 
-  raiseNotice(notice: ResolvedNotice): void {
-    this.#setTransientNotice(notice);
+  raiseRejectMessage(message: ResolvedRejectMessage): void {
+    this.#setRejectMessage(message);
   }
 
   setButtonLoading(index: number, loading: boolean): void {
@@ -370,15 +368,14 @@ class Dialog extends DialogElementBase {
     this.#adapter = view.adapter;
     this.#onClose = view.onClose;
     this.#onCancel = view.onCancel;
-    this.#baseNotice = view.notice;
 
-    // Reset transient-notice state (the old node lived in the content we're replacing).
-    if (this.#noticeDismissTimer != null) {
-      clearTimeout(this.#noticeDismissTimer);
-      this.#noticeDismissTimer = null;
+    // Reset reject-message state (the old node lived in the content we're replacing).
+    if (this.#rejectMessageDismissTimer != null) {
+      clearTimeout(this.#rejectMessageDismissTimer);
+      this.#rejectMessageDismissTimer = null;
     }
-    this.#transientNotice = null;
-    this.#transientEl = null;
+    this.#rejectMessage = null;
+    this.#rejectMessageEl = null;
     this.#loading.clear();
     this.#focusBeforeBusy = null;
 
@@ -493,7 +490,7 @@ class Dialog extends DialogElementBase {
       {
         class: "body",
         id: "dialog-body",
-        oninput: this.#dismissTransientNotice,
+        oninput: this.#dismissRejectMessage,
       },
       h("slot", { name: "intro" }),
       h("slot", { name: "content" }),
@@ -511,22 +508,13 @@ class Dialog extends DialogElementBase {
     const content = h("div", { class: "dialog-content" }, header, body, footer);
     this.#contentEl = content;
 
-    // The config notice sits between body and footer; the transient notice (if raised)
-    // is later inserted right before the footer, i.e. directly after this one.
-    if (this.#baseNotice) {
-      content.insertBefore(
-        this.#renderNoticeNode(this.#baseNotice, false),
-        footer,
-      );
-    }
-
     return content;
   }
 
   #renderButton(b: DialogButtonView, i: number): HTMLElement {
     const loading = this.#loading.has(i);
     const onClick = () => {
-      this.#dismissTransientNotice();
+      this.#dismissRejectMessage();
       b.onClick();
     };
     if (this.#renderOverrides?.actionButton) {
@@ -555,91 +543,80 @@ class Dialog extends DialogElementBase {
     );
   }
 
-  // Render a notice element. The transient (reject) notice is `animated` — it carries the
-  // enter/collapse classes and role="alert"; the persistent config notice is static with
-  // role="status". Both honor the caller's custom-notice render override.
-  #renderNoticeNode(
-    notice: ResolvedNotice,
-    animated: boolean,
+  // Render the reject message element (see FormAttempt.reject). Honors the caller's
+  // custom render override.
+  #renderRejectMessageNode(
+    message: ResolvedRejectMessage,
     entering = false,
   ): HTMLElement {
     const r = this.#renderOverrides;
-    if (r?.notice) {
-      const node = r.notice({
-        variant: notice.type,
-        title: notice.title,
-        message: notice.message,
+    if (r?.rejectMessage) {
+      const node = r.rejectMessage({
+        title: message.title,
+        message: message.message,
       });
       return node instanceof HTMLElement
         ? node
         : h("div", null, this.#node(node));
     }
-    // `animated` marks the transient reject notice: red, with the exclamation-triangle
-    // icon. Otherwise it's the config notice, rendered neutral (info icon) regardless of
-    // its configured `type`.
-    const cls = animated
-      ? `notice notice-error${entering ? " entering" : ""}`
-      : "notice";
     return h(
       "div",
-      { class: cls, role: animated ? "alert" : "status" },
-      h(
-        "span",
-        { class: "notice-icon" },
-        parseSvg(animated ? errorIconSvg : infoIconSvg),
-      ),
+      { class: `reject-message${entering ? " entering" : ""}`, role: "alert" },
+      h("span", { class: "reject-message-icon" }, parseSvg(rejectIconSvg)),
       h(
         "div",
-        { class: "notice-body" },
-        notice.title != null
-          ? h("div", { class: "notice-title" }, this.#node(notice.title))
+        { class: "reject-message-body" },
+        message.title != null
+          ? h("div", { class: "reject-message-title" }, this.#node(message.title))
           : null,
-        h("div", { class: "notice-message" }, this.#node(notice.message)),
+        h("div", { class: "reject-message-text" }, this.#node(message.message)),
       ),
     );
   }
 
-  // Raise (or update / dismiss) the transient notice. Creating it adds the `entering`
+  // Raise (or update / dismiss) the reject message. Creating it adds the `entering`
   // class then removes it on the next frames so the CSS transition plays; dismissing adds
   // `dismissing` and removes the node once the collapse finishes.
-  #setTransientNotice(notice: ResolvedNotice | null): void {
-    if (this.#noticeDismissTimer != null) {
-      clearTimeout(this.#noticeDismissTimer);
-      this.#noticeDismissTimer = null;
+  #setRejectMessage(message: ResolvedRejectMessage | null): void {
+    if (this.#rejectMessageDismissTimer != null) {
+      clearTimeout(this.#rejectMessageDismissTimer);
+      this.#rejectMessageDismissTimer = null;
     }
 
-    if (notice) {
-      this.#transientNotice = notice;
-      if (this.#transientEl) {
+    if (message) {
+      this.#rejectMessage = message;
+      if (this.#rejectMessageEl) {
         // Consecutive rejects: replace the node in place (no re-enter animation).
-        const next = this.#renderNoticeNode(notice, true, false);
-        this.#transientEl.replaceWith(next);
-        this.#transientEl = next;
-      } else if (this.#contentEl && this.#footerEl) {
-        const el = this.#renderNoticeNode(notice, true, true);
-        this.#contentEl.insertBefore(el, this.#footerEl);
-        this.#transientEl = el;
+        const next = this.#renderRejectMessageNode(message);
+        this.#rejectMessageEl.replaceWith(next);
+        this.#rejectMessageEl = next;
+      } else if (this.#footerEl) {
+        const el = this.#renderRejectMessageNode(message, true);
+        // Inserted as the footer's first child: below the divider line (the footer's
+        // top border), above the action buttons.
+        this.#footerEl.insertBefore(el, this.#footerEl.firstChild);
+        this.#rejectMessageEl = el;
         doubleRaf(() => el.classList.remove("entering"));
       }
     } else {
-      this.#transientNotice = null;
-      const el = this.#transientEl;
+      this.#rejectMessage = null;
+      const el = this.#rejectMessageEl;
       if (el) {
         el.classList.add("dismissing");
-        this.#noticeDismissTimer = setTimeout(() => {
+        this.#rejectMessageDismissTimer = setTimeout(() => {
           el.remove();
-          if (this.#transientEl === el) this.#transientEl = null;
-          this.#noticeDismissTimer = null;
-        }, NOTICE_ANIM_MS);
+          if (this.#rejectMessageEl === el) this.#rejectMessageEl = null;
+          this.#rejectMessageDismissTimer = null;
+        }, REJECT_MESSAGE_ANIM_MS);
       }
     }
   }
 
-  #dismissTransientNotice = (): void => {
-    if (this.#transientNotice == null) {
+  #dismissRejectMessage = (): void => {
+    if (this.#rejectMessage == null) {
       return;
     }
-    this.#setTransientNotice(null);
+    this.#setRejectMessage(null);
   };
 
   // On open, focus sensibly: an explicit [autofocus] in slotted content wins; else the
@@ -719,7 +696,7 @@ class Dialog extends DialogElementBase {
       return;
     }
     ev.preventDefault();
-    this.#dismissTransientNotice();
+    this.#dismissRejectMessage();
     button.onClick();
   };
 }
@@ -742,7 +719,7 @@ function handleFor(el: Dialog): DialogHandle {
     update: (view) => el.setView(view),
     close: () => el.closeDialog(),
     setButtonLoading: (index, loading) => el.setButtonLoading(index, loading),
-    raiseNotice: (notice) => el.raiseNotice(notice),
+    raiseRejectMessage: (message) => el.raiseRejectMessage(message),
     getForm: () => el.getForm(),
   };
 }

@@ -2,7 +2,7 @@
 // Content model: how caller/override values become DOM nodes.
 // -------------------------------------------------------------------
 
-// Content the caller hands in (title, body, icon, notice message, and the values a render
+// Content the caller hands in (title, body, icon, reject message, and the values a render
 // override returns). `C` is the caller's framework content type — a Lit TemplateResult, a
 // React node, etc. — normally inferred from the configured `adapter`. `string` is always
 // allowed: plain text needs no framework and the core turns it into a text node directly.

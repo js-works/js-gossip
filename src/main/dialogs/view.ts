@@ -4,11 +4,9 @@
 // DialogHandle. Neither is part of the public API.
 // -------------------------------------------------------------------
 
-import type { Severity } from "../internal/severity.js";
 import type { ContentAdapter, Renderable } from "./content.js";
 import type {
   ActionButtonType,
-  DialogNotice,
   DialogRenderOverrides,
   DialogType,
 } from "./types.js";
@@ -19,33 +17,9 @@ export interface DialogButtonView {
   onClick: () => void;
 }
 
-export interface ResolvedNotice {
-  type: Severity;
+export interface ResolvedRejectMessage {
   title: Renderable<any> | undefined;
   message: Renderable<any>;
-}
-
-export function isDialogNotice(
-  value: DialogNotice<any> | Renderable<any>,
-): value is DialogNotice<any> {
-  return (
-    value != null &&
-    typeof value === "object" &&
-    !(value instanceof Node) &&
-    "message" in value
-  );
-}
-
-export function resolveNotice(
-  notice: DialogNotice<any> | Renderable<any>,
-): ResolvedNotice {
-  // Config notices are always neutral ("info"); only the transient reject notice, built
-  // directly with type "error" in the controller, is severity-coloured. A title is shown
-  // only when the caller configures one — there is no default.
-  if (isDialogNotice(notice)) {
-    return { type: "info", title: notice.title, message: notice.message };
-  }
-  return { type: "info", title: undefined, message: notice };
 }
 
 export interface DialogView {
@@ -60,7 +34,6 @@ export interface DialogView {
   intro: Renderable<any>;
   content: Renderable<any>;
   outro: Renderable<any>;
-  notice: ResolvedNotice | null;
   hasForm: boolean;
   buttons: DialogButtonView[];
   /** Index of the button triggered by Enter, or null (e.g. critical dialogs). */
@@ -76,8 +49,8 @@ export interface DialogHandle {
   close(): Promise<void>;
   /** Toggle the inline spinner on the given action button. */
   setButtonLoading(index: number, loading: boolean): void;
-  /** Raise the transient (reject) notice, shown below the config notice. */
-  raiseNotice(notice: ResolvedNotice): void;
+  /** Raise the reject message (see FormAttempt.reject). */
+  raiseRejectMessage(message: ResolvedRejectMessage): void;
   /** The form element rendered inside the dialog, if any. */
   getForm(): HTMLFormElement | null;
 }

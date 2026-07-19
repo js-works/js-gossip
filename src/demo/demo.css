@@ -24,6 +24,12 @@ body {
   line-height: 1.5;
 }
 
+#suggestion-input {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
 .page {
   display: flex;
   gap: 2em;
