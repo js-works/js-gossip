@@ -107,13 +107,16 @@ const dialogStyles = `
     line-height: 1;
   }
 
-  /* Render the glyph as a block box sized to 1em. As an inline element the SVG picks up
-     baseline/descender space, which shaved a pixel off one edge. */
-  ::slotted([slot="icon"]) svg,
-  #icon svg {
-    display: block;
-    width: 1em;
-    height: 1em;
+  /* The icon is projected through the "icon" slot (light DOM), so this stylesheet
+     can't reach the actual <svg> inside it: ::slotted() only selects the top-level
+     slotted node itself, never its descendants (this previous rule tried
+     "::slotted([slot=\"icon\"]) svg", which is invalid — a pseudo-element can't be
+     followed by a further compound selector — and, being comma-listed with #icon
+     svg, silently invalidated this whole rule). Sizing/overflow for these glyphs is
+     baked into the SVG markup itself (see internal/icons.ts, dialogs/icons.ts)
+     instead; this just avoids the inline-element baseline gap on the wrapper. */
+  ::slotted([slot="icon"]) {
+    display: flex;
   }
 
   :host([data-dialog-type="info"]) #icon,
@@ -389,12 +392,14 @@ const dialogStyles = `
     border-bottom-width: 0;
   }
 
-  /* Reject notice: red icon + text on a light-red fill with a light-red border, all
-     derived from the danger colour so they track the theme. */
+  /* Reject notice: black icon + text on a neutral fill, with a lighter gray
+     border than the base (config) notice; extra margin-top for breathing room
+     above it (overridden below when it follows the config notice). */
   .notice-error {
-    color: ${theme.dangerBackgroundColor};
-    background-color: color-mix(in srgb, ${theme.dangerBackgroundColor} 5%, transparent);
-    border-color: color-mix(in srgb, ${theme.dangerBackgroundColor} 17%, transparent);
+    margin-top: 1.5em;
+    color: #000;
+    background-color: light-dark(#ececec, #444);
+    border-color: color-mix(in srgb, ${theme.textColor} 7%, transparent);
   }
 
   /* The reject notice, when it follows the config notice, is pulled up with a negative
@@ -406,6 +411,20 @@ const dialogStyles = `
   }
   .notice + .notice.entering,
   .notice + .notice.dismissing {
+    margin-top: 0;
+  }
+
+  /* The reject notice still wants extra gap above it even when it follows the config
+     notice — just less than its standalone margin-top, and less negative than a
+     plain second notice would get. These two rules match with the same specificity
+     as the ones above (same selector shape, one more class each); source order
+     applies each pair correctly, and the entering/dismissing pair (3 classes) beats
+     both resting-state pairs (2 classes) so the collapse animation stays untouched. */
+  .notice + .notice-error {
+    margin-top: 0.125em;
+  }
+  .notice + .notice-error.entering,
+  .notice + .notice-error.dismissing {
     margin-top: 0;
   }
 

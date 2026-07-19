@@ -1,49 +1,18 @@
 :root {
   color-scheme: light dark;
 
-  /* Variables the library's theme reads. Point them at Web Awesome's tokens so the
-     dialog chrome matches the rest of the demo exactly (the library itself has no
-     dependency on Web Awesome — these are just the host-provided values). */
-  --ui-color-primary-500: #0078D4;
-  --ui-color-success-500: var(--wa-color-success-fill-loud);
-  --ui-surface: var(--wa-color-brand-on-loud);
-  --ui-text: var(--wa-color-neutral-on-normal);
-
-  /* -------------------------------------------------------------------
-     "Dense & sharp" retheme of Web Awesome — demo only, all --wa-* tokens.
-     A handful of scale tokens do most of the work: smaller type (so the
-     components no longer need size="s"), tighter spacing, and less rounding.
-     Tweak these numbers to taste.
-     ------------------------------------------------------------------- */
-  --wa-font-size-scale: 1; /* scales all WA component */
-  --wa-space-scale: 0.85; /* tighter internal spacing / gaps */
-  --wa-border-radius-scale: 0.5; /* sharper corners (radius-m 6px → 3px) */
-
-  /* The generous block padding is the main source of the "big button" feel. */
-  --wa-form-control-padding-block: 0.45em;
-  --wa-form-control-padding-inline: 0.85em;
-  /* Buttons get 3px (set on :root so it inherits into the dialog's shadow root,
-     where its wa-buttons render); inputs are overridden to 1px below. */
-  --wa-form-control-border-radius: 3px;
+  /* The variable the library's theme reads; the rest fall back to the library's
+     own defaults. */
+  --ui-color-primary-500: #1677FF;
 
   --page-bg: light-dark(#f6f7f9, #14161a);
   --page-fg: light-dark(#1f2430, #e7e9ee);
   --card-bg: light-dark(#ffffff, #1e2126);
   --border: light-dark(#e3e5ea, #2b2f36);
-
-   --wa-focus-ring-offset: -1px;
-   --wa-focus-ring-width: 3px;
 }
 
 * {
   box-sizing: border-box;
-}
-
-/* Near-square text fields; wa-input lives in the light DOM everywhere (the dialog
-   slots its form content), so this element-scoped override reaches them all while
-   buttons keep the 3px from :root above. */
-wa-input {
-  --wa-form-control-border-radius: 1px;
 }
 
 body {
@@ -128,7 +97,7 @@ h2 {
 }
 
 .demo-btn:focus-visible {
-  outline: 2px solid var(--wa-color-brand-fill-loud, #0078D4);
+  outline: 2px solid var(--ui-color-primary-500);
   outline-offset: 1px;
 }
 

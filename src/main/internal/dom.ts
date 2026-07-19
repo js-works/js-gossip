@@ -23,7 +23,13 @@ export function h<K extends keyof HTMLElementTagNameMap>(
       if (key === "class") {
         el.className = String(value);
       } else if (key.startsWith("on") && typeof value === "function") {
-        el.addEventListener(key.slice(2).toLowerCase(), value as EventListener);
+        // Narrow to HTMLElement (stable addEventListener signature); el's precise union
+        // type can otherwise break here when global HTMLElementTagNameMap augmentations
+        // (e.g. component libraries in the demo) add elements with custom event maps.
+        (el as HTMLElement).addEventListener(
+          key.slice(2).toLowerCase(),
+          value as EventListener,
+        );
       } else if (value === true) {
         el.setAttribute(key, "");
       } else {

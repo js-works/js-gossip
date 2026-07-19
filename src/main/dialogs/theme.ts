@@ -43,7 +43,7 @@ export const defaultDialogTheme: DialogTheme = {
   radius: "4px",
   divider: "light-dark(#e5e7eb, rgba(255, 255, 255, 0.12))",
   primaryText: "var(--ui-surface, #ffffff)",
-  primaryBackground: "var(--ui-color-primary-500, #0078D4)",
+  primaryBackground: "var(--ui-color-primary-500, #007EC6)",
   secondaryText: "var(--ui-text, #1f2430)",
   secondaryBackground: "white",
   secondaryBorder: "#b0b0b0",

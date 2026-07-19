@@ -1,6 +1,7 @@
 {
   "name": "js-gossip",
   "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -40,7 +41,6 @@
     "loc:json": "sloc src/main --format json"
   },
   "devDependencies": {
-    "@awesome.me/webawesome": "3.10.0",
     "@types/archiver": "7.0.0",
     "archiver": "7.0.1",
     "sloc": "0.3.2",

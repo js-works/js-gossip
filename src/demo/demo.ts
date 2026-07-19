@@ -13,12 +13,10 @@ import type {
   ToastType,
 } from "../main/index.js";
 
-// Web Awesome (installed via npm). The theme stylesheet defines the --wa-* design
-// tokens the demo's CSS points the dialog's --ui-* variables at; the component
-// imports register the custom elements this demo uses.
-import "@awesome.me/webawesome/dist/styles/webawesome.css";
-import "@awesome.me/webawesome/dist/components/input/input.js";
-import "@awesome.me/webawesome/dist/components/checkbox/checkbox.js";
+// Custom form-associated fields — used only in the login demo below, to show the
+// library working with a third-party (Lit-based) custom element's inputs.
+import "./ui/components/text-field/text-field.js";
+import "./ui/components/password-field/password-field.js";
 
 // Assigned after the page template is rendered into #app (bottom of this file).
 let logEl: HTMLPreElement;
@@ -61,35 +59,55 @@ const dialogs = createDialogsController({
   autoIcons: true,
 });
 
-// Example form content, now using Web Awesome form controls. They're form-associated
-// (ElementInternals), so the dialog's `new FormData(form)` reads them normally. `name`
+// Example form content, plain native form controls. Native inputs are natively
+// form-associated, so the dialog's `new FormData(form)` reads them normally. `name`
 // is required so you can see validation block the confirm button.
 const formContent = () => html`
-  <wa-input
-    name="name"
-    label="Name"
-    placeholder="Jane Doe"
-    required
-    autocomplete="off"
-    spellcheck="false"
-    autofocus
-  ></wa-input>
-  <wa-input
-    name="email"
-    type="email"
-    label="Email"
-    placeholder="jane@example.com"
-    autocomplete="off"
-    spellcheck="false"
-  ></wa-input>
-  <wa-checkbox name="subscribe" value="yes">Subscribe to updates</wa-checkbox>
+  <label class="field">
+    Name
+    <input
+      name="name"
+      placeholder="Jane Doe"
+      required
+      autocomplete="off"
+      spellcheck="false"
+      autofocus
+    />
+  </label>
+  <label class="field">
+    Email
+    <input
+      name="email"
+      type="email"
+      placeholder="jane@example.com"
+      autocomplete="off"
+      spellcheck="false"
+    />
+  </label>
+  <label class="field field-checkbox">
+    <input type="checkbox" name="subscribe" value="yes" />
+    Subscribe to updates
+  </label>
 `;
 
-// The dialog wraps slotted content in a `.content` element; this just lays the fields
-// out in a column. Web Awesome controls bring their own field styling, so there are no
-// input-level rules here anymore.
+// The dialog wraps slotted content in a `.content` element; this lays the fields out
+// in a column and gives the native inputs the same look as the rest of the demo.
 const formStyles = `
   .content { display: flex; flex-direction: column; gap: 1rem; }
+  .field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
+  .field input:not([type="checkbox"]) {
+    font: inherit;
+    padding: 0.45em 0.7em;
+    border: 1px solid light-dark(#c3c7cf, #3a3f47);
+    border-radius: 4px;
+    background: light-dark(#ffffff, #1e2126);
+    color: inherit;
+  }
+  .field input:focus-visible {
+    outline: 2px solid var(--ui-color-primary-500);
+    outline-offset: 1px;
+  }
+  .field-checkbox { flex-direction: row; align-items: center; gap: 0.5rem; }
 `;
 
 async function openByType(type: DialogType): Promise<void> {
@@ -291,26 +309,24 @@ async function runLogin(): Promise<void> {
     const login = session.formAttempts({
       title: "Sign in",
       content: html`
-        <wa-input
-          name="email"
-          type="email"
-          label="Email"
-          placeholder="jane@example.com"
-          required
-          autocomplete="off"
-          spellcheck="false"
-          value="jane.doe@gmail.com"
-          autofocus
-        ></wa-input>
-        <wa-input
-          name="password"
-          type="password"
-          label="Password"
-          required
-          autocomplete="off"
-          spellcheck="false"
-          value="xyz"
-        ></wa-input>
+        <label class="field">
+          Email
+          <ui-input-field
+            name="email"
+            type="email"
+            required
+            value="jane.doe@gmail.com"
+            autofocus
+          ></ui-input-field>
+        </label>
+        <label class="field">
+          Password
+          <ui-password-field
+            name="password"
+            required
+            value="xyz"
+          ></ui-password-field>
+        </label>
       `,
       styles: formStyles,
       buttons: { confirm: "Sign in" },
@@ -330,7 +346,10 @@ async function runLogin(): Promise<void> {
       if (password === "secret") {
         attempt.accept(); // resolves the interaction and ends the loop
       } else {
-        attempt.reject("Wrong email or password. Please try again.");
+        attempt.reject(
+          "Wrong email or password. Please try again.",
+          "Login failed",
+        );
       }
     }
 
