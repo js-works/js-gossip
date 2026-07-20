@@ -348,11 +348,9 @@ const dialogStyles = `
   .reject-message {
     margin: 0;
     border: none;
-    border-top: 1px solid color-mix(in srgb, ${theme.dividerColor} 75%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, ${theme.dividerColor} 75%, transparent);
     border-radius: 0;
     color: ${theme.textColor};
-    background-color: #f8f8f8;
+    background-color: #f2f2f2;
     font-size: 0.85em;
     line-height: 1.35;
     user-select: text;
@@ -363,7 +361,7 @@ const dialogStyles = `
     display: flex;
     align-items: center;
     gap: 0.85em;
-    padding: 0.6em 1.5em;
+    padding: 0.85em 1.5em;
   }
 
   .reject-message .reject-message-icon {
