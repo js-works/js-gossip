@@ -29,7 +29,7 @@ const theme = {
 
 // Duration of the reject message appear/disappear (collapse) animation. Drives both the
 // CSS transition and the JS timer that removes the element after the collapse finishes.
-export const REJECT_MESSAGE_ANIM_MS = 350;
+export const REJECT_MESSAGE_ANIM_MS = 450;
 
 // Duration of the dialog grow-in (entrance) and fade-out (close) animations.
 export const DIALOG_ANIM_MS = 200;
@@ -323,35 +323,40 @@ const dialogStyles = `
   /* Reject message (see FormAttempt.reject): lives inside the footer (see element.ts
      #setRejectMessage), as its first child — flush against the footer's top border
      (the divider line) with no gap, and edge-to-edge across the dialog with no rounding.
-     Flat fill, normal text color, reddish icon. */
+     Flat fill, normal text color, reddish icon.
+
+     The enter/exit collapse is animated in JS (element.ts #animateRejectMessageHeight)
+     via the Web Animations API, using the element's actual measured height rather than a
+     CSS transition — a height transition needs a concrete end value and "auto" isn't
+     one. Two CSS-only workarounds were tried and discarded: an oversized max-height
+     spent most of the transition idle and then clipped unevenly right at the end (the
+     icon and text visibly diverged), and an animated CSS Grid fr track wasn't reliably
+     smooth across engines. overflow: hidden below just clips content during that
+     JS-driven height animation. */
   .reject-message {
-    display: flex;
-    align-items: center;
-    gap: 0.85em;
     margin: 0;
-    padding: 0.6em 1.5em;
     border: none;
     border-radius: 0;
     color: ${theme.textColor};
     background-color: #f8f8f8;
     font-size: 0.85em;
     line-height: 1.35;
-    overflow: hidden;
-    max-height: 12em;
     user-select: text;
+    overflow: hidden;
+  }
 
-    transition:
-      max-height ${REJECT_MESSAGE_ANIM_MS}ms ease,
-      opacity ${REJECT_MESSAGE_ANIM_MS}ms ease,
-      padding-top ${REJECT_MESSAGE_ANIM_MS}ms ease,
-      padding-bottom ${REJECT_MESSAGE_ANIM_MS}ms ease;
+  .reject-message-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.85em;
+    padding: 0.6em 1.5em;
   }
 
   .reject-message .reject-message-icon {
     flex: none;
     display: flex;
     align-items: center;
-    font-size: 1.4em;
+    font-size: 1.5em;
     line-height: 1;
     color: ${theme.dangerBackgroundColor};
   }
@@ -378,13 +383,6 @@ const dialogStyles = `
     overflow: visible;
   }
 
-  .reject-message.dismissing,
-  .reject-message.entering {
-    max-height: 0;
-    opacity: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
 
   @keyframes dialog-fade-out {
     from { opacity: 1; }

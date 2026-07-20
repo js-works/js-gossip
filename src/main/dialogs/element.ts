@@ -4,12 +4,7 @@
 // -------------------------------------------------------------------
 
 import { registerFirstFreeTag } from "../internal/custom-element.js";
-import {
-  deepActiveElement,
-  doubleRaf,
-  h,
-  parseSvg,
-} from "../internal/dom.js";
+import { deepActiveElement, h, parseSvg } from "../internal/dom.js";
 import { insertContent, withLineBreaks } from "./content.js";
 import { closeIconSvg, rejectIconSvg } from "./icons.js";
 import {
@@ -149,7 +144,7 @@ class Dialog extends DialogElementBase {
   // The reject message, raised via raiseRejectMessage() (see FormAttempt.reject).
   #rejectMessage: ResolvedRejectMessage | null = null;
   #rejectMessageEl: HTMLElement | null = null;
-  #rejectMessageDismissTimer: ReturnType<typeof setTimeout> | null = null;
+  #rejectMessageAnim: Animation | null = null;
 
   #focusBeforeBusy: HTMLElement | null = null;
   #loading = new Set<number>();
@@ -370,10 +365,8 @@ class Dialog extends DialogElementBase {
     this.#onCancel = view.onCancel;
 
     // Reset reject-message state (the old node lived in the content we're replacing).
-    if (this.#rejectMessageDismissTimer != null) {
-      clearTimeout(this.#rejectMessageDismissTimer);
-      this.#rejectMessageDismissTimer = null;
-    }
+    this.#rejectMessageAnim?.cancel();
+    this.#rejectMessageAnim = null;
     this.#rejectMessage = null;
     this.#rejectMessageEl = null;
     this.#loading.clear();
@@ -545,10 +538,7 @@ class Dialog extends DialogElementBase {
 
   // Render the reject message element (see FormAttempt.reject). Honors the caller's
   // custom render override.
-  #renderRejectMessageNode(
-    message: ResolvedRejectMessage,
-    entering = false,
-  ): HTMLElement {
+  #renderRejectMessageNode(message: ResolvedRejectMessage): HTMLElement {
     const r = this.#renderOverrides;
     if (r?.rejectMessage) {
       const node = r.rejectMessage({
@@ -561,27 +551,56 @@ class Dialog extends DialogElementBase {
     }
     return h(
       "div",
-      { class: `reject-message${entering ? " entering" : ""}`, role: "alert" },
-      h("span", { class: "reject-message-icon" }, parseSvg(rejectIconSvg)),
+      { class: "reject-message", role: "alert" },
       h(
         "div",
-        { class: "reject-message-body" },
-        message.title != null
-          ? h("div", { class: "reject-message-title" }, this.#node(message.title))
-          : null,
-        h("div", { class: "reject-message-text" }, this.#node(message.message)),
+        { class: "reject-message-inner" },
+        h("span", { class: "reject-message-icon" }, parseSvg(rejectIconSvg)),
+        h(
+          "div",
+          { class: "reject-message-body" },
+          message.title != null
+            ? h("div", { class: "reject-message-title" }, this.#node(message.title))
+            : null,
+          h("div", { class: "reject-message-text" }, this.#node(message.message)),
+        ),
       ),
     );
   }
 
-  // Raise (or update / dismiss) the reject message. Creating it adds the `entering`
-  // class then removes it on the next frames so the CSS transition plays; dismissing adds
-  // `dismissing` and removes the node once the collapse finishes.
+  // Animate the reject message's real height (measured, not guessed) between 0 and its
+  // natural size, via the Web Animations API rather than a CSS transition. A CSS
+  // transition needs concrete start/end values for `height`, and "auto" isn't one — the
+  // usual workarounds (an oversized `max-height`, or an animated CSS Grid `fr` track) each
+  // trade that off against a different flaw: a `max-height` far above the real content
+  // height spends most of the transition doing nothing and then clips unevenly at the very
+  // end (see the previous fix), and animated grid `fr` tracks aren't reliably smooth across
+  // engines. Measuring the actual rendered height in JS sidesteps both.
+  #animateRejectMessageHeight(
+    el: HTMLElement,
+    direction: "in" | "out",
+    onFinish: () => void,
+  ): void {
+    const height = el.getBoundingClientRect().height;
+    const keyframes = [
+      { height: "0px", opacity: 0 },
+      { height: `${height}px`, opacity: 1 },
+    ];
+    const anim = el.animate(
+      direction === "in" ? keyframes : [...keyframes].reverse(),
+      { duration: REJECT_MESSAGE_ANIM_MS, easing: "ease" },
+    );
+    this.#rejectMessageAnim = anim;
+    anim.onfinish = () => {
+      if (this.#rejectMessageAnim === anim) this.#rejectMessageAnim = null;
+      onFinish();
+    };
+  }
+
+  // Raise (or update / dismiss) the reject message.
   #setRejectMessage(message: ResolvedRejectMessage | null): void {
-    if (this.#rejectMessageDismissTimer != null) {
-      clearTimeout(this.#rejectMessageDismissTimer);
-      this.#rejectMessageDismissTimer = null;
-    }
+    this.#rejectMessageAnim?.cancel();
+    this.#rejectMessageAnim = null;
 
     if (message) {
       this.#rejectMessage = message;
@@ -591,23 +610,23 @@ class Dialog extends DialogElementBase {
         this.#rejectMessageEl.replaceWith(next);
         this.#rejectMessageEl = next;
       } else if (this.#footerEl) {
-        const el = this.#renderRejectMessageNode(message, true);
+        const el = this.#renderRejectMessageNode(message);
         // Inserted as the footer's first child: below the divider line (the footer's
         // top border), above the action buttons.
         this.#footerEl.insertBefore(el, this.#footerEl.firstChild);
         this.#rejectMessageEl = el;
-        doubleRaf(() => el.classList.remove("entering"));
+        this.#animateRejectMessageHeight(el, "in", () => {
+          el.style.height = "";
+        });
       }
     } else {
       this.#rejectMessage = null;
       const el = this.#rejectMessageEl;
       if (el) {
-        el.classList.add("dismissing");
-        this.#rejectMessageDismissTimer = setTimeout(() => {
+        this.#animateRejectMessageHeight(el, "out", () => {
           el.remove();
           if (this.#rejectMessageEl === el) this.#rejectMessageEl = null;
-          this.#rejectMessageDismissTimer = null;
-        }, REJECT_MESSAGE_ANIM_MS);
+        });
       }
     }
   }
