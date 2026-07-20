@@ -9,8 +9,9 @@ import { insertContent, withLineBreaks } from "./content.js";
 import { closeIconSvg, rejectIconSvg } from "./icons.js";
 import {
   CLOSE_ANIMATION_FALLBACK_MS,
-  DIALOG_ANIM_MS,
+  DIALOG_GROW_ANIM_MS,
   REJECT_MESSAGE_ANIM_MS,
+  SPINNER_DROP_ANIM_MS,
   STYLE_TEXT,
   SWAP_OUT_MS,
 } from "./styles.js";
@@ -328,7 +329,7 @@ class Dialog extends DialogElementBase {
           { transform: "scale(1)", opacity: 1 },
         ];
     box.animate(keyframes, {
-      duration: DIALOG_ANIM_MS,
+      duration: this.#spinnerOnly ? SPINNER_DROP_ANIM_MS : DIALOG_GROW_ANIM_MS,
       easing: "cubic-bezier(0.2, 0, 0, 1)",
     });
     // Clear the finished swap fade-out (fill: forwards) only after grow-in is on top of

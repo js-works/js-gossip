@@ -31,8 +31,21 @@ const theme = {
 // CSS transition and the JS timer that removes the element after the collapse finishes.
 export const REJECT_MESSAGE_ANIM_MS = 450;
 
-// Duration of the dialog grow-in (entrance) and fade-out (close) animations.
-export const DIALOG_ANIM_MS = 200;
+// Duration of the real dialog's grow-in (entrance) animation — used for the first real
+// dialog in a scope and every in-scope swap (see #growIn in element.ts).
+export const DIALOG_GROW_ANIM_MS = 200;
+
+// Duration of the spinner placeholder's drop-in animation (see #growIn in element.ts).
+export const SPINNER_DROP_ANIM_MS = 500;
+
+// Duration of the dialog's fade-out (close) animation.
+export const DIALOG_CLOSE_ANIM_MS = 200;
+
+// Duration of the backdrop's fade-in animation (dialog opening).
+export const BACKDROP_FADE_IN_ANIM_MS = 200;
+
+// Duration of the backdrop's fade-out animation (dialog closing).
+export const BACKDROP_FADE_OUT_ANIM_MS = 200;
 
 // Duration of the quick fade-out when swapping one on-screen dialog for the next within
 // a scope (the backdrop stays up; only the box content changes, then grows back in).
@@ -45,7 +58,7 @@ export const SPINNER_DIALOG_DELAY_MS = 300;
 export const BUTTON_SPINNER_DELAY_MS = 150;
 
 // Belt-and-braces close timeout in case the close animation's `animationend` never fires.
-export const CLOSE_ANIMATION_FALLBACK_MS = DIALOG_ANIM_MS + 100;
+export const CLOSE_ANIMATION_FALLBACK_MS = DIALOG_CLOSE_ANIM_MS + 100;
 
 const dialogStyles = `
   dialog {
@@ -77,7 +90,7 @@ const dialogStyles = `
   }
 
   dialog[open].closing {
-    animation: dialog-fade-out ${DIALOG_ANIM_MS}ms ease-in-out;
+    animation: dialog-fade-out ${DIALOG_CLOSE_ANIM_MS}ms ease-in-out;
   }
 
   dialog[open]::backdrop {
@@ -85,11 +98,11 @@ const dialogStyles = `
   }
 
   dialog[open]:not(.closing)::backdrop {
-    animation: backdrop-fade-in ${DIALOG_ANIM_MS}ms ease-in-out;
+    animation: backdrop-fade-in ${BACKDROP_FADE_IN_ANIM_MS}ms ease-in-out;
   }
 
   dialog[open].closing::backdrop {
-    animation: backdrop-fade-out ${DIALOG_ANIM_MS}ms ease-in-out;
+    animation: backdrop-fade-out ${BACKDROP_FADE_OUT_ANIM_MS}ms ease-in-out;
   }
 
   /* Form dialogs get a bit more room so labelled fields aren't cramped. */
