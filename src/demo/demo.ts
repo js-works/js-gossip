@@ -22,8 +22,15 @@ import "./ui/components/password-field/password-field.js";
 // Web Awesome — a real third-party form-control library (form-associated custom
 // elements with their own native constraint validation), used by the WebAwesome form
 // demo below to show the library working with an off-the-shelf component set.
-import "@awesome.me/webawesome/dist/styles/webawesome.css";
+import "@awesome.me/webawesome/dist/styles/layers.css";
+import "@awesome.me/webawesome/dist/styles/themes/default.css";
 import "@awesome.me/webawesome/dist/components/input/input.js";
+import "@awesome.me/webawesome/dist/components/textarea/textarea.js";
+import "@awesome.me/webawesome/dist/components/select/select.js";
+import "@awesome.me/webawesome/dist/components/option/option.js";
+import "@awesome.me/webawesome/dist/components/tab-group/tab-group.js";
+import "@awesome.me/webawesome/dist/components/tab/tab.js";
+import "@awesome.me/webawesome/dist/components/tab-panel/tab-panel.js";
 
 // Assigned after the page template is rendered into #app (bottom of this file).
 let logEl: HTMLPreElement;
@@ -95,37 +102,56 @@ const formStyles = `
   .content { display: flex; flex-direction: column; gap: 1rem; }
   .field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
   .field-checkbox { flex-direction: row; align-items: center; gap: 0.5rem; }
+  /* Target the panel's inner "base" part, not the host element itself — the host's own
+     display (none/block) is how wa-tab-group hides inactive panels, and overriding it
+     directly here would defeat that and show every panel at once. */
+  wa-tab-panel::part(base) { display: flex; flex-direction: column; gap: 1rem; }
 `;
 
-// Same 3 mandatory fields, but using real WebAwesome <wa-input> components instead of
-// the demo's own custom fields — wa-input brings its own label/hint, so no wrapping
-// <label> is needed. Each is `required`, so js-gossip's native reportValidity() gate
-// blocks the confirm button (via WebAwesome's own constraint-validation integration)
-// until all three are filled in.
+// Same fields as before, using real WebAwesome <wa-input> components instead of the
+// demo's own custom fields — wa-input brings its own label/hint, so no wrapping <label>
+// is needed. Split across two tabs: the 3 required fields (each blocking the confirm
+// button via native reportValidity(), per WebAwesome's constraint-validation
+// integration) and one optional field.
 const webAwesomeFormContent = () => html`
-  <wa-input
-    name="fullName"
-    label="Full name"
-    required
-    autofocus
-    autocomplete="off"
-    spellcheck="false"
-  ></wa-input>
-  <wa-input
-    name="email"
-    type="email"
-    label="Email"
-    required
-    autocomplete="off"
-    spellcheck="false"
-  ></wa-input>
-  <wa-input
-    name="company"
-    label="Company"
-    required
-    autocomplete="off"
-    spellcheck="false"
-  ></wa-input>
+  <wa-tab-group>
+    <wa-tab panel="mandatory">Mandatory info</wa-tab>
+    <wa-tab panel="optional">Optional</wa-tab>
+
+    <wa-tab-panel name="mandatory" active>
+      <wa-input
+        name="fullName"
+        label="Full name"
+        required
+        autofocus
+        autocomplete="off"
+        spellcheck="false"
+      ></wa-input>
+      <wa-input
+        name="email"
+        type="email"
+        label="Email"
+        required
+        autocomplete="off"
+        spellcheck="false"
+      ></wa-input>
+      <wa-select name="department" label="Department" required with-clear>
+        <wa-option value="engineering">Engineering</wa-option>
+        <wa-option value="sales">Sales</wa-option>
+        <wa-option value="support">Support</wa-option>
+        <wa-option value="other">Other</wa-option>
+      </wa-select>
+    </wa-tab-panel>
+
+    <wa-tab-panel name="optional">
+      <wa-textarea
+        name="notes"
+        label="Notes"
+        autocomplete="off"
+        spellcheck="false"
+      ></wa-textarea>
+    </wa-tab-panel>
+  </wa-tab-group>
 `;
 
 async function openByType(type: DialogType): Promise<void> {
@@ -392,7 +418,6 @@ async function runLogin(): Promise<void> {
 async function runWebAwesomeForm(): Promise<void> {
   const result = await dialogs.form({
     title: "WebAwesome form",
-    intro: "Three required WebAwesome inputs — try submitting empty.",
     content: webAwesomeFormContent(),
     styles: formStyles,
   });

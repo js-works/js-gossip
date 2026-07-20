@@ -200,7 +200,6 @@ const dialogStyles = `
   }
 
   .dialog-content .footer {
-    border-top: 1px solid ${theme.dividerColor};
     user-select: none;
   }
 
@@ -349,6 +348,8 @@ const dialogStyles = `
   .reject-message {
     margin: 0;
     border: none;
+    border-top: 1px solid color-mix(in srgb, ${theme.dividerColor} 75%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, ${theme.dividerColor} 75%, transparent);
     border-radius: 0;
     color: ${theme.textColor};
     background-color: #f8f8f8;
