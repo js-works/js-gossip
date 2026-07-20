@@ -348,9 +348,11 @@ const dialogStyles = `
   .reject-message {
     margin: 0;
     border: none;
+    border-top: 1px solid #e8e8e8;
+    border-bottom: 1px solid #e8e8e8;
     border-radius: 0;
     color: ${theme.textColor};
-    background-color: #f2f2f2;
+    background-color: #f8f8f8;
     font-size: 0.85em;
     line-height: 1.35;
     user-select: text;
