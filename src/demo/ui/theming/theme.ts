@@ -6,7 +6,8 @@ export const defaultTheme = css`
     --ui-bg: white;
     --ui-text: black;
 
-    --ui-color-primary-500: #4a90e2;
+    --ui-color-primary-500: #1677FF;
+    --ui-color-primary-500: #DD4814;
 
     --ui-color-primary-50: color-mix(in oklch, white 95%, var(--ui-color-primary-500) 5%);
     --ui-color-primary-100: color-mix(in oklch, white 90%, var(--ui-color-primary-500) 10%);

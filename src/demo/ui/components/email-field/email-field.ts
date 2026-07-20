@@ -62,8 +62,8 @@ export class UiEmailField extends LitElement {
       .wrapper {
         display: flex;
         align-items: center;
-        border: 1px solid var(--ui-color-gray-600, #999);
-        border-radius: var(--ui-radius-sm, 0.25rem);
+        border: 1px solid var(--ui-color-gray-600);
+        border-radius: var(--ui-radius-sm);
         box-sizing: border-box;
       }
 
@@ -71,7 +71,7 @@ export class UiEmailField extends LitElement {
         flex-grow: 1;
         min-width: 0;
         padding: 0.5rem;
-        font-family: var(--ui-font-sans, inherit);
+        font-family: var(--ui-font-sans);
         font-size: inherit;
         border: none;
         background: transparent;
@@ -91,7 +91,7 @@ export class UiEmailField extends LitElement {
       }
 
       :host([invalid]) .wrapper {
-        border-color: var(--ui-color-danger-500, crimson);
+        border-color: var(--ui-color-danger-500);
       }
     `,
   ];

@@ -62,17 +62,52 @@ export class UiInputField extends LitElement {
         display: flex;
       }
 
-      input {
+      .wrapper {
+        display: flex;
+        align-items: center;
         flex-grow: 1;
-        font-family: var(--ui-font-sans, inherit);
-        font-size: inherit;
-        padding: 0.5rem;
-        border: 1px solid var(--ui-color-gray-600, #999);
-        border-radius: var(--ui-radius-sm, 0.25rem);
+        box-sizing: border-box;
+        border: 1px solid var(--ui-color-gray-600);
+        border-radius: var(--ui-radius-sm);
+        background: var(--ui-bg);
       }
 
-      :host([invalid]) input {
-        border-color: var(--ui-color-danger-500, red);
+      :host([invalid]) .wrapper {
+        border-color: var(--ui-color-danger-500);
+      }
+
+      input {
+        flex-grow: 1;
+        min-width: 0;
+        font-family: var(--ui-font-sans);
+        font-size: inherit;
+        padding: 0.5rem;
+        border: none;
+        background: transparent;
+        color: inherit;
+      }
+
+      input:focus {
+        outline: none;
+      }
+
+      /* Only styled/spaced when something is actually assigned — an empty slot
+         has no assigned nodes for ::slotted to match, so it contributes zero
+         width/space on its own (no leftover gap for an unused slot). */
+      ::slotted([slot="prefix"]),
+      ::slotted([slot="suffix"]) {
+        display: flex;
+        align-items: center;
+        flex: none;
+        color: var(--ui-color-gray-700);
+      }
+
+      ::slotted([slot="prefix"]) {
+        margin-inline-start: 0.5rem;
+      }
+
+      ::slotted([slot="suffix"]) {
+        margin-inline-end: 0.5rem;
       }
     `,
   ];
@@ -215,22 +250,26 @@ export class UiInputField extends LitElement {
 
   render() {
     return html`
-      <input
-        .value=${this.value}
-        name=${this.name}
-        type=${this.type}
-        placeholder=${this.placeholder}
-        autocomplete=${this.autocomplete}
-        spellcheck=${this.spellcheck}
-        ?disabled=${this.disabled}
-        ?required=${this.required}
-        ?readonly=${this.readonly}
-        minlength=${this.minlength ?? ""}
-        maxlength=${this.maxlength ?? ""}
-        pattern=${this.pattern}
-        @input=${this.#onInput}
-        @change=${this.#onChange}
-      />
+      <div class="wrapper">
+        <slot name="prefix"></slot>
+        <input
+          .value=${this.value}
+          name=${this.name}
+          type=${this.type}
+          placeholder=${this.placeholder}
+          autocomplete=${this.autocomplete}
+          spellcheck=${this.spellcheck}
+          ?disabled=${this.disabled}
+          ?required=${this.required}
+          ?readonly=${this.readonly}
+          minlength=${this.minlength ?? ""}
+          maxlength=${this.maxlength ?? ""}
+          pattern=${this.pattern}
+          @input=${this.#onInput}
+          @change=${this.#onChange}
+        />
+        <slot name="suffix"></slot>
+      </div>
     `;
   }
 }

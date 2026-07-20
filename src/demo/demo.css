@@ -1,13 +1,13 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* The variable the library's theme reads; the rest fall back to the library's
      own defaults. */
   --ui-color-primary-500: #1677FF;
 
-  --page-bg: light-dark(#f6f7f9, #14161a);
+  --page-bg: light-dark(#ffffff, #14161a);
   --page-fg: light-dark(#1f2430, #e7e9ee);
-  --card-bg: light-dark(#ffffff, #1e2126);
+  --card-bg: light-dark(#f6f7f9, #1e2126);
   --border: light-dark(#e3e5ea, #2b2f36);
 }
 
@@ -24,10 +24,11 @@ body {
   line-height: 1.5;
 }
 
-#suggestion-input {
+#suggestion-combobox {
   position: fixed;
   top: 0.5rem;
   left: 0.5rem;
+  width: 16rem;
 }
 
 .page {
@@ -108,7 +109,13 @@ h2 {
 }
 
 .results {
-  min-width: 25em; 
+  min-width: 25em;
+}
+
+.data-navigator-section {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
 }
 
 pre#log {

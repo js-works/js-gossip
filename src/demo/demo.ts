@@ -18,6 +18,12 @@ import type {
 import "./ui/components/text-field/text-field.js";
 import "./ui/components/email-field/email-field.js";
 import "./ui/components/password-field/password-field.js";
+import "./ui/components/date-field/date-field.js";
+import "./ui/components/checkbox/checkbox.js";
+import { localFilter } from "./ui/components/combobox/combobox.js";
+import type { UiCombobox } from "./ui/components/combobox/combobox.js";
+import "./ui/components/data-navigator/data-navigator.js";
+import type { DataNavigatorColumn } from "./ui/components/data-navigator/data-navigator.js";
 
 // Web Awesome — a real third-party form-control library (form-associated custom
 // elements with their own native constraint validation), used by the WebAwesome form
@@ -55,6 +61,71 @@ function logFormResult(label: string, result: FormDialogResult): void {
   }
 }
 
+// Sample data for the ui-combobox demo below.
+const FRUITS = [
+  "Apple",
+  "Apricot",
+  "Avocado",
+  "Banana",
+  "Blackberry",
+  "Blueberry",
+  "Cherry",
+  "Grape",
+  "Grapefruit",
+  "Kiwi",
+  "Lemon",
+  "Lime",
+  "Mango",
+  "Melon",
+  "Nectarine",
+  "Orange",
+  "Papaya",
+  "Peach",
+  "Pear",
+  "Pineapple",
+  "Plum",
+  "Pomegranate",
+  "Raspberry",
+  "Strawberry",
+  "Watermelon",
+];
+
+// Sample data for the ui-data-navigator demo below.
+interface Employee {
+  name: string;
+  email: string;
+  department: string;
+  role: string;
+}
+
+const EMPLOYEES: Employee[] = [
+  { name: "Jane Doe", email: "jane.doe@example.com", department: "Engineering", role: "Senior Engineer" },
+  { name: "John Smith", email: "john.smith@example.com", department: "Engineering", role: "Engineer" },
+  { name: "Alice Johnson", email: "alice.johnson@example.com", department: "Sales", role: "Account Executive" },
+  { name: "Bob Williams", email: "bob.williams@example.com", department: "Sales", role: "Sales Manager" },
+  { name: "Carol Martinez", email: "carol.martinez@example.com", department: "Support", role: "Support Lead" },
+  { name: "David Brown", email: "david.brown@example.com", department: "Support", role: "Support Agent" },
+  { name: "Eve Davis", email: "eve.davis@example.com", department: "Engineering", role: "Engineering Manager" },
+  { name: "Frank Miller", email: "frank.miller@example.com", department: "Marketing", role: "Marketing Lead" },
+  { name: "Grace Wilson", email: "grace.wilson@example.com", department: "Marketing", role: "Content Strategist" },
+  { name: "Hank Moore", email: "hank.moore@example.com", department: "Engineering", role: "Engineer" },
+  { name: "Ivy Taylor", email: "ivy.taylor@example.com", department: "Sales", role: "Account Executive" },
+  { name: "Jack Anderson", email: "jack.anderson@example.com", department: "Support", role: "Support Agent" },
+  { name: "Karen Thomas", email: "karen.thomas@example.com", department: "Engineering", role: "Junior Engineer" },
+  { name: "Liam Jackson", email: "liam.jackson@example.com", department: "Marketing", role: "Designer" },
+  { name: "Mia White", email: "mia.white@example.com", department: "Sales", role: "Sales Manager" },
+  { name: "Noah Harris", email: "noah.harris@example.com", department: "Engineering", role: "Senior Engineer" },
+  { name: "Olivia Martin", email: "olivia.martin@example.com", department: "Support", role: "Support Lead" },
+  { name: "Paul Thompson", email: "paul.thompson@example.com", department: "Marketing", role: "Marketing Lead" },
+];
+
+const employeeColumns: DataNavigatorColumn<Employee>[] = [
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "email", header: "Email" },
+  { accessorKey: "department", header: "Department" },
+  { accessorKey: "role", header: "Role" },
+];
+
 const toasts = createToastController({
   adapter: litToastAdapter,
   maxVisible: 4,
@@ -89,19 +160,18 @@ const formContent = () => html`
       placeholder="jane@example.com"
     ></ui-email-field>
   </label>
-  <label class="field field-checkbox">
-    <input type="checkbox" name="subscribe" value="yes" />
-    Subscribe to updates
+  <label class="field">
+    Date of birth
+    <ui-date-field name="dateOfBirth" required></ui-date-field>
   </label>
+  <ui-checkbox name="subscribe" value="yes">Subscribe to updates</ui-checkbox>
 `;
 
 // The dialog wraps slotted content in a `.content` element; this just lays the fields
-// out in a column. The custom field components bring their own styling; only the
-// native checkbox (no custom counterpart) needs anything here.
+// out in a column. The custom field components bring their own styling.
 const formStyles = `
   .content { display: flex; flex-direction: column; gap: 1rem; }
   .field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
-  .field-checkbox { flex-direction: row; align-items: center; gap: 0.5rem; }
   /* Target the panel's inner "base" part, not the host element itself — the host's own
      display (none/block) is how wa-tab-group hides inactive panels, and overriding it
      directly here would defeat that and show every panel at once. */
@@ -429,7 +499,13 @@ async function runWebAwesomeForm(): Promise<void> {
 // -------------------------------------------------------------------
 
 const page = html`
-  <input id="suggestion-input" />
+  <ui-combobox
+    id="suggestion-combobox"
+    placeholder="Search fruits…"
+    .dataSource=${localFilter(FRUITS, 200)}
+    @change=${(e: Event) =>
+      log("Combobox picked", (e.target as UiCombobox).value)}
+  ></ui-combobox>
   <main class="page">
     <div>
       <section>
@@ -492,6 +568,23 @@ const page = html`
       <pre id="log" aria-live="polite"></pre>
     </section>
   </main>
+
+  <section class="data-navigator-section">
+    <h2>Data navigator</h2>
+    <ui-data-navigator
+      title="Employees"
+      subtitle="All employees across every department"
+      selection-mode="multi"
+      selection-appearance="default"
+      .columns=${employeeColumns}
+      .data=${EMPLOYEES}
+      @row-selection-change=${(e: CustomEvent<{ selected: Employee[] }>) =>
+        log(
+          "Data navigator selection",
+          e.detail.selected.map((employee) => employee.name),
+        )}
+    ></ui-data-navigator>
+  </section>
 `;
 
 render(page, document.getElementById("app")!);

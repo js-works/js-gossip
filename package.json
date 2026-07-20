@@ -42,10 +42,12 @@
   },
   "devDependencies": {
     "@awesome.me/webawesome": "^3.10.0",
+    "@tanstack/lit-table": "^8.21.3",
     "@types/archiver": "7.0.0",
     "archiver": "7.0.1",
     "sloc": "0.3.2",
     "typescript": "7.0.2",
+    "vanillajs-datepicker": "^1.3.4",
     "vite": "8.1.1"
   },
   "dependencies": {
