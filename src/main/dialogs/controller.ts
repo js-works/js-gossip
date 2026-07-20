@@ -40,6 +40,7 @@ import type {
   DialogType,
   ErrorDialogResult,
   FormAttempt,
+  FormDialogConfig,
   FormDialogResult,
   FormInteraction,
   InfoDialogResult,
@@ -322,20 +323,31 @@ function createDialogScope<C extends object = never>(
     clearPendingSpinner = null;
 
     const buttons = resolveButtons(spec);
+    const cfg = spec.config;
 
-    const onButtonClicked = (
+    // Async so `cfg.validate` (a caller-owned pre-submit check, e.g. a validation
+    // library) can be awaited; its result gates the same way native constraint
+    // validation already does. Not awaited by its caller below — same fire-and-forget
+    // shape as the reject-message flow, with `stopSpinner` covering the wait either way.
+    const onButtonClicked = async (
       button: ButtonConfig,
       stopSpinner: () => void,
-    ): void => {
+    ): Promise<void> => {
       let form: HTMLFormElement | null = null;
 
       if (spec.allowsForm && button.validate) {
         form = handle?.getForm() ?? null;
         form?.requestSubmit();
-        const valid = form?.reportValidity() ?? true;
+        const nativelyValid = form?.reportValidity() ?? true;
 
-        if (!valid) {
+        if (!nativelyValid) {
           stopSpinner(); // keep the dialog open so the user can fix the form
+          return;
+        }
+
+        const validate = (cfg as FormDialogConfig<any>).validate;
+        if (validate && !(await validate(form!))) {
+          stopSpinner(); // caller's own validation failed; it owns showing why
           return;
         }
       }
@@ -367,11 +379,9 @@ function createDialogScope<C extends object = never>(
           handle?.setButtonLoading(index, false);
         };
         clearPendingSpinner = () => clearTimeout(timer);
-        onButtonClicked(button, stopSpinner);
+        void onButtonClicked(button, stopSpinner);
       },
     }));
-
-    const cfg = spec.config;
 
     // Escape and the close (X) button resolve as cancel. If the dialog has a Cancel
     // button, drive its exact click path so the pending spinner shows on it, just like

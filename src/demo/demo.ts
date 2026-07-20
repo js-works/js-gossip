@@ -19,6 +19,12 @@ import "./ui/components/text-field/text-field.js";
 import "./ui/components/email-field/email-field.js";
 import "./ui/components/password-field/password-field.js";
 
+// Web Awesome — a real third-party form-control library (form-associated custom
+// elements with their own native constraint validation), used by the WebAwesome form
+// demo below to show the library working with an off-the-shelf component set.
+import "@awesome.me/webawesome/dist/styles/webawesome.css";
+import "@awesome.me/webawesome/dist/components/input/input.js";
+
 // Assigned after the page template is rendered into #app (bottom of this file).
 let logEl: HTMLPreElement;
 
@@ -89,6 +95,37 @@ const formStyles = `
   .content { display: flex; flex-direction: column; gap: 1rem; }
   .field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
   .field-checkbox { flex-direction: row; align-items: center; gap: 0.5rem; }
+`;
+
+// Same 3 mandatory fields, but using real WebAwesome <wa-input> components instead of
+// the demo's own custom fields — wa-input brings its own label/hint, so no wrapping
+// <label> is needed. Each is `required`, so js-gossip's native reportValidity() gate
+// blocks the confirm button (via WebAwesome's own constraint-validation integration)
+// until all three are filled in.
+const webAwesomeFormContent = () => html`
+  <wa-input
+    name="fullName"
+    label="Full name"
+    required
+    autofocus
+    autocomplete="off"
+    spellcheck="false"
+  ></wa-input>
+  <wa-input
+    name="email"
+    type="email"
+    label="Email"
+    required
+    autocomplete="off"
+    spellcheck="false"
+  ></wa-input>
+  <wa-input
+    name="company"
+    label="Company"
+    required
+    autocomplete="off"
+    spellcheck="false"
+  ></wa-input>
 `;
 
 async function openByType(type: DialogType): Promise<void> {
@@ -350,6 +387,18 @@ async function runLogin(): Promise<void> {
   }
 }
 
+// A plain (awaited) form built from real WebAwesome components rather than the demo's
+// own custom fields — see the imports and webAwesomeFormContent() above.
+async function runWebAwesomeForm(): Promise<void> {
+  const result = await dialogs.form({
+    title: "WebAwesome form",
+    intro: "Three required WebAwesome inputs — try submitting empty.",
+    content: webAwesomeFormContent(),
+    styles: formStyles,
+  });
+  logFormResult("WebAwesome form result", result);
+}
+
 // -------------------------------------------------------------------
 // Page template — the whole demo UI lives here; index.html only hosts #app.
 // -------------------------------------------------------------------
@@ -384,7 +433,12 @@ const page = html`
 
       <section>
         <h2>Forms</h2>
-        <div class="row">${trigger("form")} ${trigger("formCritical")}</div>
+        <div class="row">
+          ${trigger("form")} ${trigger("formCritical")}
+          <button class="demo-btn" @click=${() => void runWebAwesomeForm()}>
+            WebAwesome Form
+          </button>
+        </div>
       </section>
 
       <section>

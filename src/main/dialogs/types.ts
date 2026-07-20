@@ -133,7 +133,20 @@ export interface DecideDialogConfig<
 > extends BaseDialogConfig<C> {}
 export interface FormDialogConfig<
   C extends object = never,
-> extends BaseDialogConfig<C> {}
+> extends BaseDialogConfig<C> {
+  /**
+   * Client-side pre-validation, run when a confirm-type button is clicked, after native
+   * constraint validation (`reportValidity()`) passes and before the attempt is
+   * submitted. Return (or resolve) `false` to keep the dialog open — unlike `reject()`,
+   * which is for server-round-trip results, this is for a caller-owned validation
+   * library (Zod, react-hook-form, …) that native HTML5 constraints can't express. js-
+   * gossip has no opinion on how invalid state is shown: the caller's own content is
+   * responsible for rendering its own errors (e.g. a validation library re-rendering its
+   * own React/Lit/vanilla subtree), since content is handed to js-gossip once and is
+   * never touched again afterwards.
+   */
+  validate?(form: HTMLFormElement): boolean | Promise<boolean>;
+}
 
 export interface DialogsFunctions<C extends object = never> {
   info(config: InfoDialogConfig<C>): Promise<InfoDialogResult>;
