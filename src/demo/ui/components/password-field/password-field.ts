@@ -69,7 +69,7 @@ export class UiPasswordField extends LitElement {
         padding: 0.5rem 2.5rem 0.5rem 0.5rem;
         font-family: var(--ui-font-sans, inherit);
         font-size: inherit;
-        border: 1px solid var(--ui-color-gray-600, #999);
+        border: 1px solid var(--ui-color-neutral-600, #999);
         border-radius: var(--ui-radius-sm, 0.25rem);
         box-sizing: border-box;
       }

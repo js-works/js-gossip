@@ -20,10 +20,15 @@ import "./ui/components/email-field/email-field.js";
 import "./ui/components/password-field/password-field.js";
 import "./ui/components/date-field/date-field.js";
 import "./ui/components/checkbox/checkbox.js";
+import "./ui/components/button/button.js";
+import type { UiButton } from "./ui/components/button/button.js";
 import { localFilter } from "./ui/components/combobox/combobox.js";
 import type { UiCombobox } from "./ui/components/combobox/combobox.js";
 import "./ui/components/data-navigator/data-navigator.js";
-import type { DataNavigatorColumn } from "./ui/components/data-navigator/data-navigator.js";
+import type {
+  DataNavigatorAction,
+  DataNavigatorColumn,
+} from "./ui/components/data-navigator/data-navigator.js";
 
 // Web Awesome — a real third-party form-control library (form-associated custom
 // elements with their own native constraint validation), used by the WebAwesome form
@@ -60,6 +65,22 @@ function logFormResult(label: string, result: FormDialogResult): void {
     });
   }
 }
+
+// Sample data for the ui-button demo below.
+const BUTTON_APPEARANCES = [
+  "neutral",
+  "primary",
+  "danger",
+  "warning",
+  "success",
+] as const;
+const BUTTON_VARIANTS = [
+  "solid",
+  "outlined",
+  "filled",
+  "subtle",
+  "link",
+] as const;
 
 // Sample data for the ui-combobox demo below.
 const FRUITS = [
@@ -98,32 +119,99 @@ interface Employee {
   role: string;
 }
 
-const EMPLOYEES: Employee[] = [
-  { name: "Jane Doe", email: "jane.doe@example.com", department: "Engineering", role: "Senior Engineer" },
-  { name: "John Smith", email: "john.smith@example.com", department: "Engineering", role: "Engineer" },
-  { name: "Alice Johnson", email: "alice.johnson@example.com", department: "Sales", role: "Account Executive" },
-  { name: "Bob Williams", email: "bob.williams@example.com", department: "Sales", role: "Sales Manager" },
-  { name: "Carol Martinez", email: "carol.martinez@example.com", department: "Support", role: "Support Lead" },
-  { name: "David Brown", email: "david.brown@example.com", department: "Support", role: "Support Agent" },
-  { name: "Eve Davis", email: "eve.davis@example.com", department: "Engineering", role: "Engineering Manager" },
-  { name: "Frank Miller", email: "frank.miller@example.com", department: "Marketing", role: "Marketing Lead" },
-  { name: "Grace Wilson", email: "grace.wilson@example.com", department: "Marketing", role: "Content Strategist" },
-  { name: "Hank Moore", email: "hank.moore@example.com", department: "Engineering", role: "Engineer" },
-  { name: "Ivy Taylor", email: "ivy.taylor@example.com", department: "Sales", role: "Account Executive" },
-  { name: "Jack Anderson", email: "jack.anderson@example.com", department: "Support", role: "Support Agent" },
-  { name: "Karen Thomas", email: "karen.thomas@example.com", department: "Engineering", role: "Junior Engineer" },
-  { name: "Liam Jackson", email: "liam.jackson@example.com", department: "Marketing", role: "Designer" },
-  { name: "Mia White", email: "mia.white@example.com", department: "Sales", role: "Sales Manager" },
-  { name: "Noah Harris", email: "noah.harris@example.com", department: "Engineering", role: "Senior Engineer" },
-  { name: "Olivia Martin", email: "olivia.martin@example.com", department: "Support", role: "Support Lead" },
-  { name: "Paul Thompson", email: "paul.thompson@example.com", department: "Marketing", role: "Marketing Lead" },
+const FIRST_NAMES = [
+  "Jane", "John", "Alice", "Bob", "Carol", "David", "Eve", "Frank", "Grace", "Hank",
+  "Ivy", "Jack", "Karen", "Liam", "Mia", "Noah", "Olivia", "Paul", "Quinn", "Rachel",
+  "Sam", "Tina", "Uma", "Victor", "Wendy", "Xander", "Yara", "Zack",
 ];
+const LAST_NAMES = [
+  "Doe", "Smith", "Johnson", "Williams", "Martinez", "Brown", "Davis", "Miller",
+  "Wilson", "Moore", "Taylor", "Anderson", "Thomas", "Jackson", "White", "Harris",
+  "Martin", "Thompson", "Clark", "Lewis", "Walker", "Hall", "Allen", "Young",
+  "King", "Wright", "Scott", "Green",
+];
+const DEPARTMENT_ROLES: Record<string, string[]> = {
+  Engineering: ["Engineer", "Senior Engineer", "Junior Engineer", "Engineering Manager"],
+  Sales: ["Account Executive", "Sales Manager"],
+  Support: ["Support Agent", "Support Lead"],
+  Marketing: ["Marketing Lead", "Content Strategist", "Designer"],
+};
+const DEPARTMENTS = Object.keys(DEPARTMENT_ROLES);
 
+// 123 rows — enough to exercise sorting/filtering/pagination realistically.
+// Deterministic (no Math.random()) so the demo looks the same on every reload.
+const EMPLOYEES: Employee[] = Array.from({ length: 123 }, (_, i) => {
+  const first = FIRST_NAMES[i % FIRST_NAMES.length];
+  const last = LAST_NAMES[(i + Math.floor(i / FIRST_NAMES.length)) % LAST_NAMES.length];
+  const department = DEPARTMENTS[i % DEPARTMENTS.length];
+  const roles = DEPARTMENT_ROLES[department];
+  const role = roles[Math.floor(i / DEPARTMENTS.length) % roles.length];
+  return {
+    name: `${first} ${last}`,
+    email: `${first.toLowerCase()}.${last.toLowerCase()}${i}@example.com`,
+    department,
+    role,
+  };
+});
+
+// Demonstrates grouped column headers: "Name" and "Role" stand alone, while
+// "Email"/"Department" share a group header spanning both — 4 leaf columns,
+// 5 header cells total (3 in the top row: Name, the group, Role; 2 in the row
+// beneath the group: Email, Department).
 const employeeColumns: DataNavigatorColumn<Employee>[] = [
   { accessorKey: "name", header: "Name" },
-  { accessorKey: "email", header: "Email" },
-  { accessorKey: "department", header: "Department" },
+  {
+    header: "Contact & Org",
+    columns: [
+      { accessorKey: "email", header: "Email" },
+      { accessorKey: "department", header: "Department" },
+    ],
+  },
   { accessorKey: "role", header: "Role" },
+];
+
+const plusIcon = html`
+  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M8 2a.75.75 0 0 1 .75.75V7.25h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2" />
+  </svg>
+`;
+
+const pencilIcon = html`
+  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zM12.793 5.5 10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325" />
+  </svg>
+`;
+
+const trashIcon = html`
+  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
+    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
+  </svg>
+`;
+
+const employeeActions: DataNavigatorAction<Employee>[] = [
+  {
+    type: "general",
+    label: "Add employee",
+    icon: plusIcon,
+    onClick: () => log("Action: Add employee"),
+  },
+  {
+    type: "single",
+    label: "Edit",
+    icon: pencilIcon,
+    onClick: (selected) => log("Action: Edit", selected[0].name),
+  },
+  {
+    type: "multi",
+    label: "Delete selected",
+    icon: trashIcon,
+    onClick: (selected) =>
+      log(
+        "Action: Delete selected",
+        selected.map((employee) => employee.name),
+      ),
+  },
 ];
 
 const toasts = createToastController({
@@ -502,12 +590,75 @@ const page = html`
   <ui-combobox
     id="suggestion-combobox"
     placeholder="Search fruits…"
-    .dataSource=${localFilter(FRUITS, 200)}
+    .dataSource=${localFilter(FRUITS, 0)}
     @change=${(e: Event) =>
       log("Combobox picked", (e.target as UiCombobox).value)}
   ></ui-combobox>
   <main class="page">
     <div>
+      <section class="button-showcase">
+        <h2>Buttons</h2>
+        <div class="button-grid">
+          ${BUTTON_APPEARANCES.map(
+            (appearance) => html`
+              <span class="page-label">${appearance}</span>
+              ${BUTTON_VARIANTS.map(
+                (variant) => html`
+                  <ui-button
+                    appearance=${appearance}
+                    variant=${variant}
+                    @click=${() =>
+                      log("Button clicked", { appearance, variant })}
+                  >
+                    ${variant}
+                  </ui-button>
+                `,
+              )}
+            `,
+          )}
+        </div>
+        <div class="row">
+          <ui-button size="small">Small</ui-button>
+          <ui-button size="medium">Medium</ui-button>
+          <ui-button size="large">Large</ui-button>
+          <ui-button disabled>Disabled</ui-button>
+          <ui-button
+            appearance="primary"
+            @click=${(event: Event) => {
+              const btn = event.currentTarget as UiButton;
+              setTimeout(() => {
+                btn.loading = true;
+                setTimeout(() => {
+                  btn.loading = false;
+                }, 1500);
+              }, 200);
+            }}
+          >
+            Click to load
+          </ui-button>
+          <ui-button appearance="primary" variant="outlined" type="submit">
+            <svg
+              slot="prefix"
+              viewBox="0 0 16 16"
+              width="1em"
+              height="1em"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"
+              />
+            </svg>
+            With icon
+          </ui-button>
+        </div>
+        <div class="row">
+          <ui-button full-width appearance="success"
+            >Full-width button</ui-button
+          >
+        </div>
+      </section>
+
       <section>
         <h2>Toasts</h2>
         <div class="row">
@@ -575,9 +726,10 @@ const page = html`
       title="Employees"
       subtitle="All employees across every department"
       selection-mode="multi"
-      selection-appearance="default"
+      selection-appearance="primary"
       .columns=${employeeColumns}
       .data=${EMPLOYEES}
+      .actions=${employeeActions}
       @row-selection-change=${(e: CustomEvent<{ selected: Employee[] }>) =>
         log(
           "Data navigator selection",

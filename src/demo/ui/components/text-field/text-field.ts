@@ -20,6 +20,9 @@ export class UiInputField extends LitElement {
   @property()
   accessor type: HTMLInputElement["type"] = "text";
 
+  @property({ reflect: true })
+  accessor size: "small" | "medium" | "large" = "medium";
+
   @property({ type: Boolean })
   accessor disabled = false;
 
@@ -60,6 +63,23 @@ export class UiInputField extends LitElement {
     css`
       :host {
         display: flex;
+
+        /* size="medium" (the default). Set on :host (not just the input) so
+           slotted prefix/suffix content, which inherits ambient font-size
+           rather than the input's own, scales the same way. */
+        font-size: var(--field-font-size);
+        --field-font-size: var(--ui-font-size-md);
+        --field-padding: 0.5rem;
+      }
+
+      :host([size="small"]) {
+        --field-font-size: var(--ui-font-size-sm);
+        --field-padding: 0.35rem;
+      }
+
+      :host([size="large"]) {
+        --field-font-size: var(--ui-font-size-lg);
+        --field-padding: 0.65rem;
       }
 
       .wrapper {
@@ -67,8 +87,23 @@ export class UiInputField extends LitElement {
         align-items: center;
         flex-grow: 1;
         box-sizing: border-box;
-        border: 1px solid var(--ui-color-gray-600);
-        border-radius: var(--ui-radius-sm);
+        /* Per-side custom properties (rather than one border shorthand) so a
+           consumer can drop individual sides — e.g. data-navigator's global
+           filter, styled bottom-border-only — via a plain custom-property
+           override from outside, without reaching into the shadow root. */
+        border-block-start: var(
+          --field-border-block-start,
+          1px solid var(--ui-color-neutral-600)
+        );
+        border-inline: var(
+          --field-border-inline,
+          1px solid var(--ui-color-neutral-600)
+        );
+        border-block-end: var(
+          --field-border-block-end,
+          1px solid var(--ui-color-neutral-600)
+        );
+        border-radius: var(--field-border-radius, var(--ui-radius-sm));
         background: var(--ui-bg);
       }
 
@@ -80,8 +115,8 @@ export class UiInputField extends LitElement {
         flex-grow: 1;
         min-width: 0;
         font-family: var(--ui-font-sans);
-        font-size: inherit;
-        padding: 0.5rem;
+        font-size: var(--field-font-size);
+        padding: var(--field-padding);
         border: none;
         background: transparent;
         color: inherit;
@@ -99,7 +134,7 @@ export class UiInputField extends LitElement {
         display: flex;
         align-items: center;
         flex: none;
-        color: var(--ui-color-gray-700);
+        color: var(--ui-color-neutral-700);
       }
 
       ::slotted([slot="prefix"]) {

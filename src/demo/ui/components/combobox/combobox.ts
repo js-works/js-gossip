@@ -102,6 +102,9 @@ export class UiCombobox extends LitElement {
   @property({ type: Boolean })
   accessor required = false;
 
+  @property({ reflect: true })
+  accessor size: "small" | "medium" | "large" = "medium";
+
   // Makes the input readonly — pick-only, like a native <select>, rather than a
   // free-text search box the dropdown happens to filter. Typing is blocked (the
   // native `readonly` semantics), but focus/click/keyboard navigation still work
@@ -112,6 +115,13 @@ export class UiCombobox extends LitElement {
 
   @state()
   accessor status: SuggestionState<string>["status"] = "idle";
+
+  // Shown only once "loading" has lasted 100ms (see #updateSpinner) — a data
+  // source that resolves faster than that shouldn't ever flash a spinner.
+  @state()
+  accessor showSpinner = false;
+
+  #spinnerTimer?: ReturnType<typeof setTimeout>;
 
   @state()
   accessor rows: SuggestionState<string>["rows"] = [];
@@ -125,6 +135,13 @@ export class UiCombobox extends LitElement {
   @state()
   accessor query = "";
 
+  // Which side of the input the popup renders on. Recomputed on every open/content
+  // change (see #updatePlacement) rather than tracked continuously (no resize/scroll
+  // listeners) — good enough for a popup that only needs to be positioned right at
+  // the moment it appears or its content reflows.
+  @state()
+  accessor placement: "top" | "bottom" = "bottom";
+
   constructor() {
     super();
     this.#internals = this.attachInternals();
@@ -136,7 +153,11 @@ export class UiCombobox extends LitElement {
   protected firstUpdated() {
     this.#input = this.renderRoot.querySelector("input")!;
 
-    const resolveDataSource = () => this.dataSource ?? localFilter(this.items);
+    // dropdown mode is pick-only over a static local list, like a native <select>
+    // — no server round-trip to stand in for, so unlike the free-typing search
+    // case, its default filter shouldn't add localFilter's artificial delay.
+    const resolveDataSource = () =>
+      this.dataSource ?? localFilter(this.items, this.dropdown ? 0 : undefined);
 
     this.#suggestions = createSuggestions<string>({
       input: this.#input,
@@ -161,6 +182,44 @@ export class UiCombobox extends LitElement {
     if (changed.has("activeIndex") && this.activeIndex >= 0) {
       this.#scrollActiveIntoView();
     }
+    if (
+      this.open &&
+      (changed.has("open") || changed.has("rows") || changed.has("query"))
+    ) {
+      this.#updatePlacement();
+    }
+    if (changed.has("status")) {
+      this.#updateSpinner();
+    }
+  }
+
+  #updateSpinner() {
+    clearTimeout(this.#spinnerTimer);
+    if (this.status === "loading") {
+      this.#spinnerTimer = setTimeout(() => {
+        this.showSpinner = true;
+      }, 100);
+    } else {
+      this.showSpinner = false;
+    }
+  }
+
+  // Flips the popup above the input when there isn't enough room below for it but
+  // there is more room above than below.
+  #updatePlacement() {
+    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
+    const status = this.renderRoot.querySelector<HTMLElement>(".status");
+    const popup = listbox && !listbox.hidden ? listbox : status;
+    if (!popup) return;
+
+    const hostRect = this.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - hostRect.bottom;
+    const spaceAbove = hostRect.top;
+
+    this.placement =
+      popup.offsetHeight > spaceBelow && spaceAbove > spaceBelow
+        ? "top"
+        : "bottom";
   }
 
   // Rolled by hand rather than option.scrollIntoView(): that aligns the option
@@ -194,6 +253,7 @@ export class UiCombobox extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.#suggestions?.destroy();
+    clearTimeout(this.#spinnerTimer);
   }
 
   #applySelection(selected: string[]) {
@@ -349,14 +409,14 @@ export class UiCombobox extends LitElement {
           ?readonly=${this.dropdown}
         />
         <span class="spinner-slot"
-          >${this.status === "loading"
+          >${this.showSpinner
             ? html`<span class="spinner"></span>`
             : nothing}</span
         >
         <ul
           id="listbox"
           role="listbox"
-          class="listbox"
+          class="listbox listbox-${this.placement}"
           aria-multiselectable=${this.multiple}
           ?hidden=${!showListbox}
           @pointerdown=${(event: Event) => event.preventDefault()}
@@ -385,7 +445,7 @@ export class UiCombobox extends LitElement {
         this.status === "ready" &&
         this.rows.length === 0 &&
         this.query
-          ? html`<div class="status">No matches</div>`
+          ? html`<div class="status status-${this.placement}">No matches</div>`
           : nothing}
       </div>
     `;

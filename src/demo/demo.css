@@ -74,6 +74,25 @@ h2 {
   gap: 0.5rem;
 }
 
+.button-showcase .row {
+  align-items: center;
+}
+
+.button-showcase .row + .row {
+  margin-top: 0.5rem;
+}
+
+/* One column per variant (plus the leading appearance label), so a variant
+   lines up in the same column across every appearance row instead of each
+   row wrapping independently like .row does. */
+.button-grid {
+  display: grid;
+  grid-template-columns: auto repeat(5, auto);
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 /* Native trigger buttons on the demo page (the dialogs' own buttons are separate).
    Outline appearance: transparent fill, neutral border, subtle hover/active fill. */
 .demo-btn {

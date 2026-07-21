@@ -8,7 +8,20 @@ export const comboboxStyles = [
     :host {
       display: inline-block;
       position: relative;
+
+      /* size="medium" (the default) */
       font-size: var(--ui-font-size-md);
+      --combobox-padding-block: var(--ui-spacing-sm);
+    }
+
+    :host([size="small"]) {
+      font-size: var(--ui-font-size-sm);
+      --combobox-padding-block: 2px;
+    }
+
+    :host([size="large"]) {
+      font-size: var(--ui-font-size-lg);
+      --combobox-padding-block: 8px;
     }
 
     .wrapper {
@@ -17,9 +30,9 @@ export const comboboxStyles = [
       flex-wrap: wrap;
       align-items: center;
       gap: var(--ui-spacing-sm);
-      padding-block: var(--ui-spacing-sm);
+      padding-block: var(--combobox-padding-block);
       box-sizing: border-box;
-      border: 1px solid var(--ui-color-gray-600);
+      border: 1px solid var(--ui-color-neutral-600);
       border-radius: var(--ui-radius-sm);
       background: var(--ui-bg);
       color: var(--ui-text);
@@ -123,7 +136,6 @@ export const comboboxStyles = [
     .listbox {
       position: absolute;
       inset-inline: 0;
-      top: calc(100% + 2px);
       z-index: 1;
       margin: 0;
       padding-block: var(--ui-spacing-sm);
@@ -134,7 +146,7 @@ export const comboboxStyles = [
       box-sizing: border-box;
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-color-gray-300);
+      border: 1px solid var(--ui-color-neutral-300);
       border-radius: var(--ui-radius-sm);
       box-shadow:
         0 10px 25px -5px rgba(0, 0, 0, 0.2),
@@ -143,6 +155,14 @@ export const comboboxStyles = [
 
     .listbox[hidden] {
       display: none;
+    }
+
+    .listbox-bottom {
+      top: calc(100% + 2px);
+    }
+
+    .listbox-top {
+      bottom: calc(100% + 2px);
     }
 
     li[role="option"] {
@@ -184,10 +204,17 @@ export const comboboxStyles = [
     .status {
       position: absolute;
       inset-inline: 0;
-      top: calc(100% + 2px);
       padding: var(--ui-spacing-sm);
       font-size: var(--ui-font-size-sm);
       opacity: 0.7;
+    }
+
+    .status-bottom {
+      top: calc(100% + 2px);
+    }
+
+    .status-top {
+      bottom: calc(100% + 2px);
     }
   `,
 ];

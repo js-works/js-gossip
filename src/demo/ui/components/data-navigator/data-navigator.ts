@@ -1,4 +1,5 @@
 import { LitElement, html, nothing } from "lit";
+import type { TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import {
   TableController,
@@ -9,6 +10,7 @@ import {
   getPaginationRowModel,
   type ColumnDef,
   type CellContext,
+  type Column,
   type Table,
 } from "@tanstack/lit-table";
 
@@ -21,6 +23,7 @@ import { chevronRightIcon } from "./icons/chevron-right.icon.js";
 import { chevronsLeftIcon } from "./icons/chevrons-left.icon.js";
 import { chevronsRightIcon } from "./icons/chevrons-right.icon.js";
 import { searchIcon } from "./icons/search.icon.js";
+import { filterIcon } from "./icons/filter.icon.js";
 // Row selection (multi mode) is built from the demo's own checkbox component —
 // it exposes the same `.checked`/`change`-event contract as a native checkbox, so
 // TanStack's own `getToggleSelectedHandler()`/`getToggleAllRowsSelectedHandler()`
@@ -32,6 +35,7 @@ import "../text-field/text-field.js";
 import type { UiInputField } from "../text-field/text-field.js";
 import "../combobox/combobox.js";
 import type { UiCombobox } from "../combobox/combobox.js";
+import "../button/button.js";
 
 // "1.251" rather than "1,251" or "1251" — deterministic regardless of the
 // browser/OS locale the demo happens to run under.
@@ -42,13 +46,44 @@ function formatNumber(n: number): string {
 export type SelectionMode = "none" | "single" | "multi";
 
 /**
+ * A toolbar action, rendered as a subtle `ui-button` to the left of the global
+ * filter. Which actions show depends on the current selection count — "general"
+ * always, "single" only at exactly one selected row, "multi" only above that —
+ * so e.g. an "Edit" action (needs exactly one target) and a "Delete selected"
+ * action (needs at least one, phrased for several) can coexist without either
+ * ever showing when it wouldn't make sense.
+ */
+export interface DataNavigatorAction<T> {
+  label: string;
+  icon?: TemplateResult;
+  type: "general" | "single" | "multi";
+  onClick: (selected: T[]) => void;
+  disabled?: boolean;
+}
+
+/**
  * This component's own column shape — deliberately not TanStack's `ColumnDef`.
  * TanStack Table is an internal implementation detail (see #toColumnDefs below);
  * consumers of `ui-data-navigator` should never need to import anything from
  * `@tanstack/lit-table` themselves, or learn its property names (`size`, not
  * `width`; `enableSorting`, not `sortable`; a `CellContext` object, not the row).
+ *
+ * Two shapes: a data column (reads one field, renders one cell per row) or a
+ * group column (`columns`) — a header spanning several data/group columns
+ * beneath it, with no field/cell of its own. Groups can nest to any depth; the
+ * header then grows one row per level, with each cell's `colspan`/`rowspan`
+ * computed by TanStack Table itself (`header.colSpan`/`header.rowSpan`).
  */
-export interface DataNavigatorColumn<T> {
+export type DataNavigatorColumn<T> = DataNavigatorGroupColumn<T> | DataNavigatorDataColumn<T>;
+
+export interface DataNavigatorGroupColumn<T> {
+  /** Group header label, spanning every column nested beneath it. */
+  header: string;
+  /** The columns (data or, nested, further groups) under this group header. */
+  columns: DataNavigatorColumn<T>[];
+}
+
+export interface DataNavigatorDataColumn<T> {
   /** Which field of a row this column reads from. */
   accessorKey: keyof T & string;
   /** Column header label. */
@@ -69,15 +104,92 @@ export interface DataNavigatorColumn<T> {
   cell?: (row: T) => unknown;
 }
 
+function isGroupColumn<T>(
+  column: DataNavigatorColumn<T>,
+): column is DataNavigatorGroupColumn<T> {
+  return "columns" in column;
+}
+
 function toColumnDefs<T>(columns: DataNavigatorColumn<T>[]): ColumnDef<T>[] {
-  return columns.map((column) => ({
-    accessorKey: column.accessorKey,
-    header: column.header,
-    size: column.width !== undefined ? Number(column.width) : undefined,
-    enableSorting: column.sortable ?? true,
-    cell: (info: CellContext<T, unknown>) =>
-      column.cell ? column.cell(info.row.original) : info.renderValue(),
-  }));
+  return columns.map((column) =>
+    isGroupColumn(column)
+      ? { header: column.header, columns: toColumnDefs(column.columns) }
+      : {
+          accessorKey: column.accessorKey,
+          header: column.header,
+          size: column.width !== undefined ? Number(column.width) : undefined,
+          enableSorting: column.sortable ?? true,
+          cell: (info: CellContext<T, unknown>) =>
+            column.cell ? column.cell(info.row.original) : info.renderValue(),
+        },
+  );
+}
+
+// --- Header grid (colSpan/rowSpan for grouped headers) -------------------
+//
+// Built directly from `this.columns` rather than TanStack's own
+// `table.getHeaderGroups()`. TanStack's header-group model expresses "a leaf
+// column with no group at this level" as an *empty placeholder cell* in the
+// shallow row plus a second, separate real cell in the leaf row — not one
+// cell vertically spanning both (its own `header.rowSpan` is computed as HTML
+// `rowspan="0"`, "span to end of section", on *both* the placeholder and its
+// later real echo, so using it as-is would make a group header like "Contact
+// & Org" incorrectly stretch down into its children's row too). Since we
+// already know the exact tree shape from our own column type, it's simpler
+// and unambiguous to compute the grid ourselves: a plain (non-grouped) column
+// gets one cell spanning every remaining row (rowSpan = total rows − its
+// depth), a group column gets one cell spanning just its own row (rowSpan 1)
+// with colSpan equal to its total leaf-column count.
+
+interface HeaderCell<T> {
+  label: string;
+  colSpan: number;
+  rowSpan: number;
+  /** Only set for a real (non-group) column — what drives sorting/sizing. */
+  column?: Column<T, unknown>;
+}
+
+function countLeafColumns<T>(column: DataNavigatorColumn<T>): number {
+  return isGroupColumn(column)
+    ? column.columns.reduce((sum, child) => sum + countLeafColumns(child), 0)
+    : 1;
+}
+
+function columnDepth<T>(column: DataNavigatorColumn<T>): number {
+  return isGroupColumn(column)
+    ? 1 + Math.max(...column.columns.map(columnDepth))
+    : 1;
+}
+
+function buildHeaderRows<T>(
+  columns: DataNavigatorColumn<T>[],
+  table: Table<T>,
+): HeaderCell<T>[][] {
+  const totalRows = Math.max(1, ...columns.map(columnDepth));
+  const rows: HeaderCell<T>[][] = Array.from({ length: totalRows }, () => []);
+
+  const walk = (level: DataNavigatorColumn<T>[], depth: number) => {
+    for (const column of level) {
+      if (isGroupColumn(column)) {
+        rows[depth].push({
+          label: column.header,
+          colSpan: countLeafColumns(column),
+          rowSpan: 1,
+        });
+        walk(column.columns, depth + 1);
+      } else {
+        rows[depth].push({
+          label: column.header,
+          colSpan: 1,
+          rowSpan: totalRows - depth,
+          column: table.getColumn(column.accessorKey),
+        });
+      }
+    }
+  };
+  walk(columns, 0);
+
+  return rows;
 }
 
 /**
@@ -119,6 +231,9 @@ export class UiDataNavigator<T = unknown> extends LitElement {
 
   @property({ attribute: "global-filter-placeholder" })
   accessor globalFilterPlaceholder = "Search…";
+
+  @property({ attribute: false })
+  accessor actions: DataNavigatorAction<T>[] = [];
 
   // "none": no selection UI at all. "single": clicking a row selects it (and only
   // it — selecting a different row deselects the previous one automatically,
@@ -197,6 +312,8 @@ export class UiDataNavigator<T = unknown> extends LitElement {
   }
 
   protected updated() {
+    this.#updateStickyHeaderOffsets();
+
     if (this.selectionMode === "none") return;
 
     const table = this.#table();
@@ -214,10 +331,39 @@ export class UiDataNavigator<T = unknown> extends LitElement {
     );
   }
 
+  // Every sticky <th> uses `top: 0` in CSS, which only positions the *first*
+  // header row correctly — a second (or third, …) header row needs to stick
+  // just below the row(s) above it, not on top of them. That offset depends on
+  // actual rendered row height (font-size/padding), so it's measured here
+  // rather than hardcoded in CSS.
+  #updateStickyHeaderOffsets() {
+    const headerRowEls =
+      this.renderRoot.querySelectorAll<HTMLElement>("thead tr");
+    let offset = 0;
+    for (const row of headerRowEls) {
+      for (const cell of row.children) {
+        (cell as HTMLElement).style.top = `${offset}px`;
+      }
+      offset += row.getBoundingClientRect().height;
+    }
+  }
+
   render() {
     const table = this.#table();
-    const headerGroups = table.getHeaderGroups();
+    const headerRows = buildHeaderRows(this.columns, table);
     const rows = table.getRowModel().rows;
+
+    const selectedRows = table.getSelectedRowModel().rows.map((row) => row.original);
+    const visibleActions = this.actions.filter((action) => {
+      switch (action.type) {
+        case "general":
+          return true;
+        case "single":
+          return selectedRows.length === 1;
+        case "multi":
+          return selectedRows.length > 1;
+      }
+    });
 
     return html`
       ${this.title || this.subtitle
@@ -230,6 +376,24 @@ export class UiDataNavigator<T = unknown> extends LitElement {
         : nothing}
 
       <div class="toolbar">
+        <div class="toolbar-actions">
+          ${visibleActions.map(
+            (action) => html`
+              <ui-button
+                appearance="primary"
+                variant="subtle"
+                size="medium"
+                ?disabled=${action.disabled}
+                @click=${() => action.onClick(selectedRows)}
+              >
+                ${action.icon
+                  ? html`<span slot="prefix">${action.icon}</span>`
+                  : nothing}
+                ${action.label}
+              </ui-button>
+            `,
+          )}
+        </div>
         <ui-input-field
           class="global-filter"
           placeholder=${this.globalFilterPlaceholder}
@@ -240,35 +404,57 @@ export class UiDataNavigator<T = unknown> extends LitElement {
           }}
         >
           <span slot="prefix">${searchIcon}</span>
+          <ui-button
+            slot="suffix"
+            appearance="primary"
+            variant="subtle"
+            size="small"
+            aria-label="Filter options"
+          >
+            <span slot="prefix">${filterIcon}</span>
+          </ui-button>
         </ui-input-field>
       </div>
 
-      <table>
+      <div class="table-scroll">
+        <table>
         <thead>
-          ${headerGroups.map(
-            (headerGroup, groupIndex) => html`<tr>
-              ${this.selectionMode === "multi"
-                ? html`<th class="select-cell">
-                    ${groupIndex === 0
-                      ? html`<ui-checkbox
-                          .checked=${table.getIsAllRowsSelected()}
-                          .indeterminate=${table.getIsSomeRowsSelected()}
-                          aria-label="Select all rows"
-                          @change=${table.getToggleAllRowsSelectedHandler()}
-                        ></ui-checkbox>`
-                      : nothing}
+          ${headerRows.map(
+            (headerRow, rowIndex) => html`<tr>
+              ${this.selectionMode === "multi" && rowIndex === 0
+                ? html`<th
+                    class="select-cell spans-to-bottom"
+                    rowspan=${headerRows.length}
+                  >
+                    <ui-checkbox
+                      .checked=${table.getIsAllRowsSelected()}
+                      .indeterminate=${table.getIsSomeRowsSelected()}
+                      aria-label="Select all rows"
+                      @change=${table.getToggleAllRowsSelectedHandler()}
+                    ></ui-checkbox>
                   </th>`
                 : nothing}
-              ${headerGroup.headers.map((header) => {
-                if (header.isPlaceholder) return html`<th></th>`;
-                const canSort = header.column.getCanSort();
-                const sorted = header.column.getIsSorted();
-                const toggleSorting = header.column.getToggleSortingHandler();
-                const label = flexRender(
-                  header.column.columnDef.header,
-                  header.getContext(),
-                );
-                return html`<th style="width: ${header.getSize()}px">
+              ${headerRow.map((cell) => {
+                if (!cell.column) {
+                  // A group header: no accessor of its own, so nothing to sort.
+                  return html`<th colspan=${cell.colSpan} rowspan=${cell.rowSpan}>
+                    ${cell.label}
+                  </th>`;
+                }
+                const column = cell.column;
+                const canSort = column.getCanSort();
+                const sorted = column.getIsSorted();
+                const toggleSorting = column.getToggleSortingHandler();
+                // A rowspan cell (e.g. "Name") reaches the bottom of the header
+                // without living in the last row's own DOM, so the CSS rule
+                // that closes off the bottom edge for that row can't reach it.
+                const spansToBottom = rowIndex + cell.rowSpan === headerRows.length;
+                return html`<th
+                  class=${spansToBottom ? "spans-to-bottom" : ""}
+                  colspan=${cell.colSpan}
+                  rowspan=${cell.rowSpan}
+                  style="width: ${column.getSize()}px"
+                >
                   ${canSort && toggleSorting
                     ? html`<button
                         type="button"
@@ -278,7 +464,7 @@ export class UiDataNavigator<T = unknown> extends LitElement {
                           this.#resetSelection(table);
                         }}
                       >
-                        ${label}
+                        ${cell.label}
                         <span class="sort-icon ${sorted ? "active" : ""}">
                           ${sorted === "asc"
                             ? chevronUpIcon
@@ -287,7 +473,7 @@ export class UiDataNavigator<T = unknown> extends LitElement {
                               : chevronExpandIcon}
                         </span>
                       </button>`
-                    : label}
+                    : cell.label}
                 </th>`;
               })}
             </tr>`,
@@ -298,7 +484,7 @@ export class UiDataNavigator<T = unknown> extends LitElement {
             ? html`<tr>
                 <td
                   class="empty"
-                  colspan=${this.columns.length +
+                  colspan=${table.getVisibleLeafColumns().length +
                   (this.selectionMode === "none" ? 0 : 1)}
                 >
                   No rows
@@ -332,7 +518,8 @@ export class UiDataNavigator<T = unknown> extends LitElement {
                 </tr>`,
               )}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <div class="pagination">
         <div class="page-nav">

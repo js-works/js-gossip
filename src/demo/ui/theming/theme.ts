@@ -6,8 +6,8 @@ export const defaultTheme = css`
     --ui-bg: white;
     --ui-text: black;
 
-    --ui-color-primary-500: #1677FF;
     --ui-color-primary-500: #DD4814;
+    --ui-color-primary-500: #1677FF;
 
     --ui-color-primary-50: color-mix(in oklch, white 95%, var(--ui-color-primary-500) 5%);
     --ui-color-primary-100: color-mix(in oklch, white 90%, var(--ui-color-primary-500) 10%);
@@ -33,17 +33,43 @@ export const defaultTheme = css`
     --ui-color-danger-900: color-mix(in oklch, black 40%, var(--ui-color-danger-500) 60%);
     --ui-color-danger-950: color-mix(in oklch, black 50%, var(--ui-color-danger-500) 50%);
 
-    --ui-color-gray-50: #f9f9f9;
-    --ui-color-gray-100: #f2f2f2;
-    --ui-color-gray-200: #e6e6e6;
-    --ui-color-gray-300: #d9d9d9;
-    --ui-color-gray-400: #cccccc;
-    --ui-color-gray-500: #bfbfbf;
-    --ui-color-gray-600: #a6a6a6;
-    --ui-color-gray-700: #8c8c8c;
-    --ui-color-gray-800: #737373;
-    --ui-color-gray-900: #595959;
-    --ui-color-gray-950: #404040;
+    --ui-color-warn-500: #dd6b20;
+
+    --ui-color-warn-50: color-mix(in oklch, white 95%, var(--ui-color-warn-500) 5%);
+    --ui-color-warn-100: color-mix(in oklch, white 90%, var(--ui-color-warn-500) 10%);
+    --ui-color-warn-200: color-mix(in oklch, white 80%, var(--ui-color-warn-500) 20%);
+    --ui-color-warn-300: color-mix(in oklch, white 70%, var(--ui-color-warn-500) 30%);
+    --ui-color-warn-400: color-mix(in oklch, white 60%, var(--ui-color-warn-500) 40%);
+    --ui-color-warn-600: color-mix(in oklch, black 10%, var(--ui-color-warn-500) 90%);
+    --ui-color-warn-700: color-mix(in oklch, black 20%, var(--ui-color-warn-500) 80%);
+    --ui-color-warn-800: color-mix(in oklch, black 30%, var(--ui-color-warn-500) 70%);
+    --ui-color-warn-900: color-mix(in oklch, black 40%, var(--ui-color-warn-500) 60%);
+    --ui-color-warn-950: color-mix(in oklch, black 50%, var(--ui-color-warn-500) 50%);
+
+    --ui-color-success-500: #38a169;
+
+    --ui-color-success-50: color-mix(in oklch, white 95%, var(--ui-color-success-500) 5%);
+    --ui-color-success-100: color-mix(in oklch, white 90%, var(--ui-color-success-500) 10%);
+    --ui-color-success-200: color-mix(in oklch, white 80%, var(--ui-color-success-500) 20%);
+    --ui-color-success-300: color-mix(in oklch, white 70%, var(--ui-color-success-500) 30%);
+    --ui-color-success-400: color-mix(in oklch, white 60%, var(--ui-color-success-500) 40%);
+    --ui-color-success-600: color-mix(in oklch, black 10%, var(--ui-color-success-500) 90%);
+    --ui-color-success-700: color-mix(in oklch, black 20%, var(--ui-color-success-500) 80%);
+    --ui-color-success-800: color-mix(in oklch, black 30%, var(--ui-color-success-500) 70%);
+    --ui-color-success-900: color-mix(in oklch, black 40%, var(--ui-color-success-500) 60%);
+    --ui-color-success-950: color-mix(in oklch, black 50%, var(--ui-color-success-500) 50%);
+
+    --ui-color-neutral-50: #f9f9f9;
+    --ui-color-neutral-100: #f2f2f2;
+    --ui-color-neutral-200: #e6e6e6;
+    --ui-color-neutral-300: #d9d9d9;
+    --ui-color-neutral-400: #cccccc;
+    --ui-color-neutral-500: #bfbfbf;
+    --ui-color-neutral-600: #a6a6a6;
+    --ui-color-neutral-700: #8c8c8c;
+    --ui-color-neutral-800: #737373;
+    --ui-color-neutral-900: #595959;
+    --ui-color-neutral-950: #404040;
 
     --ui-font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --ui-font-size-sm: 0.875rem;
@@ -55,6 +81,8 @@ export const defaultTheme = css`
     --ui-radius-sm: 4px;
     --ui-radius-md: 6px;
     --ui-radius-lg: 12px;
+
+    --ui-button-radius: var(--ui-radius-sm);
 
     --ui-spacing-sm: 4px;
     --ui-spacing-md: 16px;

@@ -12,7 +12,7 @@ export const dateFieldStyles = [
     .wrapper {
       display: flex;
       align-items: center;
-      border: 1px solid var(--ui-color-gray-600);
+      border: 1px solid var(--ui-color-neutral-600);
       border-radius: var(--ui-radius-sm);
       box-sizing: border-box;
     }
@@ -103,7 +103,7 @@ export const dateFieldStyles = [
       color: var(--ui-text);
       font-family: var(--ui-font-sans);
       font-size: 1em;
-      border: 1px solid var(--ui-color-gray-300);
+      border: 1px solid var(--ui-color-neutral-300);
       border-radius: var(--ui-radius-sm);
       box-shadow:
         0 10px 25px -5px rgba(0, 0, 0, 0.2),
@@ -161,7 +161,7 @@ export const dateFieldStyles = [
     }
 
     .datepicker-controls button:hover:not(:disabled) {
-      background: var(--ui-color-gray-200);
+      background: var(--ui-color-neutral-200);
     }
 
     .datepicker-controls button:disabled {
@@ -205,7 +205,7 @@ export const dateFieldStyles = [
     .dow {
       text-align: center;
       font-size: 0.8em;
-      color: var(--ui-color-gray-700);
+      color: var(--ui-color-neutral-700);
       padding: 1px 0;
     }
 
@@ -238,16 +238,16 @@ export const dateFieldStyles = [
     }
 
     .datepicker-cell:hover:not(.disabled) {
-      background: var(--ui-color-gray-200);
+      background: var(--ui-color-neutral-200);
     }
 
     .datepicker-cell.prev,
     .datepicker-cell.next {
-      color: var(--ui-color-gray-500);
+      color: var(--ui-color-neutral-500);
     }
 
     .datepicker-cell.disabled {
-      color: var(--ui-color-gray-400);
+      color: var(--ui-color-neutral-400);
       cursor: default;
       pointer-events: none;
     }
@@ -278,7 +278,7 @@ export const dateFieldStyles = [
       width: 100%;
       align-items: stretch;
       padding-top: 2px;
-      border-top: 1px solid var(--ui-color-gray-200);
+      border-top: 1px solid var(--ui-color-neutral-200);
     }
 
     /* Today/Clear stretch to fill the footer's width equally, like the original

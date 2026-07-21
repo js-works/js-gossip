@@ -18,6 +18,9 @@ export class UiEmailField extends LitElement {
   @property()
   accessor value = "";
 
+  @property({ reflect: true })
+  accessor size: "small" | "medium" | "large" = "medium";
+
   // Default to "off": autocomplete's native default ("on") is rarely what a form
   // actually wants.
   @property()
@@ -55,6 +58,23 @@ export class UiEmailField extends LitElement {
     css`
       :host {
         display: block;
+
+        /* size="medium" (the default). Set on :host (not just the input) so
+           .icon, which inherits ambient font-size rather than the input's
+           own, scales the same way. */
+        font-size: var(--field-font-size);
+        --field-font-size: var(--ui-font-size-md);
+        --field-padding: 0.5rem;
+      }
+
+      :host([size="small"]) {
+        --field-font-size: var(--ui-font-size-sm);
+        --field-padding: 0.35rem;
+      }
+
+      :host([size="large"]) {
+        --field-font-size: var(--ui-font-size-lg);
+        --field-padding: 0.65rem;
       }
 
       /* The border lives on the wrapper, surrounding both the input and the icon;
@@ -62,7 +82,7 @@ export class UiEmailField extends LitElement {
       .wrapper {
         display: flex;
         align-items: center;
-        border: 1px solid var(--ui-color-gray-600);
+        border: 1px solid var(--ui-color-neutral-600);
         border-radius: var(--ui-radius-sm);
         box-sizing: border-box;
       }
@@ -70,9 +90,9 @@ export class UiEmailField extends LitElement {
       input {
         flex-grow: 1;
         min-width: 0;
-        padding: 0.5rem;
+        padding: var(--field-padding);
         font-family: var(--ui-font-sans);
-        font-size: inherit;
+        font-size: var(--field-font-size);
         border: none;
         background: transparent;
       }

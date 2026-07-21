@@ -22,7 +22,7 @@ export const checkboxStyles = [
 
     .wrapper {
       display: inline-flex;
-      align-items: flex-start;
+      align-items: center;
       gap: var(--ui-spacing-sm);
       cursor: pointer;
     }
@@ -51,9 +51,7 @@ export const checkboxStyles = [
       justify-content: center;
       width: 1.1em;
       height: 1.1em;
-      /* Optical alignment with the first line of label text. */
-      margin-block-start: 0.15em;
-      border: 1px solid var(--ui-color-gray-600);
+      border: 1px solid var(--ui-color-neutral-600);
       border-radius: var(--ui-radius-xs);
       background: var(--ui-bg);
       color: white;
