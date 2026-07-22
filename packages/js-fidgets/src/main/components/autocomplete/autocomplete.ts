@@ -28,13 +28,16 @@ export { localFilter };
  * An autocomplete: a text input with a filtered dropdown, built on top of the
  * framework-agnostic `injectAutocomplete` core (see autocomplete-core.ts),
  * which owns everything about the feature that isn't rendering or fetching
- * data — querying/debouncing/keyboard navigation, popup visibility and
- * placement, the loading-indicator delay, header/footer text, and form
- * association. This component only renders whatever that core reports via
- * `onChange`, and forwards its own lifecycle (post-render layout, form
- * callbacks) and DOM refs (the real `<input>`, the rendered popup/listbox/
- * option elements) into it. Unlike `ui-combobox` (which picks from
- * `<ui-option>` children filtered client-side), this component has no
+ * data — querying/debouncing/keyboard navigation, popup visibility, the
+ * loading-indicator delay, header/footer text, form association, and popup
+ * placement/flip/max-height (measured rects, same approach as ui-select/
+ * ui-combobox — see autocomplete-core.ts's header comment for why the
+ * initial pure-CSS anchor-positioning attempt was abandoned). This component
+ * only renders whatever the core reports via `onChange`, and forwards its
+ * own lifecycle (post-render layout, form callbacks) and DOM refs (the real
+ * `<input>`, the rendered popup/listbox/option elements) into it. Unlike
+ * `ui-combobox` (which picks from `<ui-option>` children filtered
+ * client-side), this component has no
  * children API at all — every option comes from `items` or an async
  * `dataSource`.
  *
@@ -118,12 +121,6 @@ export class Autocomplete extends LitElement {
   @state()
   accessor query = "";
 
-  // Which side of the input the popup renders on — recomputed by the core
-  // right after each render (see updated() below), since it needs the
-  // popup's actual measured height.
-  @state()
-  accessor placement: "top" | "bottom" = "bottom";
-
   @state()
   accessor showListbox = false;
 
@@ -183,7 +180,6 @@ export class Autocomplete extends LitElement {
         this.value = next.value;
         this.values = next.values;
         this.showLoadingIndicator = next.showLoadingIndicator;
-        this.placement = next.placement;
         this.showListbox = next.showListbox;
         this.showLoadingStatus = next.showLoadingStatus;
         this.showEmptyStatus = next.showEmptyStatus;
@@ -197,9 +193,6 @@ export class Autocomplete extends LitElement {
   protected updated(changed: PropertyValues<this>) {
     this.#core?.afterRender({
       activeIndex: changed.has("activeIndex"),
-      open: changed.has("open"),
-      rows: changed.has("rows"),
-      query: changed.has("query"),
     });
   }
 
@@ -314,7 +307,7 @@ export class Autocomplete extends LitElement {
         >
         <div
           id="popup"
-          class="popup popup-${this.placement}"
+          class="popup"
           ?hidden=${!this.popupVisible}
           @pointerdown=${(event: Event) => event.preventDefault()}
         >

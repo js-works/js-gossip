@@ -7,7 +7,7 @@ import { chevronDownIcon } from "./icons/chevron.icon.js";
 import "../select/option.js";
 import "../select/option-group.js";
 import type { Option } from "../select/option.js";
-import { computeFlipPlacement } from "../../shared/dropdown-placement.js";
+import { computeFlipPlacement } from "../../shared/popup-layout/popup-layout.js";
 import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
 
 let nextOptionId = 0;

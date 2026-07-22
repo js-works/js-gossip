@@ -2,12 +2,16 @@ import { css } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
 
+// shared/popup-layout/popup-layout.ts's trackPopupLayout (used by
+// autocomplete-core.ts) sets the popup's positioning (position/inset/
+// max-height/etc.) directly as inline styles on the element itself — nothing
+// to compose in here; this file only owns the popup's visual theming (see
+// the .popup rule below).
 export const autocompleteStyles = [
   defaultTheme,
   css`
     :host {
       display: inline-block;
-      position: relative;
 
       /* size="medium" (the default) */
       font-size: var(--ui-font-size-md);
@@ -135,12 +139,19 @@ export const autocompleteStyles = [
     /* The floating popup card — holds the header, the scrollable listbox, the
        loading/no-matches status message, and the footer, in whatever
        combination applies. Header/footer/status live outside .listbox on
-       purpose so they never scroll with the rows. */
+       purpose so they never scroll with the rows.
+
+       Positioning mechanics (position/inset/z-index/max-height/the
+       flex-column+overflow that lets max-height clip cleanly/top vs bottom
+       for placement) are all set as inline styles directly on this element
+       by shared/popup-layout/popup-layout.ts's trackPopupLayout (see this
+       file's top-of-file comment and that module's header comment for why:
+       an earlier pure-CSS anchor-positioning attempt could flip once there
+       was literally no room left, but position-try-order: most-height
+       (needed to prefer whichever side has more room, not just whichever
+       still technically fits) proved unreliable in real-world testing) —
+       this rule only adds the visual theming. */
     .popup {
-      position: absolute;
-      inset-inline: 0;
-      z-index: 1;
-      box-sizing: border-box;
       background: var(--ui-bg);
       color: var(--ui-text);
       border: 1px solid var(--ui-color-neutral-300);
@@ -150,24 +161,13 @@ export const autocompleteStyles = [
         0 4px 8px -4px rgba(0, 0, 0, 0.15);
     }
 
-    .popup[hidden] {
-      display: none;
-    }
-
-    .popup-bottom {
-      top: calc(100% + 2px);
-    }
-
-    .popup-top {
-      bottom: calc(100% + 2px);
-    }
-
     .listbox {
+      flex: 1;
+      min-height: 0;
       margin: 0;
       padding-block: var(--ui-spacing-sm);
       padding-inline: var(--ui-spacing-sm);
       list-style: none;
-      max-height: calc(16em + var(--ui-spacing-sm) * 2);
       overflow-y: auto;
       box-sizing: border-box;
     }

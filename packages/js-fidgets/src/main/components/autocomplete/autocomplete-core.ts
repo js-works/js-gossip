@@ -1,14 +1,18 @@
 // Vanilla-JS core for ui-autocomplete. Owns every part of the feature that
 // isn't rendering (the Lit template in autocomplete.ts) or fetching data (the
 // caller-supplied `dataSource`): querying/debouncing/aborting, keyboard nav,
-// selection, popup visibility + placement, the loading-indicator delay,
-// header/footer text, and form association (ElementInternals). It never
-// touches the DOM tree beyond the `input`/`host` elements handed to it and
-// whatever `get*Element` getters report back — it doesn't render itself, it
-// calls `onChange` whenever there's a new view to show and leaves producing
-// that view (the actual markup) entirely to the caller.
+// selection, popup visibility, the loading-indicator delay, header/footer
+// text, and form association (ElementInternals). Popup placement/flip/
+// max-height is delegated to shared/popup-layout.ts's trackPopupLayout —
+// originally written here, then extracted once it turned out to have
+// nothing autocomplete-specific about it (see that module's header comment
+// for why it's measured-rects JS rather than CSS anchor positioning:
+// position-try-order: most-height proved unreliable in real-world testing).
+// This core never renders — it calls `onChange` whenever there's a new view
+// to show and leaves producing that view (the actual markup) entirely to
+// the caller.
 
-import { computeFlipPlacement } from "../../shared/dropdown-placement.js";
+import { trackPopupLayout } from "../../shared/popup-layout/popup-layout.js";
 import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
 
 export interface AutocompleteItemGroup {
@@ -85,7 +89,6 @@ export interface AutocompleteViewState {
   value: string;
   values: string[];
   showLoadingIndicator: boolean;
-  placement: "top" | "bottom";
   // Precomputed so the render layer barely has to reason about state at all.
   showListbox: boolean;
   showLoadingStatus: boolean;
@@ -101,8 +104,8 @@ export type AutocompleteHeaderFooterText = (
 ) => string | undefined;
 
 export interface InjectAutocompleteConfig {
-  // The custom element instance itself — used for getBoundingClientRect()
-  // (placement) and dispatching the "change" event.
+  // The custom element instance itself — used for dispatching the "change"
+  // event.
   host: HTMLElement;
   // Created by the caller's constructor via host.attachInternals() — same
   // convention as every other form-associated component in this codebase
@@ -129,18 +132,16 @@ export interface InjectAutocompleteConfig {
 
 export interface AutocompleteRenderChanges {
   activeIndex?: boolean;
-  open?: boolean;
-  rows?: boolean;
-  query?: boolean;
 }
 
 export interface AutocompleteHandle {
   onOptionPointerDown(selectableIndex: number, event: Event): void;
   onRemovePill(item: string, event: Event): void;
   onChevronClick(): void;
-  // Called by the caller right after every render, telling the core which of
-  // its own reactive properties changed this pass — the core can't know this
-  // on its own since it never renders and so never sees the DOM settle.
+  // Called by the caller right after every render, telling the core whether
+  // activeIndex changed this pass — the core can't know this on its own
+  // since it never renders and so never sees the DOM settle, but scrolling
+  // the active option into view needs the real, just-rendered <li>.
   afterRender(changes: AutocompleteRenderChanges): void;
   destroy(): void;
   formResetCallback(): void;
@@ -149,6 +150,10 @@ export interface AutocompleteHandle {
 
 const PAGE_SIZE = 10;
 const DEBOUNCE_MS = 200;
+// 18em at the default 16px root font-size — the popup's general cap, passed
+// to trackPopupLayout, which shrinks it further when the viewport doesn't
+// have this much room on whichever side it's placed.
+export const MAX_HEIGHT_PX = 288;
 
 export function injectAutocomplete(
   config: InjectAutocompleteConfig,
@@ -178,7 +183,6 @@ export function injectAutocomplete(
   let value = config.getValue();
   let values = config.getValues();
   let showLoadingIndicator = false;
-  let placement: "top" | "bottom" = "bottom";
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let blurTimer: ReturnType<typeof setTimeout> | undefined;
@@ -215,7 +219,6 @@ export function injectAutocomplete(
       value,
       values: values.slice(),
       showLoadingIndicator,
-      placement,
       showListbox,
       showLoadingStatus,
       showEmptyStatus,
@@ -520,28 +523,20 @@ export function injectAutocomplete(
   input.addEventListener("blur", onBlur);
   input.addEventListener("keydown", onKeydown);
 
-  // --- layout: placement + scroll-active-into-view, both need live DOM refs
-  // that only exist once the caller has actually rendered the popup, so these
-  // can only run after a render — see afterRender().
-  function updatePlacement(): void {
-    const popup = config.getPopupElement();
-    if (!popup) return;
-    const next = computeFlipPlacement(
-      host.getBoundingClientRect(),
-      popup.offsetHeight,
-    );
-    if (next !== placement) {
-      placement = next;
-      emit();
-    }
-  }
-
+  // --- layout: scroll-active-into-view needs a live DOM ref to the just-
+  // rendered option, so it can only run after a render — see afterRender().
   function scrollActiveIntoView(): void {
     const listbox = config.getListboxElement();
     const option = config.getOptionElement(activeIndex);
     if (!listbox || !option) return;
     scrollIntoListboxView(listbox, option);
   }
+
+  const popupLayout = trackPopupLayout({
+    getHostElement: () => host,
+    getPopupElement: config.getPopupElement,
+    maxHeightPx: MAX_HEIGHT_PX,
+  });
 
   // --- initial sync ------------------------------------------------------------
   syncFormValue();
@@ -582,12 +577,19 @@ export function injectAutocomplete(
       if (changes.activeIndex && activeIndex >= 0) {
         scrollActiveIntoView();
       }
-      if (open && (changes.open || changes.rows || changes.query)) {
-        updatePlacement();
-      }
+      // Called on every render pass, not gated on any specific state field —
+      // the popup's visibility (its `hidden` attribute) can flip on a render
+      // where none of open/rows/query changed (e.g. the loading-indicator
+      // delay flipping `showLoadingIndicator` on its own timer), and
+      // trackPopupLayout needs to see every one of those transitions, not
+      // just the ones this core happens to name here. update() is cheap and
+      // idempotent — it only touches the DOM when something it manages
+      // actually needs to change.
+      popupLayout.update();
     },
 
     destroy() {
+      popupLayout.destroy();
       if (debounceTimer) clearTimeout(debounceTimer);
       if (blurTimer) clearTimeout(blurTimer);
       clearTimeout(loadingIndicatorTimer);
