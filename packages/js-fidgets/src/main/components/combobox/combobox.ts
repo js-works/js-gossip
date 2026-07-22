@@ -28,6 +28,10 @@ let nextOptionId = 0;
  * value renders as a removable pill at the start of the field (same UI as
  * `ui-autocomplete`'s multi mode). Form submission then goes through a `FormData`
  * with one entry per selected value rather than a single string.
+ *
+ * `allow-custom-value` turns this into a "creatable" combobox: typed text that
+ * matches no `<ui-option>` can still be committed as the value itself (Enter, or
+ * losing focus) instead of always being reverted/discarded — see #commitCustomValue.
  */
 @customElement("ui-combobox")
 export class Combobox extends LitElement {
@@ -57,6 +61,12 @@ export class Combobox extends LitElement {
   @property({ type: Boolean })
   accessor required = false;
 
+  // "Creatable" escape hatch: commits typed text that matches no <ui-option>
+  // as the value itself (see #commitCustomValue), instead of the typed text
+  // always being discarded/reverted once the input loses focus without a pick.
+  @property({ type: Boolean, attribute: "allow-custom-value" })
+  accessor allowCustomValue = false;
+
   @property({ reflect: true })
   accessor size: "small" | "medium" | "large" = "medium";
 
@@ -85,7 +95,7 @@ export class Combobox extends LitElement {
     this.#syncSelected();
     this.#syncValidity();
     if (!this.multiple) {
-      this.#input.value = this.#selectedOption?.label ?? "";
+      this.#input.value = this.#selectedOption?.label ?? this.value;
     }
   }
 
@@ -221,7 +231,7 @@ export class Combobox extends LitElement {
     if (revertText) {
       this.#input.value = this.multiple
         ? ""
-        : (this.#selectedOption?.label ?? "");
+        : (this.#selectedOption?.label ?? this.value);
     }
   }
 
@@ -264,6 +274,46 @@ export class Combobox extends LitElement {
     this.#setActiveIndex(options.length === 0 ? -1 : 0);
     this.#input.focus();
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
+  // The "creatable" escape hatch for allow-custom-value: commits whatever text
+  // is currently typed as the value itself, bypassing the <ui-option> lookup
+  // entirely since no option backs it. Callers only invoke this once they've
+  // already checked allowCustomValue and that the query is non-empty — mirrors
+  // #pick/#toggle's own closing/reset shape, just without an Option to read.
+  // `closeList` is false from Enter (multi mode keeps the popup open for the
+  // next tag, same as #toggle) but true from blur — focus has already left,
+  // so leaving the popup open behind it would strand a dropdown nothing is
+  // driving.
+  #commitCustomValue(opts: { closeList?: boolean } = {}) {
+    const text = this.query.trim();
+    if (this.multiple) {
+      if (!this.values.includes(text)) {
+        this.values = [...this.values, text];
+        this.dispatchEvent(
+          new Event("change", { bubbles: true, composed: true }),
+        );
+      }
+      this.#input.value = "";
+      if (opts.closeList) {
+        this.#closeList(false);
+      } else {
+        this.query = "";
+        this.#applyFilter("");
+        const options = this.#visibleOptions();
+        this.#setActiveIndex(options.length === 0 ? -1 : 0);
+      }
+    } else {
+      const changed = this.value !== text;
+      this.value = text;
+      this.#input.value = text;
+      this.#closeList(false);
+      if (changed) {
+        this.dispatchEvent(
+          new Event("change", { bubbles: true, composed: true }),
+        );
+      }
+    }
   }
 
   #removePill(value: string, event: Event) {
@@ -316,8 +366,13 @@ export class Combobox extends LitElement {
         break;
       case "Enter":
         event.preventDefault();
-        if (this.open) this.#selectActive();
-        else this.#openList();
+        if (this.open) {
+          if (this.#activeOption) this.#selectActive();
+          else if (this.allowCustomValue && this.query.trim())
+            this.#commitCustomValue();
+        } else {
+          this.#openList();
+        }
         break;
       case "Escape":
         if (this.open) {
@@ -326,7 +381,11 @@ export class Combobox extends LitElement {
         }
         break;
       case "Tab":
-        this.#closeList();
+        // No explicit close here — Tab also fires the native blur this input
+        // is about to lose, and #onInputBlur already decides whether to
+        // commit or revert; a direct #closeList() here would revert first
+        // and beat it to the punch, so allow-custom-value could never commit
+        // on tab-out.
         break;
       default:
         break;
@@ -334,7 +393,11 @@ export class Combobox extends LitElement {
   }
 
   #onInputBlur() {
-    this.#closeList();
+    if (this.allowCustomValue && this.query.trim()) {
+      this.#commitCustomValue({ closeList: true });
+    } else {
+      this.#closeList();
+    }
   }
 
   #onListboxClick(event: Event) {

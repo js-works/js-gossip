@@ -28,6 +28,12 @@ export interface SuggestionState<T> {
   selected: T[];
   // Only set when status is 'error' — whatever `dataSource`'s promise rejected with.
   error?: unknown;
+  // The raw value `dataSource` last resolved with (pre-flatten) — lets a caller
+  // compute something from the whole result (e.g. a "showing X of Y" header)
+  // that `rows`/`limitedTo` alone can't express. Cleared alongside rows/items
+  // whenever those are (see runQuery/onQueryText) so it's never stale relative
+  // to what's actually showing.
+  result?: SuggestionResult<T>;
 }
 
 export interface SuggestionsHandle<T> {
@@ -84,6 +90,7 @@ export function createSuggestions<T>(params: CreateSuggestionsParams<T>): Sugges
   let open = false;
   let selected: T[] = [];
   let error: unknown;
+  let lastResult: SuggestionResult<T> | undefined;
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let blurTimer: ReturnType<typeof setTimeout> | undefined;
@@ -101,6 +108,7 @@ export function createSuggestions<T>(params: CreateSuggestionsParams<T>): Sugges
       open,
       selected: selected.slice(),
       error,
+      result: lastResult,
     });
   }
 
@@ -130,6 +138,18 @@ export function createSuggestions<T>(params: CreateSuggestionsParams<T>): Sugges
     controller?.abort();
     const mySeq = ++seq;
     controller = new AbortController();
+    // Reopening after being closed (as opposed to refining an already-open
+    // search): the cached rows are from a prior, now-disconnected query, not
+    // a stale-but-still-relevant version of this one — showing them would
+    // flash irrelevant results until the real ones arrive. Drop them so the
+    // popup stays hidden (see autocomplete.ts's `open && rows.length > 0`)
+    // until this query actually resolves, same as the very first query ever.
+    if (!open) {
+      rows = [];
+      items = [];
+      limitedTo = undefined;
+      lastResult = undefined;
+    }
     status = 'loading';
     activeIndex = -1;
     open = true;
@@ -140,6 +160,7 @@ export function createSuggestions<T>(params: CreateSuggestionsParams<T>): Sugges
       .then((result) => {
         if (mySeq !== seq) return; // stale
         flatten(result);
+        lastResult = result;
         status = 'ready';
         emit();
       })
@@ -149,6 +170,7 @@ export function createSuggestions<T>(params: CreateSuggestionsParams<T>): Sugges
         rows = [];
         items = [];
         limitedTo = undefined;
+        lastResult = undefined;
         status = 'error';
         error = err;
         emit();
@@ -165,6 +187,7 @@ export function createSuggestions<T>(params: CreateSuggestionsParams<T>): Sugges
       rows = [];
       items = [];
       limitedTo = undefined;
+      lastResult = undefined;
       status = 'idle';
       activeIndex = -1;
       open = false;

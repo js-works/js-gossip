@@ -507,12 +507,24 @@ const tabs: Tab[] = [
   { id: "data-navigator", label: "Data navigator", content: dataNavigatorTab },
 ];
 
-let activeTabId: string = tabs[0].id;
+// The active tab is driven by the URL hash (e.g. #combobox) rather than local
+// state, so a reload — or a shared/bookmarked link — lands back on the same
+// tab instead of always resetting to the first one.
+function readTabFromHash(): string {
+  const id = location.hash.slice(1);
+  return tabs.some((tab) => tab.id === id) ? id : tabs[0].id;
+}
+
+let activeTabId: string = readTabFromHash();
 
 function activateTab(id: string): void {
-  activeTabId = id;
-  renderApp();
+  location.hash = id;
 }
+
+window.addEventListener("hashchange", () => {
+  activeTabId = readTabFromHash();
+  renderApp();
+});
 
 function renderApp(): void {
   const activeTab = tabs.find((tab) => tab.id === activeTabId)!;

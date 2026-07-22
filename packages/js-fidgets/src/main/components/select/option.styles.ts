@@ -44,7 +44,7 @@ export const optionStyles = [
     }
 
     .option:hover {
-      background: var(--ui-color-neutral-200);
+      background: var(--ui-color-neutral-100);
     }
 
     /* Keyboard-highlighted (see ui-select's #setActive) — distinct from

@@ -96,29 +96,19 @@ export const autocompleteStyles = [
       outline: none;
     }
 
-    /* Fixed-width slot, always in the layout (even when idle) so its appearance
-       while loading doesn't shift the input's width. */
-    .spinner-slot {
-      flex: none;
-      width: 1em;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
     .spinner {
+      flex: none;
       width: 1em;
       height: 1em;
       box-sizing: border-box;
       border: 2px solid color-mix(in srgb, currentColor 20%, transparent);
-      border-top: 2px solid var(--ui-color-primary-500);
+      border-top: 2px solid var(--ui-color-neutral-500);
       border-radius: 50%;
       animation: autocomplete-spin 0.75s linear infinite;
     }
 
     /* Same toggle-affordance chevron (and open-state rotation) as ui-select's
-       trigger — the right-edge margin that used to live on .spinner-slot moves
-       here, since this is now the wrapper's actual last child. */
+       trigger. */
     .chevron {
       flex: none;
       display: flex;
@@ -142,16 +132,14 @@ export const autocompleteStyles = [
       }
     }
 
-    .listbox {
+    /* The floating popup card — holds the header, the scrollable listbox, the
+       loading/no-matches status message, and the footer, in whatever
+       combination applies. Header/footer/status live outside .listbox on
+       purpose so they never scroll with the rows. */
+    .popup {
       position: absolute;
       inset-inline: 0;
       z-index: 1;
-      margin: 0;
-      padding-block: var(--ui-spacing-sm);
-      padding-inline: var(--ui-spacing-sm);
-      list-style: none;
-      max-height: calc(16em + var(--ui-spacing-sm) * 2);
-      overflow-y: auto;
       box-sizing: border-box;
       background: var(--ui-bg);
       color: var(--ui-text);
@@ -162,16 +150,30 @@ export const autocompleteStyles = [
         0 4px 8px -4px rgba(0, 0, 0, 0.15);
     }
 
-    .listbox[hidden] {
+    .popup[hidden] {
       display: none;
     }
 
-    .listbox-bottom {
+    .popup-bottom {
       top: calc(100% + 2px);
     }
 
-    .listbox-top {
+    .popup-top {
       bottom: calc(100% + 2px);
+    }
+
+    .listbox {
+      margin: 0;
+      padding-block: var(--ui-spacing-sm);
+      padding-inline: var(--ui-spacing-sm);
+      list-style: none;
+      max-height: calc(16em + var(--ui-spacing-sm) * 2);
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+
+    .listbox[hidden] {
+      display: none;
     }
 
     li[role="option"] {
@@ -192,7 +194,7 @@ export const autocompleteStyles = [
     }
 
     li[role="option"]:hover {
-      background: var(--ui-color-neutral-200);
+      background: var(--ui-color-neutral-100);
     }
 
     li[role="option"].active {
@@ -220,20 +222,29 @@ export const autocompleteStyles = [
       opacity: 0.6;
     }
 
-    .status {
-      position: absolute;
-      inset-inline: 0;
-      padding: var(--ui-spacing-sm);
+    .header,
+    .footer {
+      padding-block: var(--ui-spacing-sm);
+      padding-inline: var(--ui-spacing-md);
       font-size: var(--ui-font-size-sm);
       opacity: 0.7;
     }
 
-    .status-bottom {
-      top: calc(100% + 2px);
+    .header {
+      border-bottom: 1px solid var(--ui-color-neutral-200);
     }
 
-    .status-top {
-      bottom: calc(100% + 2px);
+    .footer {
+      border-top: 1px solid var(--ui-color-neutral-200);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-block: var(--ui-spacing-sm);
+      padding-inline: var(--ui-spacing-md);
+      font-size: 1em;
     }
   `,
 ];

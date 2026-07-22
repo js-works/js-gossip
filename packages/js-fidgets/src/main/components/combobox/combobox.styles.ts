@@ -128,15 +128,14 @@ export const comboboxStyles = [
       transform: rotate(180deg);
     }
 
-    .listbox {
+    /* Shared "floating popup card" look for both the real listbox and the
+       no-matches status message — they're the same popup, just with
+       different content, so they shouldn't read as two different surfaces. */
+    .listbox,
+    .status {
       position: absolute;
       inset-inline: 0;
       z-index: 1;
-      margin: 0;
-      padding-block: var(--ui-spacing-sm);
-      padding-inline: var(--ui-spacing-sm);
-      max-height: calc(16em + var(--ui-spacing-sm) * 2);
-      overflow-y: auto;
       box-sizing: border-box;
       background: var(--ui-bg);
       color: var(--ui-text);
@@ -145,6 +144,14 @@ export const comboboxStyles = [
       box-shadow:
         0 10px 25px -5px rgba(0, 0, 0, 0.2),
         0 4px 8px -4px rgba(0, 0, 0, 0.15);
+    }
+
+    .listbox {
+      margin: 0;
+      padding-block: var(--ui-spacing-sm);
+      padding-inline: var(--ui-spacing-sm);
+      max-height: calc(16em + var(--ui-spacing-sm) * 2);
+      overflow-y: auto;
     }
 
     .listbox[hidden] {
@@ -160,11 +167,9 @@ export const comboboxStyles = [
     }
 
     .status {
-      position: absolute;
-      inset-inline: 0;
-      padding: var(--ui-spacing-sm);
-      font-size: var(--ui-font-size-sm);
-      opacity: 0.7;
+      padding-block: var(--ui-spacing-sm);
+      padding-inline: var(--ui-spacing-md);
+      font-size: 1em;
     }
 
     .status-bottom {

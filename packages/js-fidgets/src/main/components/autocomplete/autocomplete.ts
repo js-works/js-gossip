@@ -115,6 +115,27 @@ export class Autocomplete extends LitElement {
   @property({ attribute: false })
   accessor dataSource: AutocompleteDataSource | undefined = undefined;
 
+  // Computes a line shown at the top/bottom of the popup — e.g. "Showing 20 of
+  // 500" from `limitedTo`, or anything else derivable from the raw dataSource
+  // result and the query that produced it. Only consulted while actual rows
+  // are showing (see showListbox in render()) — there's nothing meaningful to
+  // describe during "Loading…"/"No matches", so neither runs in those states.
+  @property({ attribute: false })
+  accessor headerText:
+    | ((
+        result: SuggestionResult<string> | undefined,
+        query: string,
+      ) => string | undefined)
+    | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor footerText:
+    | ((
+        result: SuggestionResult<string> | undefined,
+        query: string,
+      ) => string | undefined)
+    | undefined = undefined;
+
   @property()
   accessor name = "";
 
@@ -142,15 +163,21 @@ export class Autocomplete extends LitElement {
   @state()
   accessor status: SuggestionState<string>["status"] = "idle";
 
-  // Shown only once "loading" has lasted 100ms (see #updateSpinner) — a data
-  // source that resolves faster than that shouldn't ever flash a spinner.
+  // Shown only once "loading" has lasted 100ms (see #updateLoadingIndicator) —
+  // a data source that resolves faster than that shouldn't ever flash the
+  // popup's "Loading…" message open just to immediately replace it.
   @state()
-  accessor showSpinner = false;
+  accessor showLoadingIndicator = false;
 
-  #spinnerTimer?: ReturnType<typeof setTimeout>;
+  #loadingIndicatorTimer?: ReturnType<typeof setTimeout>;
 
   @state()
   accessor rows: SuggestionState<string>["rows"] = [];
+
+  // The raw dataSource result behind the current `rows` — kept only for
+  // `headerText`, which needs more than the flattened rows can express.
+  @state()
+  accessor result: SuggestionState<string>["result"] = undefined;
 
   @state()
   accessor activeIndex = -1;
@@ -192,6 +219,7 @@ export class Autocomplete extends LitElement {
         this.query = next.query;
         this.status = next.status;
         this.rows = next.rows;
+        this.result = next.result;
         this.activeIndex = next.activeIndex;
         this.open = next.open;
       },
@@ -211,18 +239,18 @@ export class Autocomplete extends LitElement {
       this.#updatePlacement();
     }
     if (changed.has("status")) {
-      this.#updateSpinner();
+      this.#updateLoadingIndicator();
     }
   }
 
-  #updateSpinner() {
-    clearTimeout(this.#spinnerTimer);
+  #updateLoadingIndicator() {
+    clearTimeout(this.#loadingIndicatorTimer);
     if (this.status === "loading") {
-      this.#spinnerTimer = setTimeout(() => {
-        this.showSpinner = true;
+      this.#loadingIndicatorTimer = setTimeout(() => {
+        this.showLoadingIndicator = true;
       }, 100);
     } else {
-      this.showSpinner = false;
+      this.showLoadingIndicator = false;
     }
   }
 
@@ -230,9 +258,7 @@ export class Autocomplete extends LitElement {
   // there is more room above than below — see shared/dropdown-placement.ts (same
   // helper ui-select and ui-combobox use).
   #updatePlacement() {
-    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
-    const status = this.renderRoot.querySelector<HTMLElement>(".status");
-    const popup = listbox && !listbox.hidden ? listbox : status;
+    const popup = this.renderRoot.querySelector<HTMLElement>("#popup");
     if (!popup) return;
 
     this.placement = computeFlipPlacement(
@@ -253,7 +279,7 @@ export class Autocomplete extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.#suggestions?.destroy();
-    clearTimeout(this.#spinnerTimer);
+    clearTimeout(this.#loadingIndicatorTimer);
   }
 
   #applySelection(selected: string[]) {
@@ -372,7 +398,33 @@ export class Autocomplete extends LitElement {
   render() {
     const activeId =
       this.activeIndex >= 0 ? `option-${this.activeIndex}` : undefined;
-    const showListbox = this.open && this.rows.length > 0;
+    // Rows aren't cleared when a refinement query starts loading (see
+    // suggestions.ts's runQuery — kept in memory so a later "reopen" has
+    // something to preserve), but they're still the previous query's results,
+    // not this one's, so the listbox itself must not render them while a
+    // fresh query is in flight — only once it's actually "ready" again.
+    const showListbox =
+      this.open && this.status === "ready" && this.rows.length > 0;
+    const showLoadingStatus =
+      this.open && this.status === "loading" && this.showLoadingIndicator;
+    const showEmptyStatus =
+      this.open &&
+      this.status === "ready" &&
+      this.rows.length === 0 &&
+      !!this.query;
+    // Drives the chevron rotation — `this.open` alone flips true the instant a
+    // query starts (see suggestions.ts), before there's anything to show, so
+    // using it directly here would rotate the chevron open over a popup that's
+    // still empty. This tracks the popup's actual visible content.
+    const popupVisible = showListbox || showLoadingStatus || showEmptyStatus;
+    // Only shown alongside actual rows — not during loading or "no matches",
+    // since there's no meaningful result to describe in either of those.
+    const headerContent = showListbox
+      ? this.headerText?.(this.result, this.query)
+      : undefined;
+    const footerContent = showListbox
+      ? this.footerText?.(this.result, this.query)
+      : undefined;
 
     // Preview the arrow-key-highlighted item in the input itself (single-select
     // only — in multi-select the input stays a free-form search box while picks
@@ -420,51 +472,61 @@ export class Autocomplete extends LitElement {
           ?disabled=${this.disabled}
           ?required=${this.required}
         />
-        <span class="spinner-slot"
-          >${this.showSpinner
-            ? html`<span class="spinner"></span>`
-            : nothing}</span
-        >
         <span
-          class="chevron ${this.open ? "chevron-open" : ""}"
+          class="chevron ${popupVisible ? "chevron-open" : ""}"
           @pointerdown=${(event: Event) => event.preventDefault()}
           @click=${() => this.#onChevronClick()}
           >${chevronDownIcon}</span
         >
-        <ul
-          id="listbox"
-          role="listbox"
-          class="listbox listbox-${this.placement}"
-          aria-multiselectable=${this.multiple}
-          ?hidden=${!showListbox}
+        <div
+          id="popup"
+          class="popup popup-${this.placement}"
+          ?hidden=${!popupVisible}
           @pointerdown=${(event: Event) => event.preventDefault()}
         >
-          ${this.rows.map((row) =>
-            row.kind === "separator"
-              ? html`<li role="presentation" class="separator">
-                  ${row.label ?? nothing}
-                </li>`
-              : html`<li
-                  id="option-${row.selectableIndex}"
-                  role="option"
-                  class=${row.selectableIndex === this.activeIndex ? "active" : ""}
-                  aria-selected=${this.#isSelected(row.item)}
-                  @pointerdown=${(event: Event) =>
-                    this.#onOptionPointerDown(row.selectableIndex, event)}
-                >
-                  <span class="check"
-                    >${this.#isSelected(row.item) ? checkIcon : nothing}</span
+          ${headerContent
+            ? html`<div class="header">${headerContent}</div>`
+            : nothing}
+          <ul
+            id="listbox"
+            role="listbox"
+            class="listbox"
+            aria-multiselectable=${this.multiple}
+            ?hidden=${!showListbox}
+          >
+            ${this.rows.map((row) =>
+              row.kind === "separator"
+                ? html`<li role="presentation" class="separator">
+                    ${row.label ?? nothing}
+                  </li>`
+                : html`<li
+                    id="option-${row.selectableIndex}"
+                    role="option"
+                    class=${row.selectableIndex === this.activeIndex
+                      ? "active"
+                      : ""}
+                    aria-selected=${this.#isSelected(row.item)}
+                    @pointerdown=${(event: Event) =>
+                      this.#onOptionPointerDown(row.selectableIndex, event)}
                   >
-                  <span class="option-label">${row.item}</span>
-                </li>`,
-          )}
-        </ul>
-        ${this.open &&
-        this.status === "ready" &&
-        this.rows.length === 0 &&
-        this.query
-          ? html`<div class="status status-${this.placement}">No matches</div>`
-          : nothing}
+                    <span class="check"
+                      >${this.#isSelected(row.item) ? checkIcon : nothing}</span
+                    >
+                    <span class="option-label">${row.item}</span>
+                  </li>`,
+            )}
+          </ul>
+          ${showLoadingStatus
+            ? html`<div class="status">
+                <span class="spinner"></span>Loading…
+              </div>`
+            : showEmptyStatus
+              ? html`<div class="status">No matches</div>`
+              : nothing}
+          ${footerContent
+            ? html`<div class="footer">${footerContent}</div>`
+            : nothing}
+        </div>
       </div>
     `;
   }
