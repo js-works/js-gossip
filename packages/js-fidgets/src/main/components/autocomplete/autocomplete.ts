@@ -6,100 +6,50 @@ import { autocompleteStyles } from "./autocomplete.styles.js";
 import { checkIcon } from "./icons/check.icon.js";
 import { chevronDownIcon } from "./icons/chevron.icon.js";
 import {
-  createSuggestions,
-  type SuggestionsHandle,
-  type SuggestionState,
-  type SuggestionResult,
-  type Row,
-} from "./suggestions.js";
-import { computeFlipPlacement } from "../../shared/dropdown-placement.js";
-import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
+  injectAutocomplete,
+  localFilter,
+  type AutocompleteHandle,
+  type AutocompleteRow,
+  type AutocompleteItemGroup,
+  type AutocompleteDataSource,
+  type AutocompleteResult,
+  type AutocompleteHeaderFooterText,
+  type AutocompleteViewState,
+} from "./autocomplete-core.js";
 
-// How many characters the user must type before this data source is queried at
-// all — e.g. skip hitting a server for a 1-character query. This is a trait of a
-// *data source* (a plain local filter needs none; a paginated server endpoint might
-// need 3), not of the autocomplete itself, so it's declared on the function rather
-// than as an autocomplete-level property/attribute (a `min-length` attribute there
-// would read as a constraint on the length of the *selected value*, like `<input
-// minlength>`).
-export type AutocompleteDataSource = ((
-  query: string,
-  opts: { signal: AbortSignal },
-) => Promise<SuggestionResult<string>>) & { minLength?: number };
-
-// A labeled run of items — pass an array of these to `items`/`localFilter`
-// instead of a flat string array to get a labeled separator per group in the
-// dropdown (see suggestions.ts's flatten(), which already renders separators
-// for however many groups a data source's result comes back with — this is
-// just a declarative way to reach that from the plain `items` list rather
-// than writing a custom `dataSource`).
-export interface AutocompleteItemGroup {
-  label?: string;
-  items: string[];
-}
-
-function isGroupedItems(
-  items: readonly string[] | readonly AutocompleteItemGroup[],
-): items is readonly AutocompleteItemGroup[] {
-  return items.length > 0 && typeof items[0] !== "string";
-}
-
-// Default data source when no `dataSource` override is set: filters `items` locally,
-// case-insensitively (within each group, if grouped). The delay keeps the "loading"
-// state genuinely reachable rather than only theoretical, and doubles as a
-// debounce-friendly stand-in for a real server round-trip.
-export function localFilter(
-  items: readonly string[] | readonly AutocompleteItemGroup[],
-  delayMs = 150,
-  minLength = 0,
-): AutocompleteDataSource {
-  const groups: AutocompleteItemGroup[] = isGroupedItems(items)
-    ? items.slice()
-    : [{ items: items.slice() }];
-
-  const source: AutocompleteDataSource = (query, { signal }) =>
-    new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const q = query.trim().toLowerCase();
-        const filtered = groups
-          .map((group) => ({
-            label: group.label,
-            items: q
-              ? group.items.filter((item) => item.toLowerCase().includes(q))
-              : group.items.slice(),
-          }))
-          .filter((group) => group.items.length > 0);
-        resolve({ groups: filtered });
-      }, delayMs);
-      signal.addEventListener("abort", () => {
-        clearTimeout(timer);
-        reject(new DOMException("Aborted", "AbortError"));
-      });
-    });
-  source.minLength = minLength;
-  return source;
-}
+export type {
+  AutocompleteItemGroup,
+  AutocompleteDataSource,
+  AutocompleteResult,
+};
+export { localFilter };
 
 /**
  * An autocomplete: a text input with a filtered dropdown, built on top of the
- * framework-agnostic `createSuggestions` core (see suggestions.ts), which owns
- * querying/debouncing/keyboard navigation. This component only renders that core's
- * state as an ARIA combobox/listbox and forwards the real `<input>` to it — the core
- * attaches its own input/focus/blur/keydown listeners directly. Unlike `ui-combobox`
- * (which picks from `<ui-option>` children filtered client-side), this component has
- * no children API at all — every option comes from `items` or an async `dataSource`.
+ * framework-agnostic `injectAutocomplete` core (see autocomplete-core.ts),
+ * which owns everything about the feature that isn't rendering or fetching
+ * data — querying/debouncing/keyboard navigation, popup visibility and
+ * placement, the loading-indicator delay, header/footer text, and form
+ * association. This component only renders whatever that core reports via
+ * `onChange`, and forwards its own lifecycle (post-render layout, form
+ * callbacks) and DOM refs (the real `<input>`, the rendered popup/listbox/
+ * option elements) into it. Unlike `ui-combobox` (which picks from
+ * `<ui-option>` children filtered client-side), this component has no
+ * children API at all — every option comes from `items` or an async
+ * `dataSource`.
  *
- * Single-select (default) tracks the pick in `value` and mirrors it into the input
- * text, closing the popup on pick. `multiple` (like `<select multiple>`) instead
- * accumulates picks in `values`, toggling per option and leaving the popup open and
- * the input's text as free-form search; each selected value renders as a removable
- * pill at the start of the field. Form submission then goes through a `FormData`
- * with one entry per selected value rather than a single string.
+ * Single-select (default) tracks the pick in `value` and mirrors it into the
+ * input text, closing the popup on pick. `multiple` (like `<select
+ * multiple>`) instead accumulates picks in `values`, toggling per option and
+ * leaving the popup open and the input's text as free-form search; each
+ * selected value renders as a removable pill at the start of the field. Form
+ * submission then goes through a `FormData` with one entry per selected value
+ * rather than a single string.
  *
  * Either pass a static `items` list — a flat string array, or an array of
- * `AutocompleteItemGroup` for a labeled separator per group (filtered locally, see
- * `localFilter` above) — or a `dataSource` (e.g. to query a server); `dataSource`
- * takes precedence when set.
+ * `AutocompleteItemGroup` for a labeled separator per group (filtered
+ * locally, see `localFilter`) — or a `dataSource` (e.g. to query a server);
+ * `dataSource` takes precedence when set.
  */
 @customElement("ui-autocomplete")
 export class Autocomplete extends LitElement {
@@ -107,7 +57,7 @@ export class Autocomplete extends LitElement {
 
   #internals: ElementInternals;
   #input!: HTMLInputElement;
-  #suggestions?: SuggestionsHandle<string>;
+  #core?: AutocompleteHandle;
 
   @property({ type: Array })
   accessor items: string[] | AutocompleteItemGroup[] = [];
@@ -118,23 +68,13 @@ export class Autocomplete extends LitElement {
   // Computes a line shown at the top/bottom of the popup — e.g. "Showing 20 of
   // 500" from `limitedTo`, or anything else derivable from the raw dataSource
   // result and the query that produced it. Only consulted while actual rows
-  // are showing (see showListbox in render()) — there's nothing meaningful to
+  // are showing (see the core's showListbox) — there's nothing meaningful to
   // describe during "Loading…"/"No matches", so neither runs in those states.
   @property({ attribute: false })
-  accessor headerText:
-    | ((
-        result: SuggestionResult<string> | undefined,
-        query: string,
-      ) => string | undefined)
-    | undefined = undefined;
+  accessor headerText: AutocompleteHeaderFooterText | undefined = undefined;
 
   @property({ attribute: false })
-  accessor footerText:
-    | ((
-        result: SuggestionResult<string> | undefined,
-        query: string,
-      ) => string | undefined)
-    | undefined = undefined;
+  accessor footerText: AutocompleteHeaderFooterText | undefined = undefined;
 
   @property()
   accessor name = "";
@@ -161,23 +101,13 @@ export class Autocomplete extends LitElement {
   accessor size: "small" | "medium" | "large" = "medium";
 
   @state()
-  accessor status: SuggestionState<string>["status"] = "idle";
+  accessor status: AutocompleteViewState["status"] = "idle";
 
-  // Shown only once "loading" has lasted 100ms (see #updateLoadingIndicator) —
-  // a data source that resolves faster than that shouldn't ever flash the
-  // popup's "Loading…" message open just to immediately replace it.
   @state()
   accessor showLoadingIndicator = false;
 
-  #loadingIndicatorTimer?: ReturnType<typeof setTimeout>;
-
   @state()
-  accessor rows: SuggestionState<string>["rows"] = [];
-
-  // The raw dataSource result behind the current `rows` — kept only for
-  // `headerText`, which needs more than the flattened rows can express.
-  @state()
-  accessor result: SuggestionState<string>["result"] = undefined;
+  accessor rows: AutocompleteRow[] = [];
 
   @state()
   accessor activeIndex = -1;
@@ -188,12 +118,29 @@ export class Autocomplete extends LitElement {
   @state()
   accessor query = "";
 
-  // Which side of the input the popup renders on. Recomputed on every open/content
-  // change (see #updatePlacement) rather than tracked continuously (no resize/scroll
-  // listeners) — good enough for a popup that only needs to be positioned right at
-  // the moment it appears or its content reflows.
+  // Which side of the input the popup renders on — recomputed by the core
+  // right after each render (see updated() below), since it needs the
+  // popup's actual measured height.
   @state()
   accessor placement: "top" | "bottom" = "bottom";
+
+  @state()
+  accessor showListbox = false;
+
+  @state()
+  accessor showLoadingStatus = false;
+
+  @state()
+  accessor showEmptyStatus = false;
+
+  @state()
+  accessor popupVisible = false;
+
+  @state()
+  accessor headerContent: string | undefined = undefined;
+
+  @state()
+  accessor footerContent: string | undefined = undefined;
 
   constructor() {
     super();
@@ -206,148 +153,75 @@ export class Autocomplete extends LitElement {
   protected firstUpdated() {
     this.#input = this.renderRoot.querySelector("input")!;
 
-    const resolveDataSource = () => this.dataSource ?? localFilter(this.items);
-
-    this.#suggestions = createSuggestions<string>({
+    this.#core = injectAutocomplete({
+      host: this,
+      internals: this.#internals,
       input: this.#input,
-      dataSource: (query, opts) => resolveDataSource()(query, opts),
-      getKey: (item) => item,
-      selectionMode: this.multiple ? "multi" : "single",
-      minLength: resolveDataSource().minLength ?? 0,
-      onSelectionChange: (selected) => this.#applySelection(selected),
-      onSuggestionsChange: (next) => {
+      getItems: () => this.items,
+      getDataSource: () => this.dataSource,
+      getMultiple: () => this.multiple,
+      getDisabled: () => this.disabled,
+      getName: () => this.name,
+      getValue: () => this.value,
+      getValues: () => this.values,
+      getHeaderText: () => this.headerText,
+      getFooterText: () => this.footerText,
+      getPopupElement: () =>
+        this.renderRoot.querySelector<HTMLElement>("#popup"),
+      getListboxElement: () =>
+        this.renderRoot.querySelector<HTMLElement>("#listbox"),
+      getOptionElement: (selectableIndex) =>
+        this.renderRoot.querySelector<HTMLElement>(
+          `#option-${selectableIndex}`,
+        ),
+      onChange: (next) => {
         this.query = next.query;
         this.status = next.status;
         this.rows = next.rows;
-        this.result = next.result;
         this.activeIndex = next.activeIndex;
         this.open = next.open;
+        this.value = next.value;
+        this.values = next.values;
+        this.showLoadingIndicator = next.showLoadingIndicator;
+        this.placement = next.placement;
+        this.showListbox = next.showListbox;
+        this.showLoadingStatus = next.showLoadingStatus;
+        this.showEmptyStatus = next.showEmptyStatus;
+        this.popupVisible = next.popupVisible;
+        this.headerContent = next.headerContent;
+        this.footerContent = next.footerContent;
       },
     });
-
-    this.#syncFormValue();
   }
 
   protected updated(changed: PropertyValues<this>) {
-    if (changed.has("activeIndex") && this.activeIndex >= 0) {
-      this.#scrollActiveIntoView();
-    }
-    if (
-      this.open &&
-      (changed.has("open") || changed.has("rows") || changed.has("query"))
-    ) {
-      this.#updatePlacement();
-    }
-    if (changed.has("status")) {
-      this.#updateLoadingIndicator();
-    }
-  }
-
-  #updateLoadingIndicator() {
-    clearTimeout(this.#loadingIndicatorTimer);
-    if (this.status === "loading") {
-      this.#loadingIndicatorTimer = setTimeout(() => {
-        this.showLoadingIndicator = true;
-      }, 100);
-    } else {
-      this.showLoadingIndicator = false;
-    }
-  }
-
-  // Flips the popup above the input when there isn't enough room below for it but
-  // there is more room above than below — see shared/dropdown-placement.ts (same
-  // helper ui-select and ui-combobox use).
-  #updatePlacement() {
-    const popup = this.renderRoot.querySelector<HTMLElement>("#popup");
-    if (!popup) return;
-
-    this.placement = computeFlipPlacement(
-      this.getBoundingClientRect(),
-      popup.offsetHeight,
-    );
-  }
-
-  #scrollActiveIntoView() {
-    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
-    const option = this.renderRoot.querySelector<HTMLElement>(
-      `#option-${this.activeIndex}`,
-    );
-    if (!listbox || !option) return;
-    scrollIntoListboxView(listbox, option);
+    this.#core?.afterRender({
+      activeIndex: changed.has("activeIndex"),
+      open: changed.has("open"),
+      rows: changed.has("rows"),
+      query: changed.has("query"),
+    });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this.#suggestions?.destroy();
-    clearTimeout(this.#loadingIndicatorTimer);
+    this.#core?.destroy();
   }
 
-  #applySelection(selected: string[]) {
-    if (this.multiple) {
-      this.values = selected;
-    } else {
-      this.value = selected[0] ?? "";
-      this.#input.value = this.value;
-    }
-    this.#syncFormValue();
-    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-  }
-
-  // Multi-select has no single string to submit, so it hands the internals a
-  // FormData with one entry per selected value under this element's own `name` —
-  // the browser folds those straight into the parent form's submission.
-  #syncFormValue() {
-    if (this.disabled) {
-      this.#internals.setFormValue(null);
-      return;
-    }
-    if (this.multiple) {
-      const formData = new FormData();
-      for (const item of this.values) {
-        formData.append(this.name, item);
-      }
-      this.#internals.setFormValue(formData);
-    } else {
-      this.#internals.setFormValue(this.value);
-    }
-  }
-
-  // Routed through the core's own deselect (rather than splicing `this.values`
-  // directly) so its internal `selected` stays in sync — otherwise re-picking the
-  // same item from the dropdown later would desync from what the pills show.
   #removePill(item: string, event: Event) {
-    event.preventDefault();
-    this.#suggestions?.deselect(item);
+    this.#core?.onRemovePill(item, event);
   }
 
   #onOptionPointerDown(index: number, event: Event) {
-    // Keep focus on the input rather than letting it blur to the option, which
-    // would otherwise close the listbox (via the core's onBlur) before the click
-    // that selects from it lands.
-    event.preventDefault();
-    this.#suggestions?.select(index);
+    this.#core?.onOptionPointerDown(index, event);
   }
 
-  // Same toggle affordance as ui-select's trigger chevron. Focusing the input
-  // (rather than calling suggestions.open() alone) is what actually shows every
-  // option when nothing's been typed yet — see suggestions.ts's onFocus.
   #onChevronClick() {
-    if (this.disabled) return;
-    if (this.open) {
-      this.#suggestions?.close();
-    } else {
-      this.#input.focus();
-      this.#suggestions?.open();
-    }
+    this.#core?.onChevronClick();
   }
 
   formResetCallback() {
-    this.value = "";
-    this.values = [];
-    if (this.#input) {
-      this.#input.value = "";
-    }
-    this.#syncFormValue();
+    this.#core?.formResetCallback();
   }
 
   formDisabledCallback(disabled: boolean) {
@@ -355,20 +229,7 @@ export class Autocomplete extends LitElement {
   }
 
   formStateRestoreCallback(state: string | File | FormData | null) {
-    if (this.multiple) {
-      if (state instanceof FormData) {
-        this.values = state.getAll(this.name).map(String);
-        this.#syncFormValue();
-      }
-      return;
-    }
-    if (typeof state === "string") {
-      this.value = state;
-      if (this.#input) {
-        this.#input.value = state;
-      }
-      this.#syncFormValue();
-    }
+    this.#core?.formStateRestoreCallback(state);
   }
 
   checkValidity() {
@@ -398,33 +259,6 @@ export class Autocomplete extends LitElement {
   render() {
     const activeId =
       this.activeIndex >= 0 ? `option-${this.activeIndex}` : undefined;
-    // Rows aren't cleared when a refinement query starts loading (see
-    // suggestions.ts's runQuery — kept in memory so a later "reopen" has
-    // something to preserve), but they're still the previous query's results,
-    // not this one's, so the listbox itself must not render them while a
-    // fresh query is in flight — only once it's actually "ready" again.
-    const showListbox =
-      this.open && this.status === "ready" && this.rows.length > 0;
-    const showLoadingStatus =
-      this.open && this.status === "loading" && this.showLoadingIndicator;
-    const showEmptyStatus =
-      this.open &&
-      this.status === "ready" &&
-      this.rows.length === 0 &&
-      !!this.query;
-    // Drives the chevron rotation — `this.open` alone flips true the instant a
-    // query starts (see suggestions.ts), before there's anything to show, so
-    // using it directly here would rotate the chevron open over a popup that's
-    // still empty. This tracks the popup's actual visible content.
-    const popupVisible = showListbox || showLoadingStatus || showEmptyStatus;
-    // Only shown alongside actual rows — not during loading or "no matches",
-    // since there's no meaningful result to describe in either of those.
-    const headerContent = showListbox
-      ? this.headerText?.(this.result, this.query)
-      : undefined;
-    const footerContent = showListbox
-      ? this.footerText?.(this.result, this.query)
-      : undefined;
 
     // Preview the arrow-key-highlighted item in the input itself (single-select
     // only — in multi-select the input stays a free-form search box while picks
@@ -434,7 +268,7 @@ export class Autocomplete extends LitElement {
     // popup closes), which also happens to be the correctly resolved text on
     // Escape/blur without picking, since those reset activeIndex the same way.
     const activeRow = this.rows.find(
-      (row): row is Extract<Row<string>, { kind: "item" }> =>
+      (row): row is Extract<AutocompleteRow, { kind: "item" }> =>
         row.kind === "item" && row.selectableIndex === this.activeIndex,
     );
     const displayValue =
@@ -473,7 +307,7 @@ export class Autocomplete extends LitElement {
           ?required=${this.required}
         />
         <span
-          class="chevron ${popupVisible ? "chevron-open" : ""}"
+          class="chevron ${this.popupVisible ? "chevron-open" : ""}"
           @pointerdown=${(event: Event) => event.preventDefault()}
           @click=${() => this.#onChevronClick()}
           >${chevronDownIcon}</span
@@ -481,18 +315,18 @@ export class Autocomplete extends LitElement {
         <div
           id="popup"
           class="popup popup-${this.placement}"
-          ?hidden=${!popupVisible}
+          ?hidden=${!this.popupVisible}
           @pointerdown=${(event: Event) => event.preventDefault()}
         >
-          ${headerContent
-            ? html`<div class="header">${headerContent}</div>`
+          ${this.headerContent
+            ? html`<div class="header">${this.headerContent}</div>`
             : nothing}
           <ul
             id="listbox"
             role="listbox"
             class="listbox"
             aria-multiselectable=${this.multiple}
-            ?hidden=${!showListbox}
+            ?hidden=${!this.showListbox}
           >
             ${this.rows.map((row) =>
               row.kind === "separator"
@@ -516,15 +350,15 @@ export class Autocomplete extends LitElement {
                   </li>`,
             )}
           </ul>
-          ${showLoadingStatus
+          ${this.showLoadingStatus
             ? html`<div class="status">
                 <span class="spinner"></span>Loading…
               </div>`
-            : showEmptyStatus
+            : this.showEmptyStatus
               ? html`<div class="status">No matches</div>`
               : nothing}
-          ${footerContent
-            ? html`<div class="footer">${footerContent}</div>`
+          ${this.footerContent
+            ? html`<div class="footer">${this.footerContent}</div>`
             : nothing}
         </div>
       </div>
