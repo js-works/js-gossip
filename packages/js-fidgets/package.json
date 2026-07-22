@@ -1,0 +1,59 @@
+{
+  "name": "js-fizzle",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./lingo": {
+      "types": "./dist/lingo/index.d.ts",
+      "import": "./dist/lingo/index.js"
+    },
+    "./lingo/english": {
+      "types": "./dist/lingo/english.d.ts",
+      "import": "./dist/lingo/english.js"
+    },
+    "./lingo/german": {
+      "types": "./dist/lingo/german.d.ts",
+      "import": "./dist/lingo/german.js"
+    },
+    "./lingo/xwiki": {
+      "types": "./dist/xwiki/index.d.ts",
+      "import": "./dist/xwiki/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc",
+    "build": "tsc && rm -rf dist && tsc -p tsconfig.build.json",
+    "build:release": "npm run build && node scripts/pack-source.mts",
+    "preview": "vite preview",
+    "loc": "sloc src/main",
+    "loc:src": "sloc . --exclude 'node_modules|coverage|dist|\\.test\\.|\\.config\\.'",
+    "loc:json": "sloc src/main --format json"
+  },
+  "devDependencies": {
+    "@awesome.me/webawesome": "^3.10.0",
+    "@tanstack/lit-table": "^8.21.3",
+    "@types/archiver": "7.0.0",
+    "archiver": "7.0.1",
+    "sloc": "0.3.2",
+    "typescript": "7.0.2",
+    "vanillajs-datepicker": "^1.3.4",
+    "vite": "8.1.1"
+  },
+  "dependencies": {
+    "lit": "3.3.3"
+  },
+  "peerDependencies": {
+    "js-lingo": "^0.0.3"
+  }
+}

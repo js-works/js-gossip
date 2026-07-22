@@ -78,7 +78,7 @@ h2 {
   align-items: center;
 }
 
-.button-showcase .row + .row {
+.row + .row {
   margin-top: 0.5rem;
 }
 
@@ -135,6 +135,11 @@ h2 {
   max-width: 960px;
   margin: 0 auto;
   padding-bottom: 2rem;
+}
+
+/* Kept in the markup (not deleted) so it's a one-line toggle to bring back. */
+.hidden-demo {
+  display: none;
 }
 
 pre#log {

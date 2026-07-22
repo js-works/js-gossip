@@ -32,9 +32,9 @@ import "../checkbox/checkbox.js";
 // The pagination bar's page-jump field and page-size picker are built from the
 // demo's own field components rather than plain <input>/<select>.
 import "../text-field/text-field.js";
-import type { UiInputField } from "../text-field/text-field.js";
+import type { InputField } from "../text-field/text-field.js";
 import "../combobox/combobox.js";
-import type { UiCombobox } from "../combobox/combobox.js";
+import type { Combobox } from "../combobox/combobox.js";
 import "../button/button.js";
 
 // "1.251" rather than "1,251" or "1251" — deterministic regardless of the
@@ -208,7 +208,7 @@ function buildHeaderRows<T>(
  * *initial* page size (TanStack only reads `initialState` once, at first render).
  */
 @customElement("ui-data-navigator")
-export class UiDataNavigator<T = unknown> extends LitElement {
+export class DataNavigator<T = unknown> extends LitElement {
   #tableController = new TableController<T>(this);
 
   @property({ attribute: false })
@@ -294,7 +294,7 @@ export class UiDataNavigator<T = unknown> extends LitElement {
   }
 
   #jumpToPage(event: Event, table: Table<T>) {
-    const requested = Number((event.target as UiInputField).value);
+    const requested = Number((event.target as InputField).value);
     if (!Number.isFinite(requested)) return;
 
     const lastPageIndex = Math.max(table.getPageCount() - 1, 0);
@@ -399,7 +399,7 @@ export class UiDataNavigator<T = unknown> extends LitElement {
           placeholder=${this.globalFilterPlaceholder}
           .value=${(table.getState().globalFilter as string | undefined) ?? ""}
           @input=${(event: Event) => {
-            table.setGlobalFilter((event.target as UiInputField).value);
+            table.setGlobalFilter((event.target as InputField).value);
             this.#resetSelection(table);
           }}
         >
@@ -596,7 +596,7 @@ export class UiDataNavigator<T = unknown> extends LitElement {
             .items=${this.pageSizeOptions.map(String)}
             .value=${String(table.getState().pagination.pageSize)}
             @change=${(event: Event) => {
-              table.setPageSize(Number((event.target as UiCombobox).value));
+              table.setPageSize(Number((event.target as Combobox).value));
               this.#resetSelection(table);
             }}
           ></ui-combobox>

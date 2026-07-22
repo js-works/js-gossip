@@ -4,6 +4,7 @@ import type { PropertyValues } from "lit";
 
 import { comboboxStyles } from "./combobox.styles.js";
 import { checkIcon } from "./icons/check.icon.js";
+import { chevronDownIcon } from "./icons/chevron.icon.js";
 import {
   createSuggestions,
   type SuggestionsHandle,
@@ -23,23 +24,49 @@ export type ComboboxDataSource = ((
   opts: { signal: AbortSignal },
 ) => Promise<SuggestionResult<string>>) & { minLength?: number };
 
+// A labeled run of items — pass an array of these to `items`/`localFilter`
+// instead of a flat string array to get a labeled separator per group in the
+// dropdown (see suggestions.ts's flatten(), which already renders separators
+// for however many groups a data source's result comes back with — this is
+// just a declarative way to reach that from the plain `items` list rather
+// than writing a custom `dataSource`).
+export interface ComboboxItemGroup {
+  label?: string;
+  items: string[];
+}
+
+function isGroupedItems(
+  items: readonly string[] | readonly ComboboxItemGroup[],
+): items is readonly ComboboxItemGroup[] {
+  return items.length > 0 && typeof items[0] !== "string";
+}
+
 // Default data source when no `dataSource` override is set: filters `items` locally,
-// case-insensitively. The delay keeps the "loading" state genuinely reachable rather
-// than only theoretical, and doubles as a debounce-friendly stand-in for a real
-// server round-trip.
+// case-insensitively (within each group, if grouped). The delay keeps the "loading"
+// state genuinely reachable rather than only theoretical, and doubles as a
+// debounce-friendly stand-in for a real server round-trip.
 export function localFilter(
-  items: readonly string[],
+  items: readonly string[] | readonly ComboboxItemGroup[],
   delayMs = 150,
   minLength = 0,
 ): ComboboxDataSource {
+  const groups: ComboboxItemGroup[] = isGroupedItems(items)
+    ? items.slice()
+    : [{ items: items.slice() }];
+
   const source: ComboboxDataSource = (query, { signal }) =>
     new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         const q = query.trim().toLowerCase();
-        const matches = q
-          ? items.filter((item) => item.toLowerCase().includes(q))
-          : items.slice();
-        resolve({ groups: [{ items: matches }] });
+        const filtered = groups
+          .map((group) => ({
+            label: group.label,
+            items: q
+              ? group.items.filter((item) => item.toLowerCase().includes(q))
+              : group.items.slice(),
+          }))
+          .filter((group) => group.items.length > 0);
+        resolve({ groups: filtered });
       }, delayMs);
       signal.addEventListener("abort", () => {
         clearTimeout(timer);
@@ -64,11 +91,13 @@ export function localFilter(
  * pill at the start of the field. Form submission then goes through a `FormData`
  * with one entry per selected value rather than a single string.
  *
- * Either pass a static `items` list (filtered locally, see `localFilter` above) or a
- * `dataSource` (e.g. to query a server); `dataSource` takes precedence when set.
+ * Either pass a static `items` list — a flat string array, or an array of
+ * `ComboboxItemGroup` for a labeled separator per group (filtered locally, see
+ * `localFilter` above) — or a `dataSource` (e.g. to query a server); `dataSource`
+ * takes precedence when set.
  */
 @customElement("ui-combobox")
-export class UiCombobox extends LitElement {
+export class Combobox extends LitElement {
   static formAssociated = true;
 
   #internals: ElementInternals;
@@ -76,7 +105,7 @@ export class UiCombobox extends LitElement {
   #suggestions?: SuggestionsHandle<string>;
 
   @property({ type: Array })
-  accessor items: string[] = [];
+  accessor items: string[] | ComboboxItemGroup[] = [];
 
   @property({ attribute: false })
   accessor dataSource: ComboboxDataSource | undefined = undefined;
@@ -302,6 +331,19 @@ export class UiCombobox extends LitElement {
     this.#suggestions?.select(index);
   }
 
+  // Same toggle affordance as ui-select's trigger chevron. Focusing the input
+  // (rather than calling suggestions.open() alone) is what actually shows every
+  // option when nothing's been typed yet — see suggestions.ts's onFocus.
+  #onChevronClick() {
+    if (this.disabled) return;
+    if (this.open) {
+      this.#suggestions?.close();
+    } else {
+      this.#input.focus();
+      this.#suggestions?.open();
+    }
+  }
+
   formResetCallback() {
     this.value = "";
     this.values = [];
@@ -412,6 +454,12 @@ export class UiCombobox extends LitElement {
           >${this.showSpinner
             ? html`<span class="spinner"></span>`
             : nothing}</span
+        >
+        <span
+          class="chevron ${this.open ? "chevron-open" : ""}"
+          @pointerdown=${(event: Event) => event.preventDefault()}
+          @click=${() => this.#onChevronClick()}
+          >${chevronDownIcon}</span
         >
         <ul
           id="listbox"

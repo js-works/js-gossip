@@ -1,0 +1,140 @@
+/* No page-local color tokens here — the demo adopts the library's own theme
+   (see theme.ts's :root selector, adopted in demo.ts) so its chrome uses the
+   exact same --ui-bg/--ui-text/--ui-color-* custom properties the components
+   themselves read, rather than a separate hand-picked palette that could drift
+   out of sync with whatever theme is active. */
+
+:root {
+  /* --ui-bg/--ui-text are fixed (light-only) values, not a light-dark() pair,
+     so pin the scheme rather than letting it follow the OS preference. */
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 2rem 1.5rem;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--ui-font-sans);
+  line-height: 1.5;
+}
+
+.combobox-demo {
+  width: 20rem;
+}
+
+.page {
+  display: flex;
+  gap: 2em;
+  margin: 0;
+  margin-inline-start: 2.5rem;
+  padding: 0.5rem 0 2rem;
+  user-select: none;
+}
+
+.tab-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  flex-grow: 0;
+  flex-shrink: 0;
+  width: fit-content;
+  border-inline-end: 1px solid var(--ui-color-neutral-300);
+}
+
+.tab-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: end;
+  color: var(--ui-text);
+  background: transparent;
+  border: none;
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+  padding: 0.55em 0.8em;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.tab-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--ui-color-primary-500);
+  outline-offset: 1px;
+}
+
+.tab-btn[aria-selected="true"] {
+  background: var(--ui-color-primary-50);
+  color: var(--ui-color-primary-500);
+  font-weight: 600;
+}
+
+.tab-content {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+header {
+  margin-bottom: 2rem;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.95rem;
+}
+
+section {
+  margin-bottom: 1.75rem;
+}
+
+h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+  margin: 0 0 0.6rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.row + .row {
+  margin-top: 0.5rem;
+}
+
+.button-showcase .row {
+  align-items: center;
+}
+
+/* One column per variant (plus the leading appearance label), so a variant
+   lines up in the same column across every appearance row instead of each
+   row wrapping independently like .row does. */
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(6, max-content);
+  align-items: center;
+  gap: 0.35rem 1.5rem;
+  margin-bottom: 0.5rem;
+}
+

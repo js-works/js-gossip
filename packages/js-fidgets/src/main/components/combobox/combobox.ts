@@ -1,0 +1,506 @@
+import { LitElement, html, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+import type { PropertyValues } from "lit";
+
+import { comboboxStyles } from "./combobox.styles.js";
+import { chevronDownIcon } from "./icons/chevron.icon.js";
+import "../select/option.js";
+import "../select/option-group.js";
+import type { Option } from "../select/option.js";
+import { computeFlipPlacement } from "../../shared/dropdown-placement.js";
+import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
+
+let nextOptionId = 0;
+
+/**
+ * Like `ui-select`, but editable: a text input filters the `<ui-option>` children
+ * (optionally grouped under `<ui-option-group>`) client-side as you type, rather
+ * than requiring a click to open a closed list. Unlike `ui-autocomplete`, there's
+ * no `items`/`dataSource` — every option is a real slotted child, matched
+ * synchronously by comparing its `.label` against the typed text (see
+ * #applyFilter), the same way `ui-select` reads that DOM directly rather than
+ * rendering plain data rows.
+ *
+ * Single-select (default) tracks the pick in `value` and mirrors it into the input
+ * text, closing the popup on pick. `multiple` (like `<select multiple>`) instead
+ * accumulates picks in `values`, toggling per option and leaving the popup open and
+ * the input's text as a free-form filter that resets after each pick; each selected
+ * value renders as a removable pill at the start of the field (same UI as
+ * `ui-autocomplete`'s multi mode). Form submission then goes through a `FormData`
+ * with one entry per selected value rather than a single string.
+ */
+@customElement("ui-combobox")
+export class Combobox extends LitElement {
+  static formAssociated = true;
+
+  #internals: ElementInternals;
+  #input!: HTMLInputElement;
+
+  @property()
+  accessor name = "";
+
+  @property()
+  accessor value = "";
+
+  @property({ type: Boolean })
+  accessor multiple = false;
+
+  @property({ type: Array })
+  accessor values: string[] = [];
+
+  @property()
+  accessor placeholder = "";
+
+  @property({ type: Boolean, reflect: true })
+  accessor disabled = false;
+
+  @property({ type: Boolean })
+  accessor required = false;
+
+  @property({ reflect: true })
+  accessor size: "small" | "medium" | "large" = "medium";
+
+  @state()
+  accessor open = false;
+
+  @state()
+  accessor query = "";
+
+  @state()
+  accessor activeIndex = -1;
+
+  @state()
+  accessor placement: "top" | "bottom" = "bottom";
+
+  constructor() {
+    super();
+    this.#internals = this.attachInternals();
+  }
+
+  static styles = comboboxStyles;
+
+  protected firstUpdated() {
+    this.#input = this.renderRoot.querySelector("input")!;
+    this.#syncFormValue();
+    this.#syncSelected();
+    this.#syncValidity();
+    if (!this.multiple) {
+      this.#input.value = this.#selectedOption?.label ?? "";
+    }
+  }
+
+  protected updated(changed: PropertyValues<this>) {
+    if (changed.has("value") || changed.has("values")) {
+      this.#syncFormValue();
+      this.#syncSelected();
+      this.#syncValidity();
+    }
+    if (changed.has("required")) {
+      this.#syncValidity();
+    }
+    if (changed.has("open") && this.open) {
+      this.#updatePlacement();
+    }
+  }
+
+  #options(): Option[] {
+    return [...this.querySelectorAll<Option>("ui-option")];
+  }
+
+  #visibleOptions(): Option[] {
+    return this.#options().filter(
+      (option) => !option.disabled && !option.hidden,
+    );
+  }
+
+  get #selectedOption(): Option | undefined {
+    return this.#options().find((option) => option.value === this.value);
+  }
+
+  get #activeOption(): Option | undefined {
+    return this.#visibleOptions()[this.activeIndex];
+  }
+
+  #onSlotChange() {
+    this.#syncSelected();
+    this.#applyFilter(this.query);
+  }
+
+  #syncFormValue() {
+    if (this.disabled) {
+      this.#internals.setFormValue(null);
+      return;
+    }
+    if (this.multiple) {
+      const formData = new FormData();
+      for (const item of this.values) formData.append(this.name, item);
+      this.#internals.setFormValue(formData);
+    } else {
+      this.#internals.setFormValue(this.value || null);
+    }
+  }
+
+  #syncValidity() {
+    if (!this.#input) return;
+
+    const flags: ValidityStateFlags = {};
+    let message = "";
+    const hasValue = this.multiple ? this.values.length > 0 : !!this.value;
+
+    if (this.required && !hasValue) {
+      flags.valueMissing = true;
+      message = "Please select an option.";
+    }
+
+    this.#internals.setValidity(flags, message, this.#input);
+    this.toggleAttribute("invalid", !this.#internals.validity.valid);
+  }
+
+  #syncSelected() {
+    for (const option of this.#options()) {
+      option.selected = this.multiple
+        ? this.values.includes(option.value)
+        : option.value === this.value;
+    }
+  }
+
+  // Case-insensitive substring match against each option's plain-text label —
+  // same semantics as ui-autocomplete's localFilter. Also hides any
+  // <ui-option-group> left with no visible options, so filtering never leaves a
+  // stray group heading floating above an empty section.
+  #applyFilter(query: string) {
+    const q = query.trim().toLowerCase();
+    for (const option of this.#options()) {
+      option.hidden = q.length > 0 && !option.label.toLowerCase().includes(q);
+    }
+    for (const group of this.querySelectorAll<HTMLElement>("ui-option-group")) {
+      const options = [...group.querySelectorAll<Option>("ui-option")];
+      group.hidden = options.length > 0 && options.every((o) => o.hidden);
+    }
+  }
+
+  // `preview` mirrors the highlighted option's text into the input — only done
+  // for explicit keyboard navigation (arrow/Home/End), never while the user is
+  // typing/filtering (that would fight their own input), and never in multi mode
+  // (the input there stays a free-form search box; picks show up as pills).
+  #setActiveIndex(index: number, opts: { preview?: boolean } = {}) {
+    for (const option of this.#options()) option.active = false;
+    this.activeIndex = index;
+
+    const option = this.#visibleOptions()[index];
+    if (!option) return;
+
+    option.id ||= `ui-combobox-option-${++nextOptionId}`;
+    option.active = true;
+    if (opts.preview && !this.multiple) {
+      this.#input.value = option.label;
+    }
+    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
+    if (listbox) scrollIntoListboxView(listbox, option);
+  }
+
+  #openList() {
+    if (this.open || this.disabled) return;
+    this.open = true;
+    const options = this.#visibleOptions();
+    const selectedIndex = this.multiple
+      ? -1
+      : options.findIndex((option) => option.value === this.value);
+    this.#setActiveIndex(options.length === 0 ? -1 : Math.max(selectedIndex, 0));
+  }
+
+  // `revertText` discards any typed-but-not-picked filter text, restoring the
+  // input to its resting state (the selected label, or blank in multi mode) —
+  // skipped by #pick, which has already put the right text in place itself.
+  #closeList(revertText = true) {
+    if (!this.open) return;
+    this.open = false;
+    this.#setActiveIndex(-1);
+    this.query = "";
+    this.#applyFilter("");
+    if (revertText) {
+      this.#input.value = this.multiple
+        ? ""
+        : (this.#selectedOption?.label ?? "");
+    }
+  }
+
+  #moveActive(delta: number) {
+    const options = this.#visibleOptions();
+    if (options.length === 0) return;
+    const next = Math.min(Math.max(this.activeIndex + delta, 0), options.length - 1);
+    this.#setActiveIndex(next, { preview: true });
+  }
+
+  #selectActive() {
+    const option = this.#activeOption;
+    if (!option) return;
+    if (this.multiple) this.#toggle(option);
+    else this.#pick(option);
+  }
+
+  #pick(option: Option) {
+    const changed = this.value !== option.value;
+    this.value = option.value;
+    this.#input.value = option.label;
+    this.#closeList(false);
+    this.#input.focus();
+    if (changed) {
+      this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    }
+  }
+
+  // Toggles the pick, clears the search text/filter so the full list is visible
+  // again for the next pick, and keeps the popup open — same shape as
+  // ui-autocomplete's multi mode.
+  #toggle(option: Option) {
+    this.values = this.values.includes(option.value)
+      ? this.values.filter((value) => value !== option.value)
+      : [...this.values, option.value];
+    this.#input.value = "";
+    this.query = "";
+    this.#applyFilter("");
+    const options = this.#visibleOptions();
+    this.#setActiveIndex(options.length === 0 ? -1 : 0);
+    this.#input.focus();
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
+  #removePill(value: string, event: Event) {
+    event.preventDefault();
+    this.values = this.values.filter((v) => v !== value);
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
+  #onInput() {
+    this.query = this.#input.value;
+    this.#applyFilter(this.query);
+    if (!this.open) this.open = true;
+    const options = this.#visibleOptions();
+    this.#setActiveIndex(options.length === 0 ? -1 : 0);
+  }
+
+  #onInputFocus() {
+    this.#openList();
+  }
+
+  #onInputClick() {
+    this.#openList();
+  }
+
+  #onInputKeydown(event: KeyboardEvent) {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        if (this.open) this.#moveActive(1);
+        else this.#openList();
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        if (this.open) this.#moveActive(-1);
+        else this.#openList();
+        break;
+      case "Home":
+        if (this.open) {
+          event.preventDefault();
+          this.#setActiveIndex(0, { preview: true });
+        }
+        break;
+      case "End":
+        if (this.open) {
+          event.preventDefault();
+          this.#setActiveIndex(this.#visibleOptions().length - 1, {
+            preview: true,
+          });
+        }
+        break;
+      case "Enter":
+        event.preventDefault();
+        if (this.open) this.#selectActive();
+        else this.#openList();
+        break;
+      case "Escape":
+        if (this.open) {
+          event.preventDefault();
+          this.#closeList();
+        }
+        break;
+      case "Tab":
+        this.#closeList();
+        break;
+      default:
+        break;
+    }
+  }
+
+  #onInputBlur() {
+    this.#closeList();
+  }
+
+  #onListboxClick(event: Event) {
+    const option = (event.target as Element).closest(
+      "ui-option",
+    ) as Option | null;
+    if (!option || option.disabled || option.hidden) return;
+    if (this.multiple) this.#toggle(option);
+    else this.#pick(option);
+  }
+
+  // Keeps focus on the input through a listbox click rather than letting it blur
+  // (which would close the popup, via #onInputBlur, before the click that picks
+  // from it lands) — same technique as ui-select/ui-autocomplete use.
+  #onListboxPointerDown(event: Event) {
+    event.preventDefault();
+  }
+
+  // Same toggle affordance as ui-select's trigger chevron.
+  #onChevronClick() {
+    if (this.disabled) return;
+    if (this.open) {
+      this.#closeList();
+    } else {
+      this.#input.focus();
+      this.#openList();
+    }
+  }
+
+  // Flips the popup above the input when there isn't enough room below for it but
+  // there is more room above than below — see shared/dropdown-placement.ts (same
+  // helper ui-select and ui-autocomplete use).
+  #updatePlacement() {
+    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
+    if (!listbox) return;
+    this.placement = computeFlipPlacement(
+      this.getBoundingClientRect(),
+      listbox.offsetHeight,
+    );
+  }
+
+  focus(options?: FocusOptions) {
+    this.#input?.focus(options);
+  }
+
+  blur() {
+    this.#input?.blur();
+  }
+
+  formResetCallback() {
+    this.value = "";
+    this.values = [];
+    if (this.#input) this.#input.value = "";
+    this.#syncFormValue();
+  }
+
+  formDisabledCallback(disabled: boolean) {
+    this.disabled = disabled;
+  }
+
+  formStateRestoreCallback(state: string | File | FormData | null) {
+    if (this.multiple) {
+      if (state instanceof FormData) {
+        this.values = state.getAll(this.name).map(String);
+      }
+      return;
+    }
+    if (typeof state === "string") {
+      this.value = state;
+      if (this.#input) {
+        this.#input.value = this.#selectedOption?.label ?? state;
+      }
+    }
+  }
+
+  checkValidity() {
+    return this.#internals.checkValidity();
+  }
+
+  reportValidity() {
+    return this.#internals.reportValidity();
+  }
+
+  setCustomValidity(message: string) {
+    if (message) {
+      this.#internals.setValidity({ customError: true }, message, this.#input);
+    } else {
+      this.#syncValidity();
+    }
+  }
+
+  render() {
+    const pills = this.multiple
+      ? this.values.map((value) => ({
+          value,
+          label: this.#options().find((o) => o.value === value)?.label ?? value,
+        }))
+      : [];
+    const showListbox = this.open && this.#visibleOptions().length > 0;
+    const showNoMatches =
+      this.open && this.query && this.#visibleOptions().length === 0;
+
+    return html`
+      <div class="wrapper">
+        ${this.multiple
+          ? pills.map(
+              (pill) => html`<span class="pill">
+                <span class="pill-label">${pill.label}</span>
+                <button
+                  type="button"
+                  class="pill-remove"
+                  aria-label="Remove ${pill.label}"
+                  @pointerdown=${(event: Event) =>
+                    this.#removePill(pill.value, event)}
+                >
+                  ×
+                </button>
+              </span>`,
+            )
+          : nothing}
+        <input
+          type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded=${this.open}
+          aria-controls="listbox"
+          aria-activedescendant=${this.#activeOption?.id ?? nothing}
+          name=${this.name}
+          placeholder=${this.placeholder}
+          autocomplete="off"
+          spellcheck="false"
+          ?disabled=${this.disabled}
+          ?required=${this.required}
+          @input=${() => this.#onInput()}
+          @focus=${() => this.#onInputFocus()}
+          @click=${() => this.#onInputClick()}
+          @keydown=${(event: KeyboardEvent) => this.#onInputKeydown(event)}
+          @blur=${() => this.#onInputBlur()}
+        />
+        <span
+          class="chevron ${this.open ? "chevron-open" : ""}"
+          @pointerdown=${(event: Event) => event.preventDefault()}
+          @click=${() => this.#onChevronClick()}
+          >${chevronDownIcon}</span
+        >
+        <div
+          id="listbox"
+          role="listbox"
+          class="listbox listbox-${this.placement}"
+          aria-multiselectable=${this.multiple}
+          ?hidden=${!showListbox}
+          @click=${(event: Event) => this.#onListboxClick(event)}
+          @pointerdown=${(event: Event) => this.#onListboxPointerDown(event)}
+        >
+          <slot @slotchange=${() => this.#onSlotChange()}></slot>
+        </div>
+        ${showNoMatches
+          ? html`<div class="status status-${this.placement}">No matches</div>`
+          : nothing}
+      </div>
+    `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ui-combobox": Combobox;
+  }
+}

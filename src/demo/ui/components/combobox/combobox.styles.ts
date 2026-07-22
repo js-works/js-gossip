@@ -108,7 +108,6 @@ export const comboboxStyles = [
     .spinner-slot {
       flex: none;
       width: 1em;
-      margin-inline-end: var(--ui-spacing-md);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -122,6 +121,23 @@ export const comboboxStyles = [
       border-top: 2px solid var(--ui-color-primary-500);
       border-radius: 50%;
       animation: combobox-spin 0.75s linear infinite;
+    }
+
+    /* Same toggle-affordance chevron (and open-state rotation) as ui-select's
+       trigger — the right-edge margin that used to live on .spinner-slot moves
+       here, since this is now the wrapper's actual last child. */
+    .chevron {
+      flex: none;
+      display: flex;
+      align-items: center;
+      margin-inline-end: var(--ui-spacing-md);
+      opacity: 0.6;
+      cursor: pointer;
+      transition: transform 120ms ease;
+    }
+
+    .chevron-open {
+      transform: rotate(180deg);
     }
 
     @keyframes combobox-spin {
@@ -180,6 +196,10 @@ export const comboboxStyles = [
 
     li[role="option"][aria-selected="true"] {
       font-weight: 600;
+    }
+
+    li[role="option"]:hover {
+      background: var(--ui-color-neutral-200);
     }
 
     li[role="option"].active {
