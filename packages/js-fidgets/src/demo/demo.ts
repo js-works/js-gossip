@@ -17,6 +17,12 @@ import type {
   DataNavigatorAction,
   DataNavigatorColumn,
 } from "../main/components/data-navigator/data-navigator.js";
+import "../main/components/text-field/text-field.js";
+import "../main/components/number-field/number-field.js";
+import "../main/components/password-field/password-field.js";
+import "../main/components/email-field/email-field.js";
+import "../main/components/date-field/date-field.js";
+import "../main/components/native-date-field/native-date-field.js";
 
 // Adopts the library's own theme tokens (--ui-bg, --ui-text, --ui-color-*, ...)
 // at the document level (see theme.ts's `:root` selector) so the demo page's own
@@ -338,8 +344,7 @@ function selectTab() {
           <ui-option value="b">Option B</ui-option>
         </ui-select>
         <ui-select size="medium" placeholder="Medium">
-          <ui-option value="a">Option A></button >
-          </ui-option>
+          <ui-option value="a">Option A</ui-option>
           <ui-option value="b">Option B</ui-option>
         </ui-select>
         <ui-select size="large" placeholder="Large">
@@ -348,6 +353,18 @@ function selectTab() {
         </ui-select>
         <ui-select disabled placeholder="Disabled">
           <ui-option value="a">Option A</ui-option>
+        </ui-select>
+      </div>
+      <div class="row">
+        <ui-select multiple placeholder="Choose fruits…">
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
         </ui-select>
       </div>
     </section>
@@ -417,6 +434,151 @@ function checkboxTab() {
   `;
 }
 
+function textFieldTab() {
+  return html`
+    <section>
+      <h2>Text field</h2>
+      <div class="row">
+        <ui-text-field placeholder="Full name"></ui-text-field>
+      </div>
+      <div class="row">
+        <ui-text-field size="small" placeholder="Small"></ui-text-field>
+        <ui-text-field size="medium" placeholder="Medium"></ui-text-field>
+        <ui-text-field size="large" placeholder="Large"></ui-text-field>
+        <ui-text-field disabled placeholder="Disabled"></ui-text-field>
+      </div>
+      <div class="row">
+        <ui-text-field
+          required
+          minlength="3"
+          maxlength="20"
+          placeholder="3-20 characters"
+        ></ui-text-field>
+      </div>
+    </section>
+  `;
+}
+
+function numberFieldTab() {
+  return html`
+    <section>
+      <h2>Number field</h2>
+      <div class="row">
+        <ui-number-field placeholder="Quantity"></ui-number-field>
+      </div>
+      <div class="row">
+        <ui-number-field size="small" placeholder="Small"></ui-number-field>
+        <ui-number-field size="medium" placeholder="Medium"></ui-number-field>
+        <ui-number-field size="large" placeholder="Large"></ui-number-field>
+        <ui-number-field disabled placeholder="Disabled"></ui-number-field>
+      </div>
+      <div class="row">
+        <ui-number-field
+          required
+          min="0"
+          max="10"
+          step="1"
+          placeholder="0 to 10"
+        ></ui-number-field>
+      </div>
+    </section>
+  `;
+}
+
+function passwordFieldTab() {
+  return html`
+    <section>
+      <h2>Password field</h2>
+      <div class="row">
+        <ui-password-field placeholder="Password"></ui-password-field>
+      </div>
+      <div class="row">
+        <ui-password-field size="small" placeholder="Small"></ui-password-field>
+        <ui-password-field size="medium" placeholder="Medium"></ui-password-field>
+        <ui-password-field size="large" placeholder="Large"></ui-password-field>
+        <ui-password-field disabled placeholder="Disabled"></ui-password-field>
+      </div>
+      <div class="row">
+        <ui-password-field
+          required
+          minlength="8"
+          placeholder="At least 8 characters"
+        ></ui-password-field>
+      </div>
+    </section>
+  `;
+}
+
+function emailFieldTab() {
+  return html`
+    <section>
+      <h2>Email field</h2>
+      <div class="row">
+        <ui-email-field placeholder="you@example.com"></ui-email-field>
+      </div>
+      <div class="row">
+        <ui-email-field size="small" placeholder="Small"></ui-email-field>
+        <ui-email-field size="medium" placeholder="Medium"></ui-email-field>
+        <ui-email-field size="large" placeholder="Large"></ui-email-field>
+        <ui-email-field disabled placeholder="Disabled"></ui-email-field>
+      </div>
+      <div class="row">
+        <ui-email-field required placeholder="Required"></ui-email-field>
+      </div>
+    </section>
+  `;
+}
+
+function dateFieldTab() {
+  return html`
+    <section>
+      <h2>Date field</h2>
+      <p>Custom calendar popup, built on vanillajs-datepicker.</p>
+      <div class="row">
+        <ui-date-field></ui-date-field>
+      </div>
+      <div class="row">
+        <ui-date-field disabled></ui-date-field>
+      </div>
+      <div class="row">
+        <ui-date-field
+          required
+          min="2026-01-01"
+          max="2026-12-31"
+        ></ui-date-field>
+      </div>
+    </section>
+  `;
+}
+
+function nativeDateFieldTab() {
+  return html`
+    <section>
+      <h2>Native date field</h2>
+      <p>Thin themed wrapper around the browser's own native date picker.</p>
+      <div class="row">
+        <ui-native-date-field></ui-native-date-field>
+      </div>
+      <div class="row">
+        <ui-native-date-field type="datetime-local"></ui-native-date-field>
+      </div>
+      <div class="row">
+        <ui-native-date-field size="small"></ui-native-date-field>
+        <ui-native-date-field size="medium"></ui-native-date-field>
+        <ui-native-date-field size="large"></ui-native-date-field>
+        <ui-native-date-field disabled></ui-native-date-field>
+      </div>
+      <div class="row">
+        <ui-native-date-field
+          required
+          min="2026-01-01"
+          max="2026-12-31"
+        ></ui-native-date-field>
+      </div>
+    </section>
+  `;
+}
+
 // Renders FRUITS as real <ui-option>/<ui-option-group> children — each call
 // produces a fresh set of elements, so it's safe to use once per <ui-combobox>
 // below rather than sharing a single set of slotted nodes across two hosts.
@@ -465,6 +627,14 @@ function autocompleteTab() {
           .dataSource=${localFilter(FRUITS, 1000)}
         ></ui-autocomplete>
       </div>
+      <div class="row">
+        <ui-autocomplete
+          class="combobox-demo"
+          multiple
+          placeholder="Search fruits…"
+          .dataSource=${localFilter(FRUITS, 1000)}
+        ></ui-autocomplete>
+      </div>
     </section>
   `;
 }
@@ -504,6 +674,16 @@ const tabs: Tab[] = [
   { id: "autocomplete", label: "Autocomplete", content: autocompleteTab },
   { id: "radio", label: "Radio group", content: radioTab },
   { id: "checkbox", label: "Checkbox group", content: checkboxTab },
+  { id: "text-field", label: "Text field", content: textFieldTab },
+  { id: "number-field", label: "Number field", content: numberFieldTab },
+  { id: "password-field", label: "Password field", content: passwordFieldTab },
+  { id: "email-field", label: "Email field", content: emailFieldTab },
+  { id: "date-field", label: "Date field", content: dateFieldTab },
+  {
+    id: "native-date-field",
+    label: "Native date field",
+    content: nativeDateFieldTab,
+  },
   { id: "data-navigator", label: "Data navigator", content: dataNavigatorTab },
 ];
 

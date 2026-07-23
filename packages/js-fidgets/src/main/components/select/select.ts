@@ -7,9 +7,20 @@ import { chevronDownIcon } from "./icons/chevron.icon.js";
 import "./option.js";
 import "./option-group.js";
 import type { Option } from "./option.js";
-import { computeFlipPlacement } from "../../shared/popup-layout/popup-layout.js";
+import { trackPopupLayout } from "../../shared/popup-layout/popup-layout.js";
 import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
+import {
+  renderPills,
+  togglePillValue,
+  removePillValue,
+  buildMultiFormData,
+} from "../../shared/pills/pills.js";
 
+// Mixed into every generated option id (see #setActive) alongside the
+// incrementing counter below, so ids stay collision-safe against another
+// copy of this same module bundled elsewhere on the page (each gets its own
+// random instance number, rather than every copy's counter restarting at 1).
+const instanceId = Math.floor(Math.random() * 1e9);
 let nextOptionId = 0;
 
 /**
@@ -19,7 +30,7 @@ let nextOptionId = 0;
  * themed. The actual `<ui-option>` elements are slotted, unchanged, into the
  * open listbox; this component only tracks which one is selected/active (see
  * #syncSelected/#setActive) and opens/closes/positions the popup, using the
- * shared flip-when-tight-on-room placement helper (see shared/dropdown-placement.ts)
+ * shared popup-positioning tracker (see shared/popup-layout/popup-layout.ts)
  * also used by `ui-combobox` and `ui-autocomplete`.
  */
 @customElement("ui-select")
@@ -27,8 +38,18 @@ export class Select extends LitElement {
   static formAssociated = true;
 
   #internals: ElementInternals;
-  #trigger!: HTMLButtonElement;
+  #trigger!: HTMLElement;
   #activeOption?: Option;
+  #popupLayout?: ReturnType<typeof trackPopupLayout>;
+  // Options we generated an id for (see #setActive) — a slotted <ui-option>
+  // is the consumer's own element, so we only ever assign it an id (needed
+  // for aria-activedescendant, which requires a real id reference — a
+  // data-* attribute wouldn't satisfy that) when it doesn't already have
+  // one, and only for as long as it's actually the active option; tracked
+  // here so #setActive knows which ids are ours to remove again once an
+  // option stops being active, rather than leaving generated ids permanently
+  // stuck on every option a user has ever arrowed past.
+  #generatedIdOptions = new WeakSet<Option>();
 
   @property()
   accessor name = "";
@@ -38,6 +59,12 @@ export class Select extends LitElement {
 
   @property()
   accessor placeholder = "";
+
+  @property({ type: Boolean })
+  accessor multiple = false;
+
+  @property({ type: Array })
+  accessor values: string[] = [];
 
   @property({ type: Boolean, reflect: true })
   accessor disabled = false;
@@ -51,9 +78,6 @@ export class Select extends LitElement {
   @state()
   accessor open = false;
 
-  @state()
-  accessor placement: "top" | "bottom" = "bottom";
-
   constructor() {
     super();
     this.#internals = this.attachInternals();
@@ -62,24 +86,48 @@ export class Select extends LitElement {
   static styles = selectStyles;
 
   protected firstUpdated() {
-    this.#trigger = this.renderRoot.querySelector("button")!;
+    this.#trigger = this.renderRoot.querySelector<HTMLElement>(".trigger")!;
     this.#syncFormValue();
     this.#syncSelected();
     this.#syncValidity();
+    this.#popupLayout = trackPopupLayout({
+      // .wrapper, not `this` — :host can be stretched taller than the
+      // trigger by a consumer's own layout (see .wrapper's comment in
+      // select.styles.ts), which would then also throw off the
+      // available-space math below/above the trigger, not just the popup's
+      // visual anchor point.
+      getHostElement: () =>
+        this.renderRoot.querySelector<HTMLElement>(".wrapper"),
+      getPopupElement: () => this.renderRoot.querySelector<HTMLElement>("#popup"),
+    });
   }
 
   protected updated(changed: PropertyValues<this>) {
-    if (changed.has("value")) {
+    if (changed.has("value") || changed.has("values")) {
       this.#syncFormValue();
       this.#syncSelected();
       this.#syncValidity();
     }
+    // In multiple mode, #syncFormValue bakes `name` into the FormData it
+    // builds (buildMultiFormData) — re-run it if `name` changes on its own
+    // (e.g. set dynamically after mount), or the submitted field name would
+    // stay stuck at whatever it was during the last value/values change.
+    if (changed.has("name")) {
+      this.#syncFormValue();
+    }
     if (changed.has("required")) {
       this.#syncValidity();
     }
-    if (changed.has("open") && this.open) {
-      this.#updatePlacement();
-    }
+    // Called on every render pass, not gated on `open` — the popup's
+    // visibility can flip without `open` itself changing on that particular
+    // render (see autocomplete-core.ts's afterRender for why relying on a
+    // narrower gate silently missed a real transition there).
+    this.#popupLayout?.update();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.#popupLayout?.destroy();
   }
 
   #options(): Option[] {
@@ -95,7 +143,15 @@ export class Select extends LitElement {
   }
 
   #syncFormValue() {
-    this.#internals.setFormValue(this.disabled ? null : this.value || null);
+    if (this.disabled) {
+      this.#internals.setFormValue(null);
+      return;
+    }
+    if (this.multiple) {
+      this.#internals.setFormValue(buildMultiFormData(this.name, this.values));
+    } else {
+      this.#internals.setFormValue(this.value || null);
+    }
   }
 
   #syncValidity() {
@@ -103,8 +159,9 @@ export class Select extends LitElement {
 
     const flags: ValidityStateFlags = {};
     let message = "";
+    const hasValue = this.multiple ? this.values.length > 0 : !!this.value;
 
-    if (this.required && !this.value) {
+    if (this.required && !hasValue) {
       flags.valueMissing = true;
       message = "Please select an option.";
     }
@@ -115,15 +172,25 @@ export class Select extends LitElement {
 
   #syncSelected() {
     for (const option of this.#options()) {
-      option.selected = option.value === this.value;
+      option.selected = this.multiple
+        ? this.values.includes(option.value)
+        : option.value === this.value;
     }
   }
 
   #setActive(option: Option | undefined) {
-    if (this.#activeOption) this.#activeOption.active = false;
+    if (this.#activeOption) {
+      this.#activeOption.active = false;
+      if (this.#generatedIdOptions.delete(this.#activeOption)) {
+        this.#activeOption.removeAttribute("id");
+      }
+    }
     this.#activeOption = option;
     if (option) {
-      option.id ||= `ui-option-${++nextOptionId}`;
+      if (!option.id) {
+        option.id = `ui-option-${instanceId}-${++nextOptionId}`;
+        this.#generatedIdOptions.add(option);
+      }
       option.active = true;
       const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
       if (listbox) scrollIntoListboxView(listbox, option);
@@ -159,6 +226,10 @@ export class Select extends LitElement {
   }
 
   #pick(option: Option) {
+    if (this.multiple) {
+      this.#toggle(option);
+      return;
+    }
     const changed = this.value !== option.value;
     this.value = option.value;
     this.#closeList();
@@ -168,7 +239,24 @@ export class Select extends LitElement {
     }
   }
 
+  // Toggles the pick and keeps the popup open — same shape as ui-combobox's
+  // multi mode — rather than #pick's single-select close-on-pick.
+  #toggle(option: Option) {
+    this.values = togglePillValue(this.values, option.value);
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
+  // Routed through #toggle (rather than the caller splicing `values`
+  // directly) so the underlying <ui-option>.selected stays in sync — see
+  // #syncSelected.
+  #removePill(value: string, event: Event) {
+    event.preventDefault();
+    this.values = removePillValue(this.values, value);
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
   #onTriggerClick() {
+    if (this.disabled) return;
     if (this.open) {
       this.#closeList();
     } else {
@@ -177,6 +265,7 @@ export class Select extends LitElement {
   }
 
   #onTriggerKeydown(event: KeyboardEvent) {
+    if (this.disabled) return;
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -242,19 +331,6 @@ export class Select extends LitElement {
     event.preventDefault();
   }
 
-  // Flips the popup above the trigger when there isn't enough room below for it
-  // but there is more room above than below — see shared/dropdown-placement.ts
-  // (same helper ui-combobox and ui-autocomplete use).
-  #updatePlacement() {
-    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
-    if (!listbox) return;
-
-    this.placement = computeFlipPlacement(
-      this.getBoundingClientRect(),
-      listbox.offsetHeight,
-    );
-  }
-
   focus(options?: FocusOptions) {
     this.#trigger?.focus(options);
   }
@@ -265,6 +341,7 @@ export class Select extends LitElement {
 
   formResetCallback() {
     this.value = "";
+    this.values = [];
   }
 
   formDisabledCallback(disabled: boolean) {
@@ -272,6 +349,12 @@ export class Select extends LitElement {
   }
 
   formStateRestoreCallback(state: string | File | FormData | null) {
+    if (this.multiple) {
+      if (state instanceof FormData) {
+        this.values = state.getAll(this.name).map(String);
+      }
+      return;
+    }
     if (typeof state === "string") {
       this.value = state;
     }
@@ -294,38 +377,65 @@ export class Select extends LitElement {
   }
 
   render() {
-    const label = this.#selectedOption?.label ?? "";
+    // In multiple mode, the picks show as pills instead of this text — the
+    // placeholder still shows once there's nothing left to remove, same as
+    // combobox's <input placeholder> effect once its value is empty.
+    const pills = this.multiple
+      ? this.values.map((value) => ({
+          value,
+          label: this.#options().find((o) => o.value === value)?.label ?? value,
+        }))
+      : [];
+    const singleLabel = this.#selectedOption?.label ?? "";
+    const valueText = this.multiple
+      ? pills.length === 0
+        ? this.placeholder
+        : ""
+      : singleLabel || this.placeholder;
+    const isPlaceholder = this.multiple ? pills.length === 0 : !singleLabel;
 
     return html`
-      <button
-        type="button"
-        class="trigger"
-        role="combobox"
-        aria-haspopup="listbox"
-        aria-expanded=${this.open}
-        aria-controls="listbox"
-        aria-activedescendant=${this.#activeOption?.id ?? nothing}
-        ?disabled=${this.disabled}
-        @click=${this.#onTriggerClick}
-        @keydown=${this.#onTriggerKeydown}
-        @blur=${this.#onTriggerBlur}
-      >
-        <span class="value ${label ? "" : "placeholder"}">
-          ${label || this.placeholder}
-        </span>
-        <span class="chevron ${this.open ? "chevron-open" : ""}"
-          >${chevronDownIcon}</span
+      <div class="wrapper">
+        <div
+          class="trigger"
+          role="combobox"
+          tabindex=${this.disabled ? -1 : 0}
+          aria-haspopup="listbox"
+          aria-expanded=${this.open}
+          aria-controls="listbox"
+          aria-activedescendant=${this.#activeOption?.id ?? nothing}
+          aria-disabled=${this.disabled ? "true" : nothing}
+          @click=${this.#onTriggerClick}
+          @keydown=${this.#onTriggerKeydown}
+          @blur=${this.#onTriggerBlur}
         >
-      </button>
-      <div
-        id="listbox"
-        role="listbox"
-        class="listbox listbox-${this.placement}"
-        ?hidden=${!this.open}
-        @click=${this.#onListboxClick}
-        @pointerdown=${this.#onListboxPointerDown}
-      >
-        <slot @slotchange=${this.#onSlotChange}></slot>
+          <div class="content">
+            ${this.multiple
+              ? renderPills(pills, (value, event) => this.#removePill(value, event))
+              : nothing}
+            ${valueText
+              ? html`<span class="value ${isPlaceholder ? "placeholder" : ""}">
+                  ${valueText}
+                </span>`
+              : nothing}
+          </div>
+          <span class="chevron"
+            ><span class="chevron-icon ${this.open ? "chevron-open" : ""}"
+              >${chevronDownIcon}</span
+            ></span
+          >
+        </div>
+        <div id="popup" class="popup" ?hidden=${!this.open}>
+          <div
+            id="listbox"
+            role="listbox"
+            class="listbox"
+            @click=${this.#onListboxClick}
+            @pointerdown=${this.#onListboxPointerDown}
+          >
+            <slot @slotchange=${this.#onSlotChange}></slot>
+          </div>
+        </div>
       </div>
     `;
   }

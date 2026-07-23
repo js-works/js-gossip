@@ -269,36 +269,39 @@ export class Autocomplete extends LitElement {
 
     return html`
       <div class="wrapper">
-        ${this.multiple
-          ? this.values.map(
-              (item) => html`<span class="pill">
-                <span class="pill-label">${item}</span>
-                <button
-                  type="button"
-                  class="pill-remove"
-                  aria-label="Remove ${item}"
-                  @pointerdown=${(event: Event) => this.#removePill(item, event)}
-                >
-                  ×
-                </button>
-              </span>`,
-            )
-          : nothing}
-        <input
-          type="text"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded=${this.open}
-          aria-controls="listbox"
-          aria-activedescendant=${activeId ?? nothing}
-          .value=${displayValue}
-          name=${this.name}
-          placeholder=${this.placeholder}
-          autocomplete="off"
-          spellcheck="false"
-          ?disabled=${this.disabled}
-          ?required=${this.required}
-        />
+        <div class="content">
+          ${this.multiple
+            ? this.values.map(
+                (item) => html`<span class="pill">
+                  <span class="pill-label">${item}</span>
+                  <button
+                    type="button"
+                    class="pill-remove"
+                    aria-label="Remove ${item}"
+                    @pointerdown=${(event: Event) =>
+                      this.#removePill(item, event)}
+                  >
+                    ×
+                  </button>
+                </span>`,
+              )
+            : nothing}
+          <input
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded=${this.open}
+            aria-controls="listbox"
+            aria-activedescendant=${activeId ?? nothing}
+            .value=${displayValue}
+            name=${this.name}
+            placeholder=${this.placeholder}
+            autocomplete="off"
+            spellcheck="false"
+            ?disabled=${this.disabled}
+            ?required=${this.required}
+          />
+        </div>
         <span
           class="chevron ${this.popupVisible ? "chevron-open" : ""}"
           @pointerdown=${(event: Event) => event.preventDefault()}

@@ -1,9 +1,11 @@
 import { css } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
+import { pillsStyles } from "../../shared/pills/pills.js";
 
 export const comboboxStyles = [
   defaultTheme,
+  pillsStyles,
   css`
     :host {
       display: inline-block;
@@ -30,10 +32,15 @@ export const comboboxStyles = [
       cursor: not-allowed;
     }
 
+    /* Two columns: .content (pills/input, flex-grow, wraps its own lines
+       independently) and .chevron (fixed, pinned to the end) — kept as
+       separate flex items of a non-wrapping row so the chevron always stays
+       put as its own column, vertically centered, instead of flowing into
+       .content's own wrap (which would otherwise drag it down onto a
+       trailing line alongside whichever pill last wrapped). */
     .wrapper {
       position: relative;
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
       gap: var(--ui-spacing-sm);
       min-width: var(--combobox-min-width);
@@ -43,6 +50,15 @@ export const comboboxStyles = [
       border-radius: var(--ui-radius-sm);
       background: var(--ui-bg);
       color: var(--ui-text);
+    }
+
+    .content {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--ui-spacing-sm);
+      flex: 1;
+      min-width: 0;
     }
 
     .wrapper:has(.pill) {
@@ -56,39 +72,6 @@ export const comboboxStyles = [
 
     :host([invalid]) .wrapper {
       border-color: var(--ui-color-danger-500);
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      flex: none;
-      background: transparent;
-      color: var(--ui-color-primary-500);
-      border: 1px solid var(--ui-color-primary-500);
-      border-radius: 3px;
-      padding: 2px var(--ui-spacing-sm);
-      font-size: var(--ui-font-size-sm);
-      line-height: 1.4;
-    }
-
-    .pill-remove {
-      flex: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      line-height: 1;
-      padding: 0;
-      cursor: pointer;
-      opacity: 0.7;
-    }
-
-    .pill-remove:hover {
-      opacity: 1;
     }
 
     input {
@@ -112,31 +95,40 @@ export const comboboxStyles = [
       cursor: not-allowed;
     }
 
-    /* Same toggle-affordance chevron (and open-state rotation) as ui-select's
-       trigger. */
+    /* Padding is deliberately symmetric — asymmetric padding here would put
+       the icon visibly off-center within its own box, not just relative to
+       .wrapper as a whole. .chevron-icon is a second, tight inner wrapper
+       (sized to exactly the icon) carrying the open/close rotation, so it
+       always spins around the icon's own true center regardless of
+       whatever padding/stretch this outer box has. */
     .chevron {
       flex: none;
+      align-self: stretch;
       display: flex;
       align-items: center;
-      margin-inline-end: var(--ui-spacing-md);
+      justify-content: center;
+      padding-inline: 0.5em;
       opacity: 0.6;
       cursor: pointer;
+    }
+
+    .chevron-icon {
+      display: flex;
       transition: transform 120ms ease;
     }
 
-    .chevron-open {
+    .chevron-icon.chevron-open {
       transform: rotate(180deg);
     }
 
-    /* Shared "floating popup card" look for both the real listbox and the
-       no-matches status message — they're the same popup, just with
-       different content, so they shouldn't read as two different surfaces. */
-    .listbox,
-    .status {
-      position: absolute;
-      inset-inline: 0;
-      z-index: 1;
-      box-sizing: border-box;
+    /* The floating popup card — holds either the real listbox or the
+       no-matches status message. Positioning (position/inset/z-index/
+       max-height/display/flex-direction/overflow/top or bottom) is set
+       directly as inline styles on this element by
+       shared/popup-layout/popup-layout.ts's trackPopupLayout (see
+       combobox.ts's firstUpdated()) — this rule only adds the visual
+       theming. */
+    .popup {
       background: var(--ui-bg);
       color: var(--ui-text);
       border: 1px solid var(--ui-color-neutral-300);
@@ -147,37 +139,19 @@ export const comboboxStyles = [
     }
 
     .listbox {
+      flex: 1;
+      min-height: 0;
       margin: 0;
       padding-block: var(--ui-spacing-sm);
       padding-inline: var(--ui-spacing-sm);
-      max-height: calc(16em + var(--ui-spacing-sm) * 2);
       overflow-y: auto;
-    }
-
-    .listbox[hidden] {
-      display: none;
-    }
-
-    .listbox-bottom {
-      top: calc(100% + 2px);
-    }
-
-    .listbox-top {
-      bottom: calc(100% + 2px);
+      box-sizing: border-box;
     }
 
     .status {
       padding-block: var(--ui-spacing-sm);
       padding-inline: var(--ui-spacing-md);
       font-size: 1em;
-    }
-
-    .status-bottom {
-      top: calc(100% + 2px);
-    }
-
-    .status-top {
-      bottom: calc(100% + 2px);
     }
   `,
 ];

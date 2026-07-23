@@ -4,8 +4,8 @@ import type { PropertyValues } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
 
-@customElement("ui-input-field")
-export class InputField extends LitElement {
+@customElement("ui-text-field")
+export class TextField extends LitElement {
   static formAssociated = true;
 
   #internals: ElementInternals;
@@ -109,6 +109,11 @@ export class InputField extends LitElement {
 
       :host([invalid]) .wrapper {
         border-color: var(--ui-color-danger-500);
+      }
+
+      .wrapper:focus-within {
+        outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
+        outline-offset: var(--ui-focus-ring-offset);
       }
 
       input {
@@ -306,5 +311,11 @@ export class InputField extends LitElement {
         <slot name="suffix"></slot>
       </div>
     `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ui-text-field": TextField;
   }
 }

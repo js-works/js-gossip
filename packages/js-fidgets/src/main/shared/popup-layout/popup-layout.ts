@@ -7,13 +7,12 @@
 // measured-rects JS rather than CSS anchor positioning (position-try-order:
 // most-height proved unreliable in real-world testing).
 
-export { computeFlipPlacement, trackPopupLayout };
+export { trackPopupLayout };
 
 // Flips a popup above its anchor when there isn't enough room below for it
-// but there is more room above than below. Exported standalone too — used
-// directly (without the rest of trackPopupLayout below) by ui-select and
-// ui-combobox, whose simpler fixed-max-height popups only need the one-shot
-// placement decision, not continuous shrinking.
+// but there is more room above than below. Not exported — only used
+// internally by trackPopupLayout below; ui-select/ui-combobox/ui-autocomplete
+// all go through the full tracker now.
 function computeFlipPlacement(
   hostRect: DOMRect,
   popupHeight: number,
@@ -114,13 +113,9 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
   }
 
   function apply(popup: HTMLElement): void {
-    popup.style.setProperty("position", "absolute");
-    popup.style.setProperty("inset-inline", "0");
-    popup.style.setProperty("z-index", "1");
     popup.style.setProperty("display", "flex");
     popup.style.setProperty("flex-direction", "column");
     popup.style.setProperty("overflow", "hidden");
-    popup.style.setProperty("box-sizing", "border-box");
     popup.style.setProperty("max-height", `${maxHeightPx}px`);
     if (placement === "bottom") {
       popup.style.setProperty("top", `calc(100% + ${gapPx}px)`);
@@ -131,10 +126,36 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
     }
   }
 
+  // Takes the popup out of normal document flow. Safe to do unconditionally,
+  // even while the popup is still `hidden` (a `display: none` element isn't
+  // laid out at all, so its `position` has no visual effect yet) — and
+  // that's exactly why this has to happen separately from, and before,
+  // apply() above: the first time a popup ever becomes visible, update()
+  // below measures the *host's* rect to decide placement, and if the popup
+  // were still sitting in normal flow at that exact moment (position: static,
+  // as a flex item of the same wrapper the host measures), its full
+  // unclamped content height would inflate the host's own measured rect,
+  // corrupting the very placement decision this is trying to make. Doing
+  // this eagerly — on the first update() call regardless of hidden state —
+  // guarantees the popup is already out of flow well before that moment ever
+  // arrives.
+  function ensureOutOfFlow(popup: HTMLElement): void {
+    popup.style.setProperty("position", "absolute");
+    popup.style.setProperty("inset-inline", "0");
+    popup.style.setProperty("z-index", "1");
+    popup.style.setProperty("box-sizing", "border-box");
+  }
+
   function update(): void {
     const host = config.getHostElement();
     const popup = config.getPopupElement();
     if (!host || !popup) return;
+
+    if (claimedFrom !== popup) {
+      claim(popup);
+      ensureOutOfFlow(popup);
+    }
+
     // A caller's own hidden-while-loading state (e.g. `hidden` bound to
     // something narrower than "the popup is conceptually open") takes
     // priority over this tracker's own `display: flex`. An inline `display`
@@ -150,6 +171,7 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
       if (domVisible) {
         popup.style.removeProperty("display");
         domVisible = false;
+        detachLiveTracking();
       }
       return;
     }
@@ -176,8 +198,8 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
       placement = nextPlacement;
       maxHeightPx = nextMaxHeightPx;
       domVisible = true;
-      claim(popup);
       apply(popup);
+      attachLiveTracking();
     }
   }
 
@@ -186,22 +208,46 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
   // moment — a window resize or the page scrolling while the popup stays
   // open changes neither, so without these it would stay stuck at whatever
   // placement/height it last computed instead of continuing to track the
-  // host live.
-  const onWindowResize = (): void => update();
-  const onWindowScroll = (): void => update();
-  window.addEventListener("resize", onWindowResize);
-  // capture: true so this also fires for scroll on any scrollable ancestor,
-  // not just the window itself.
-  window.addEventListener("scroll", onWindowScroll, {
-    capture: true,
-    passive: true,
-  });
+  // host live. Attached only while a popup is actually visible (see
+  // domVisible above/below) rather than for this tracker's whole lifetime —
+  // a page can have many trackPopupLayout instances (one per ui-select,
+  // say), almost all closed at any given moment, and each would otherwise
+  // add its own permanent window-level resize/scroll (capture, so it also
+  // fires for scrolling inside any open listbox's own options) listener
+  // doing pointless work on every such event across the whole page.
+  let tracking = false;
+
+  function attachLiveTracking(): void {
+    if (tracking) return;
+    tracking = true;
+    window.addEventListener("resize", onWindowResize);
+    // capture: true so this also fires for scroll on any scrollable
+    // ancestor, not just the window itself.
+    window.addEventListener("scroll", onWindowScroll, {
+      capture: true,
+      passive: true,
+    });
+  }
+
+  function detachLiveTracking(): void {
+    if (!tracking) return;
+    tracking = false;
+    window.removeEventListener("resize", onWindowResize);
+    window.removeEventListener("scroll", onWindowScroll, { capture: true });
+  }
+
+  function onWindowResize(): void {
+    update();
+  }
+
+  function onWindowScroll(): void {
+    update();
+  }
 
   return {
     update,
     destroy() {
-      window.removeEventListener("resize", onWindowResize);
-      window.removeEventListener("scroll", onWindowScroll, { capture: true });
+      detachLiveTracking();
       release();
     },
   };

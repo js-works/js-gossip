@@ -39,6 +39,12 @@ export class PasswordField extends LitElement {
   @property({ type: Number })
   accessor maxlength: number | undefined = undefined;
 
+  @property()
+  accessor placeholder = "";
+
+  @property({ reflect: true })
+  accessor size: "small" | "medium" | "large" = "medium";
+
   #visible = false;
 
   constructor() {
@@ -56,47 +62,77 @@ export class PasswordField extends LitElement {
     css`
       :host {
         display: block;
+
+        /* size="medium" (the default). Set on :host (not just the input) so
+           .toggle, which inherits ambient font-size rather than the input's
+           own, scales the same way. */
+        font-size: var(--field-font-size);
+        --field-font-size: var(--ui-font-size-md);
+        --field-padding: 0.5rem;
       }
 
+      :host([size="small"]) {
+        --field-font-size: var(--ui-font-size-sm);
+        --field-padding: 0.35rem;
+      }
+
+      :host([size="large"]) {
+        --field-font-size: var(--ui-font-size-lg);
+        --field-padding: 0.65rem;
+      }
+
+      /* The border lives on the wrapper, surrounding both the input and the
+         toggle button; the input itself stays borderless so the two read as
+         one control. */
       .wrapper {
-        position: relative;
         display: flex;
         align-items: center;
+        border: 1px solid var(--ui-color-neutral-600);
+        border-radius: var(--ui-radius-sm);
+        background: var(--ui-bg);
+        box-sizing: border-box;
+      }
+
+      .wrapper:focus-within {
+        outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
+        outline-offset: var(--ui-focus-ring-offset);
       }
 
       input {
         flex-grow: 1;
-        padding: 0.5rem 2.5rem 0.5rem 0.5rem;
-        font-family: var(--ui-font-sans, inherit);
-        font-size: inherit;
-        border: 1px solid var(--ui-color-neutral-600, #999);
-        border-radius: var(--ui-radius-sm, 0.25rem);
-        box-sizing: border-box;
+        min-width: 0;
+        padding: var(--field-padding);
+        font-family: var(--ui-font-sans);
+        font-size: var(--field-font-size);
+        border: none;
+        background: transparent;
+        color: inherit;
       }
 
-      button {
-        position: absolute;
-        right: 0.25rem;
-        width: 2rem;
-        height: 2rem;
+      input:focus {
+        outline: none;
+      }
 
-        display: grid;
-        place-items: center;
-
-        border: 0;
+      .toggle {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.25rem var(--field-padding);
+        border: none;
         background: transparent;
+        color: inherit;
         cursor: pointer;
-
         font-size: 1em;
       }
 
-      button:disabled {
+      .toggle:disabled {
         cursor: default;
         opacity: 0.5;
       }
 
-      :host([invalid]) input {
-        border-color: var(--ui-color-danger-500, crimson);
+      :host([invalid]) .wrapper {
+        border-color: var(--ui-color-danger-500);
       }
     `,
   ];
@@ -242,6 +278,7 @@ export class PasswordField extends LitElement {
         <input
           .value=${this.value}
           name=${this.name}
+          placeholder=${this.placeholder}
           autocomplete=${this.autocomplete}
           spellcheck=${this.spellcheck}
           type=${this.#visible ? "text" : "password"}
@@ -255,6 +292,7 @@ export class PasswordField extends LitElement {
 
         <button
           type="button"
+          class="toggle"
           aria-label=${this.#visible ? "Hide password" : "Show password"}
           aria-pressed=${this.#visible}
           ?disabled=${this.disabled}
@@ -264,5 +302,11 @@ export class PasswordField extends LitElement {
         </button>
       </div>
     `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ui-password-field": PasswordField;
   }
 }

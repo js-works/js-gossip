@@ -32,7 +32,7 @@ import "../checkbox/checkbox.js";
 // The pagination bar's page-jump field and page-size picker are built from the
 // demo's own field components rather than plain <input>/<select>.
 import "../text-field/text-field.js";
-import type { InputField } from "../text-field/text-field.js";
+import type { TextField } from "../text-field/text-field.js";
 import "../select/select.js";
 import type { Select } from "../select/select.js";
 import "../button/button.js";
@@ -294,7 +294,7 @@ export class DataNavigator<T = unknown> extends LitElement {
   }
 
   #jumpToPage(event: Event, table: Table<T>) {
-    const requested = Number((event.target as InputField).value);
+    const requested = Number((event.target as TextField).value);
     if (!Number.isFinite(requested)) return;
 
     const lastPageIndex = Math.max(table.getPageCount() - 1, 0);
@@ -394,12 +394,12 @@ export class DataNavigator<T = unknown> extends LitElement {
             `,
           )}
         </div>
-        <ui-input-field
+        <ui-text-field
           class="global-filter"
           placeholder=${this.globalFilterPlaceholder}
           .value=${(table.getState().globalFilter as string | undefined) ?? ""}
           @input=${(event: Event) => {
-            table.setGlobalFilter((event.target as InputField).value);
+            table.setGlobalFilter((event.target as TextField).value);
             this.#resetSelection(table);
           }}
         >
@@ -413,7 +413,7 @@ export class DataNavigator<T = unknown> extends LitElement {
           >
             <span slot="prefix">${filterIcon}</span>
           </ui-button>
-        </ui-input-field>
+        </ui-text-field>
       </div>
 
       <div class="table-scroll">
@@ -548,7 +548,7 @@ export class DataNavigator<T = unknown> extends LitElement {
             ${chevronLeftIcon}
           </button>
           <span class="page-label">Page</span>
-          <ui-input-field
+          <ui-text-field
             class="page-jump"
             type="text"
             maxlength="4"
@@ -558,7 +558,7 @@ export class DataNavigator<T = unknown> extends LitElement {
               this.#jumpToPage(event, table);
               this.#resetSelection(table);
             }}
-          ></ui-input-field>
+          ></ui-text-field>
           <span class="page-label">of ${table.getPageCount()}</span>
           <button
             type="button"

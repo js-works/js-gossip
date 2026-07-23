@@ -3,10 +3,16 @@ import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
-import { emailIcon } from "./icons/email.icon.js";
 
-@customElement("ui-email-field")
-export class EmailField extends LitElement {
+/**
+ * A themed `<input type="number">` — min/max/step/required validity comes
+ * straight from the native input's own `ValidityState` (rangeUnderflow/
+ * rangeOverflow/stepMismatch/valueMissing), the same delegation approach
+ * `ui-email-field` uses for its native email-format check, rather than
+ * reimplementing numeric range/step logic by hand.
+ */
+@customElement("ui-number-field")
+export class NumberField extends LitElement {
   static formAssociated = true;
 
   #internals: ElementInternals;
@@ -21,11 +27,6 @@ export class EmailField extends LitElement {
   @property({ reflect: true })
   accessor size: "small" | "medium" | "large" = "medium";
 
-  // Default to "off": autocomplete's native default ("on") is rarely what a form
-  // actually wants.
-  @property()
-  accessor autocomplete = "off";
-
   @property({ type: Boolean })
   accessor disabled = false;
 
@@ -35,11 +36,18 @@ export class EmailField extends LitElement {
   @property({ type: Boolean })
   accessor readonly = false;
 
-  @property({ type: Number })
-  accessor minlength: number | undefined = undefined;
+  @property()
+  accessor min = "";
 
-  @property({ type: Number })
-  accessor maxlength: number | undefined = undefined;
+  @property()
+  accessor max = "";
+
+  // Empty means "any" (arbitrary decimals allowed), not the native default of
+  // 1 — the native default would flag ordinary decimal input (e.g. "3.5") as
+  // a stepMismatch unless a consumer remembered to opt out of it explicitly,
+  // which isn't the sensible default for a general-purpose numeric field.
+  @property()
+  accessor step = "";
 
   @property()
   accessor placeholder = "";
@@ -47,10 +55,6 @@ export class EmailField extends LitElement {
   constructor() {
     super();
     this.#internals = this.attachInternals();
-    // `spellcheck` is a native HTMLElement property/attribute (default true); flip
-    // the default here rather than redeclaring it as a reactive property (its type
-    // is fixed to boolean by the platform, and it rarely needs to react to changes).
-    this.spellcheck = false;
   }
 
   static styles = [
@@ -59,9 +63,8 @@ export class EmailField extends LitElement {
       :host {
         display: block;
 
-        /* size="medium" (the default). Set on :host (not just the input) so
-           .icon, which inherits ambient font-size rather than the input's
-           own, scales the same way. */
+        /* size="medium" (the default). Set on :host so a consumer overriding
+           this element's font-size from outside scales consistently. */
         font-size: var(--field-font-size);
         --field-font-size: var(--ui-font-size-md);
         --field-padding: 0.5rem;
@@ -77,14 +80,18 @@ export class EmailField extends LitElement {
         --field-padding: 0.65rem;
       }
 
-      /* The border lives on the wrapper, surrounding both the input and the icon;
-         the input itself stays borderless so the two read as one control. */
       .wrapper {
         display: flex;
         align-items: center;
         border: 1px solid var(--ui-color-neutral-600);
         border-radius: var(--ui-radius-sm);
+        background: var(--ui-bg);
         box-sizing: border-box;
+      }
+
+      .wrapper:focus-within {
+        outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
+        outline-offset: var(--ui-focus-ring-offset);
       }
 
       input {
@@ -95,24 +102,21 @@ export class EmailField extends LitElement {
         font-size: var(--field-font-size);
         border: none;
         background: transparent;
+        color: inherit;
+        /* Plain numeric input, no stepper UI at all (native or custom) — the
+           native spin buttons would otherwise overlap long placeholder/value
+           text, since nothing reserves room for them. */
+        appearance: textfield;
+      }
+
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
       }
 
       input:focus {
         outline: none;
-      }
-
-      .wrapper:focus-within {
-        outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
-        outline-offset: var(--ui-focus-ring-offset);
-      }
-
-      .icon {
-        flex: none;
-        display: flex;
-        align-items: center;
-        padding-inline-end: 0.5rem;
-        font-size: 1em;
-        color: inherit;
       }
 
       :host([invalid]) .wrapper {
@@ -134,8 +138,9 @@ export class EmailField extends LitElement {
 
     if (
       changed.has("required") ||
-      changed.has("minlength") ||
-      changed.has("maxlength")
+      changed.has("min") ||
+      changed.has("max") ||
+      changed.has("step")
     ) {
       this.#syncValidity();
     }
@@ -145,13 +150,11 @@ export class EmailField extends LitElement {
     this.#internals.setFormValue(this.disabled ? null : this.value);
   }
 
-  // Delegates to the internal <input type="email">'s own ValidityState, so the
-  // browser's native email-format check (typeMismatch) is reused rather than
-  // reimplemented.
+  // Delegates to the internal <input type="number">'s own ValidityState, so
+  // the browser's native range/step checks (rangeUnderflow/rangeOverflow/
+  // stepMismatch) are reused rather than reimplemented.
   #syncValidity() {
-    if (!this.#input) {
-      return;
-    }
+    if (!this.#input) return;
 
     this.#internals.setValidity(
       this.#input.validity,
@@ -244,19 +247,17 @@ export class EmailField extends LitElement {
         <input
           .value=${this.value}
           name=${this.name}
-          type="email"
+          type="number"
           placeholder=${this.placeholder}
-          autocomplete=${this.autocomplete}
-          spellcheck=${this.spellcheck}
           ?disabled=${this.disabled}
           ?required=${this.required}
           ?readonly=${this.readonly}
-          minlength=${this.minlength ?? ""}
-          maxlength=${this.maxlength ?? ""}
+          min=${this.min}
+          max=${this.max}
+          step=${this.step || "any"}
           @input=${this.#onInput}
           @change=${this.#onChange}
         />
-        <span class="icon">${emailIcon}</span>
       </div>
     `;
   }
@@ -264,6 +265,6 @@ export class EmailField extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "ui-email-field": EmailField;
+    "ui-number-field": NumberField;
   }
 }

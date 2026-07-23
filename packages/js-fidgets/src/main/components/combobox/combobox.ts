@@ -7,9 +7,20 @@ import { chevronDownIcon } from "./icons/chevron.icon.js";
 import "../select/option.js";
 import "../select/option-group.js";
 import type { Option } from "../select/option.js";
-import { computeFlipPlacement } from "../../shared/popup-layout/popup-layout.js";
+import { trackPopupLayout } from "../../shared/popup-layout/popup-layout.js";
 import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
+import {
+  renderPills,
+  togglePillValue,
+  removePillValue,
+  buildMultiFormData,
+} from "../../shared/pills/pills.js";
 
+// Mixed into every generated option id (see #setActiveIndex) alongside the
+// incrementing counter below, so ids stay collision-safe against another
+// copy of this same module bundled elsewhere on the page (each gets its own
+// random instance number, rather than every copy's counter restarting at 1).
+const instanceId = Math.floor(Math.random() * 1e9);
 let nextOptionId = 0;
 
 /**
@@ -39,6 +50,17 @@ export class Combobox extends LitElement {
 
   #internals: ElementInternals;
   #input!: HTMLInputElement;
+  #popupLayout?: ReturnType<typeof trackPopupLayout>;
+  // Options we generated an id for (see #setActiveIndex) — a slotted
+  // <ui-option> is the consumer's own element, so we only ever assign it an
+  // id (needed for aria-activedescendant, which requires a real id
+  // reference — a data-* attribute wouldn't satisfy that) when it doesn't
+  // already have one, and only for as long as it's actually the active
+  // option; tracked here so #setActiveIndex knows which ids are ours to
+  // remove again once an option stops being active, rather than leaving
+  // generated ids permanently stuck on every option a user has ever arrowed
+  // past.
+  #generatedIdOptions = new WeakSet<Option>();
 
   @property()
   accessor name = "";
@@ -79,9 +101,6 @@ export class Combobox extends LitElement {
   @state()
   accessor activeIndex = -1;
 
-  @state()
-  accessor placement: "top" | "bottom" = "bottom";
-
   constructor() {
     super();
     this.#internals = this.attachInternals();
@@ -97,6 +116,10 @@ export class Combobox extends LitElement {
     if (!this.multiple) {
       this.#input.value = this.#selectedOption?.label ?? this.value;
     }
+    this.#popupLayout = trackPopupLayout({
+      getHostElement: () => this,
+      getPopupElement: () => this.renderRoot.querySelector<HTMLElement>("#popup"),
+    });
   }
 
   protected updated(changed: PropertyValues<this>) {
@@ -105,12 +128,26 @@ export class Combobox extends LitElement {
       this.#syncSelected();
       this.#syncValidity();
     }
+    // In multiple mode, #syncFormValue bakes `name` into the FormData it
+    // builds (buildMultiFormData) — re-run it if `name` changes on its own
+    // (e.g. set dynamically after mount), or the submitted field name would
+    // stay stuck at whatever it was during the last value/values change.
+    if (changed.has("name")) {
+      this.#syncFormValue();
+    }
     if (changed.has("required")) {
       this.#syncValidity();
     }
-    if (changed.has("open") && this.open) {
-      this.#updatePlacement();
-    }
+    // Called on every render pass, not gated on `open` — the popup's
+    // visibility can flip without `open` itself changing on that particular
+    // render (see autocomplete-core.ts's afterRender for why relying on a
+    // narrower gate silently missed a real transition there).
+    this.#popupLayout?.update();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.#popupLayout?.destroy();
   }
 
   #options(): Option[] {
@@ -142,9 +179,7 @@ export class Combobox extends LitElement {
       return;
     }
     if (this.multiple) {
-      const formData = new FormData();
-      for (const item of this.values) formData.append(this.name, item);
-      this.#internals.setFormValue(formData);
+      this.#internals.setFormValue(buildMultiFormData(this.name, this.values));
     } else {
       this.#internals.setFormValue(this.value || null);
     }
@@ -194,13 +229,20 @@ export class Combobox extends LitElement {
   // typing/filtering (that would fight their own input), and never in multi mode
   // (the input there stays a free-form search box; picks show up as pills).
   #setActiveIndex(index: number, opts: { preview?: boolean } = {}) {
+    const previousOption = this.#activeOption;
     for (const option of this.#options()) option.active = false;
+    if (previousOption && this.#generatedIdOptions.delete(previousOption)) {
+      previousOption.removeAttribute("id");
+    }
     this.activeIndex = index;
 
     const option = this.#visibleOptions()[index];
     if (!option) return;
 
-    option.id ||= `ui-combobox-option-${++nextOptionId}`;
+    if (!option.id) {
+      option.id = `ui-combobox-option-${instanceId}-${++nextOptionId}`;
+      this.#generatedIdOptions.add(option);
+    }
     option.active = true;
     if (opts.preview && !this.multiple) {
       this.#input.value = option.label;
@@ -264,9 +306,7 @@ export class Combobox extends LitElement {
   // again for the next pick, and keeps the popup open — same shape as
   // ui-autocomplete's multi mode.
   #toggle(option: Option) {
-    this.values = this.values.includes(option.value)
-      ? this.values.filter((value) => value !== option.value)
-      : [...this.values, option.value];
+    this.values = togglePillValue(this.values, option.value);
     this.#input.value = "";
     this.query = "";
     this.#applyFilter("");
@@ -318,7 +358,7 @@ export class Combobox extends LitElement {
 
   #removePill(value: string, event: Event) {
     event.preventDefault();
-    this.values = this.values.filter((v) => v !== value);
+    this.values = removePillValue(this.values, value);
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
 
@@ -427,18 +467,6 @@ export class Combobox extends LitElement {
     }
   }
 
-  // Flips the popup above the input when there isn't enough room below for it but
-  // there is more room above than below — see shared/dropdown-placement.ts (same
-  // helper ui-select and ui-autocomplete use).
-  #updatePlacement() {
-    const listbox = this.renderRoot.querySelector<HTMLElement>("#listbox");
-    if (!listbox) return;
-    this.placement = computeFlipPlacement(
-      this.getBoundingClientRect(),
-      listbox.offsetHeight,
-    );
-  }
-
   focus(options?: FocusOptions) {
     this.#input?.focus(options);
   }
@@ -499,64 +527,58 @@ export class Combobox extends LitElement {
     const showListbox = this.open && this.#visibleOptions().length > 0;
     const showNoMatches =
       this.open && this.query && this.#visibleOptions().length === 0;
+    const popupVisible = showListbox || showNoMatches;
 
     return html`
       <div class="wrapper">
-        ${this.multiple
-          ? pills.map(
-              (pill) => html`<span class="pill">
-                <span class="pill-label">${pill.label}</span>
-                <button
-                  type="button"
-                  class="pill-remove"
-                  aria-label="Remove ${pill.label}"
-                  @pointerdown=${(event: Event) =>
-                    this.#removePill(pill.value, event)}
-                >
-                  ×
-                </button>
-              </span>`,
-            )
-          : nothing}
-        <input
-          type="text"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded=${this.open}
-          aria-controls="listbox"
-          aria-activedescendant=${this.#activeOption?.id ?? nothing}
-          name=${this.name}
-          placeholder=${this.placeholder}
-          autocomplete="off"
-          spellcheck="false"
-          ?disabled=${this.disabled}
-          ?required=${this.required}
-          @input=${() => this.#onInput()}
-          @focus=${() => this.#onInputFocus()}
-          @click=${() => this.#onInputClick()}
-          @keydown=${(event: KeyboardEvent) => this.#onInputKeydown(event)}
-          @blur=${() => this.#onInputBlur()}
-        />
+        <div class="content">
+          ${this.multiple
+            ? renderPills(pills, (value, event) => this.#removePill(value, event))
+            : nothing}
+          <input
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded=${this.open}
+            aria-controls="listbox"
+            aria-activedescendant=${this.#activeOption?.id ?? nothing}
+            name=${this.name}
+            placeholder=${this.placeholder}
+            autocomplete="off"
+            spellcheck="false"
+            ?disabled=${this.disabled}
+            ?required=${this.required}
+            @input=${() => this.#onInput()}
+            @focus=${() => this.#onInputFocus()}
+            @click=${() => this.#onInputClick()}
+            @keydown=${(event: KeyboardEvent) => this.#onInputKeydown(event)}
+            @blur=${() => this.#onInputBlur()}
+          />
+        </div>
         <span
-          class="chevron ${this.open ? "chevron-open" : ""}"
+          class="chevron"
           @pointerdown=${(event: Event) => event.preventDefault()}
           @click=${() => this.#onChevronClick()}
-          >${chevronDownIcon}</span
+          ><span class="chevron-icon ${this.open ? "chevron-open" : ""}"
+            >${chevronDownIcon}</span
+          ></span
         >
-        <div
-          id="listbox"
-          role="listbox"
-          class="listbox listbox-${this.placement}"
-          aria-multiselectable=${this.multiple}
-          ?hidden=${!showListbox}
-          @click=${(event: Event) => this.#onListboxClick(event)}
-          @pointerdown=${(event: Event) => this.#onListboxPointerDown(event)}
-        >
-          <slot @slotchange=${() => this.#onSlotChange()}></slot>
+        <div id="popup" class="popup" ?hidden=${!popupVisible}>
+          <div
+            id="listbox"
+            role="listbox"
+            class="listbox"
+            aria-multiselectable=${this.multiple}
+            ?hidden=${!showListbox}
+            @click=${(event: Event) => this.#onListboxClick(event)}
+            @pointerdown=${(event: Event) => this.#onListboxPointerDown(event)}
+          >
+            <slot @slotchange=${() => this.#onSlotChange()}></slot>
+          </div>
+          ${showNoMatches
+            ? html`<div class="status">No matches</div>`
+            : nothing}
         </div>
-        ${showNoMatches
-          ? html`<div class="status status-${this.placement}">No matches</div>`
-          : nothing}
       </div>
     `;
   }

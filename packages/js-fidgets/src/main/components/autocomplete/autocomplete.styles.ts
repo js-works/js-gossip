@@ -28,10 +28,15 @@ export const autocompleteStyles = [
       --autocomplete-padding-block: 8px;
     }
 
+    /* Two columns: .content (pills/input, flex-grow, wraps its own lines
+       independently) and .chevron (fixed, pinned to the end) — kept as
+       separate flex items of a non-wrapping row so the chevron always stays
+       put as its own column, vertically centered, instead of flowing into
+       .content's own wrap (which would otherwise drag it down onto a
+       trailing line alongside whichever pill last wrapped). */
     .wrapper {
       position: relative;
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
       gap: var(--ui-spacing-sm);
       padding-block: var(--autocomplete-padding-block);
@@ -42,6 +47,15 @@ export const autocompleteStyles = [
       color: var(--ui-text);
     }
 
+    .content {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--ui-spacing-sm);
+      flex: 1;
+      min-width: 0;
+    }
+
     .wrapper:has(.pill) {
       padding-inline-start: var(--ui-spacing-sm);
     }
@@ -49,15 +63,17 @@ export const autocompleteStyles = [
     .pill {
       display: inline-flex;
       align-items: center;
-      gap: 2px;
+      gap: 6px;
       flex: none;
-      background: transparent;
-      color: var(--ui-color-primary-500);
-      border: 1px solid var(--ui-color-primary-500);
+      background: var(--ui-color-neutral-200);
+      color: var(--ui-color-neutral-800);
+      border: 1px solid var(--ui-color-neutral-300);
       border-radius: 3px;
-      padding: 2px var(--ui-spacing-sm);
+      padding-block: 2px;
+      padding-inline-start: 6px;
+      padding-inline-end: var(--ui-spacing-sm);
       font-size: var(--ui-font-size-sm);
-      line-height: 1.4;
+      line-height: 1;
     }
 
     .pill-remove {
@@ -69,6 +85,7 @@ export const autocompleteStyles = [
       background: transparent;
       color: inherit;
       font: inherit;
+      font-size: 1.6em;
       line-height: 1;
       padding: 0;
       cursor: pointer;

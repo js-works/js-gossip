@@ -3,10 +3,25 @@ import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
-import { emailIcon } from "./icons/email.icon.js";
 
-@customElement("ui-email-field")
-export class EmailField extends LitElement {
+/**
+ * A themed wrapper around the browser's own native date picker — `<input
+ * type="date">` or, with `type="datetime-local"`, its date+time variant.
+ * Unlike `ui-date-field` (a custom calendar built on vanillajs-datepicker),
+ * this one has no picker UI of its own: the browser's native picker affordance
+ * (the small calendar icon Chromium/Firefox/Safari all render inside the
+ * input) is what opens it, so there's nothing to theme beyond the input's own
+ * border/background/font — the picker popup itself is native chrome outside
+ * this element's control.
+ *
+ * min/max/step/required validity comes straight from the native input's own
+ * `ValidityState` (rangeUnderflow/rangeOverflow/stepMismatch/valueMissing/
+ * badInput for an unparseable typed value) — same delegation approach
+ * `ui-email-field`/`ui-number-field` use for their own native format/range
+ * checks, rather than reimplementing date comparison by hand.
+ */
+@customElement("ui-native-date-field")
+export class NativeDateField extends LitElement {
   static formAssociated = true;
 
   #internals: ElementInternals;
@@ -15,16 +30,17 @@ export class EmailField extends LitElement {
   @property()
   accessor name = "";
 
+  // ISO format matching whichever `type` is active — yyyy-mm-dd for "date",
+  // yyyy-mm-ddThh:mm for "datetime-local" — same as the underlying native
+  // input's own `.value`, and unambiguous regardless of locale.
   @property()
   accessor value = "";
 
+  @property()
+  accessor type: "date" | "datetime-local" = "date";
+
   @property({ reflect: true })
   accessor size: "small" | "medium" | "large" = "medium";
-
-  // Default to "off": autocomplete's native default ("on") is rarely what a form
-  // actually wants.
-  @property()
-  accessor autocomplete = "off";
 
   @property({ type: Boolean })
   accessor disabled = false;
@@ -35,22 +51,18 @@ export class EmailField extends LitElement {
   @property({ type: Boolean })
   accessor readonly = false;
 
-  @property({ type: Number })
-  accessor minlength: number | undefined = undefined;
-
-  @property({ type: Number })
-  accessor maxlength: number | undefined = undefined;
+  @property()
+  accessor min = "";
 
   @property()
-  accessor placeholder = "";
+  accessor max = "";
+
+  @property()
+  accessor step = "";
 
   constructor() {
     super();
     this.#internals = this.attachInternals();
-    // `spellcheck` is a native HTMLElement property/attribute (default true); flip
-    // the default here rather than redeclaring it as a reactive property (its type
-    // is fixed to boolean by the platform, and it rarely needs to react to changes).
-    this.spellcheck = false;
   }
 
   static styles = [
@@ -59,9 +71,7 @@ export class EmailField extends LitElement {
       :host {
         display: block;
 
-        /* size="medium" (the default). Set on :host (not just the input) so
-           .icon, which inherits ambient font-size rather than the input's
-           own, scales the same way. */
+        /* size="medium" (the default). */
         font-size: var(--field-font-size);
         --field-font-size: var(--ui-font-size-md);
         --field-padding: 0.5rem;
@@ -77,14 +87,18 @@ export class EmailField extends LitElement {
         --field-padding: 0.65rem;
       }
 
-      /* The border lives on the wrapper, surrounding both the input and the icon;
-         the input itself stays borderless so the two read as one control. */
       .wrapper {
         display: flex;
         align-items: center;
         border: 1px solid var(--ui-color-neutral-600);
         border-radius: var(--ui-radius-sm);
+        background: var(--ui-bg);
         box-sizing: border-box;
+      }
+
+      .wrapper:focus-within {
+        outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
+        outline-offset: var(--ui-focus-ring-offset);
       }
 
       input {
@@ -95,24 +109,15 @@ export class EmailField extends LitElement {
         font-size: var(--field-font-size);
         border: none;
         background: transparent;
+        color: inherit;
+        /* Match the picker-icon/text color to the rest of the field instead
+           of the UA default (usually a fixed dark gray regardless of theme
+           or dark mode). */
+        color-scheme: light dark;
       }
 
       input:focus {
         outline: none;
-      }
-
-      .wrapper:focus-within {
-        outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
-        outline-offset: var(--ui-focus-ring-offset);
-      }
-
-      .icon {
-        flex: none;
-        display: flex;
-        align-items: center;
-        padding-inline-end: 0.5rem;
-        font-size: 1em;
-        color: inherit;
       }
 
       :host([invalid]) .wrapper {
@@ -134,8 +139,10 @@ export class EmailField extends LitElement {
 
     if (
       changed.has("required") ||
-      changed.has("minlength") ||
-      changed.has("maxlength")
+      changed.has("min") ||
+      changed.has("max") ||
+      changed.has("step") ||
+      changed.has("type")
     ) {
       this.#syncValidity();
     }
@@ -145,13 +152,11 @@ export class EmailField extends LitElement {
     this.#internals.setFormValue(this.disabled ? null : this.value);
   }
 
-  // Delegates to the internal <input type="email">'s own ValidityState, so the
-  // browser's native email-format check (typeMismatch) is reused rather than
-  // reimplemented.
+  // Delegates to the internal <input>'s own ValidityState, so the browser's
+  // native date/date-time checks (rangeUnderflow/rangeOverflow/
+  // stepMismatch/badInput) are reused rather than reimplemented.
   #syncValidity() {
-    if (!this.#input) {
-      return;
-    }
+    if (!this.#input) return;
 
     this.#internals.setValidity(
       this.#input.validity,
@@ -234,8 +239,12 @@ export class EmailField extends LitElement {
     this.#input?.focus(options);
   }
 
-  select() {
-    this.#input?.select();
+  // Native browser affordance (Chromium/Firefox/Safari all support this) to
+  // programmatically open the picker — mirrors `ui-date-field`'s own
+  // trigger button, without needing one here since the native input already
+  // renders its own picker-icon affordance.
+  showPicker() {
+    this.#input?.showPicker();
   }
 
   render() {
@@ -244,19 +253,16 @@ export class EmailField extends LitElement {
         <input
           .value=${this.value}
           name=${this.name}
-          type="email"
-          placeholder=${this.placeholder}
-          autocomplete=${this.autocomplete}
-          spellcheck=${this.spellcheck}
+          type=${this.type}
           ?disabled=${this.disabled}
           ?required=${this.required}
           ?readonly=${this.readonly}
-          minlength=${this.minlength ?? ""}
-          maxlength=${this.maxlength ?? ""}
+          min=${this.min}
+          max=${this.max}
+          step=${this.step}
           @input=${this.#onInput}
           @change=${this.#onChange}
         />
-        <span class="icon">${emailIcon}</span>
       </div>
     `;
   }
@@ -264,6 +270,6 @@ export class EmailField extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "ui-email-field": EmailField;
+    "ui-native-date-field": NativeDateField;
   }
 }

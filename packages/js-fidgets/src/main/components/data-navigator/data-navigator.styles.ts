@@ -53,7 +53,7 @@ export const dataNavigatorStyles = [
       gap: var(--ui-spacing-sm);
     }
 
-    /* ui-input-field brings its own border/background/padding — this only needs
+    /* ui-text-field brings its own border/background/padding — this only needs
        to size it, not restyle it, beyond dropping the top/left/right border for
        an underline look (--field-border-* pierces its shadow root as plain
        custom properties). */
