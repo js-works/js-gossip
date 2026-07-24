@@ -61,6 +61,18 @@ export class NumberField extends LitElement {
   @property()
   accessor placeholder = "";
 
+  // Hides the native up/down spin buttons — e.g. a compact "go to page"
+  // field, where the stepper has no room and clamping is handled by the
+  // consumer instead. Off by default, so the native stepper still shows.
+  @property({ type: Boolean, reflect: true, attribute: "hide-stepper" })
+  accessor hideStepper = false;
+
+  // Centers the value instead of the native start-alignment — e.g. a short
+  // "go to page" field, where a left-hugging single/double digit reads
+  // oddly next to surrounding centered text.
+  @property({ type: Boolean, reflect: true })
+  accessor centered = false;
+
   constructor() {
     super();
     this.#internals = this.attachInternals();
@@ -118,10 +130,10 @@ export class NumberField extends LitElement {
         border: none;
         background: transparent;
         color: inherit;
-        /* Plain numeric input, no stepper UI at all (native or custom) — the
-           native spin buttons would otherwise overlap long placeholder/value
-           text, since nothing reserves room for them. */
-        appearance: textfield;
+      }
+
+      :host([centered]) input {
+        text-align: center;
       }
 
       input::placeholder {
@@ -130,8 +142,15 @@ export class NumberField extends LitElement {
         font-size: var(--field-font-size);
       }
 
-      input::-webkit-outer-spin-button,
-      input::-webkit-inner-spin-button {
+      /* hide-stepper: no stepper UI at all (native or custom) — the native
+         spin buttons would otherwise overlap long placeholder/value text,
+         since nothing reserves room for them. */
+      :host([hide-stepper]) input {
+        appearance: textfield;
+      }
+
+      :host([hide-stepper]) input::-webkit-outer-spin-button,
+      :host([hide-stepper]) input::-webkit-inner-spin-button {
         appearance: none;
         margin: 0;
       }

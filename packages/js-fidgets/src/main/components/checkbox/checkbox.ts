@@ -159,6 +159,15 @@ export class Checkbox extends LitElement {
   }
 
   render() {
+    // No `<span class="label">` at all — not just an empty one — when
+    // there's no label text and nothing slotted: `.wrapper`'s flex `gap`
+    // reserves space for every flex item regardless of whether it has any
+    // visible content, so an empty label span was leaving a dead strip to
+    // the right of the box (most visible when a bare `<ui-checkbox>` with no
+    // label is centered in a narrow container, e.g. a datagrid's selection
+    // column).
+    const hasLabel = this.label !== "" || this.textContent!.trim() !== "";
+
     return html`
       <label class="wrapper">
         <input
@@ -180,7 +189,9 @@ export class Checkbox extends LitElement {
         >
           ${this.indeterminate ? dashIcon : this.checked ? checkIcon : nothing}
         </span>
-        <span class="label">${this.label}<slot></slot></span>
+        ${hasLabel
+          ? html`<span class="label">${this.label}<slot></slot></span>`
+          : nothing}
       </label>
     `;
   }

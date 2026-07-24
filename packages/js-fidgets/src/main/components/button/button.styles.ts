@@ -9,8 +9,7 @@ export const buttonStyles = [
        rule below reads only these, so adding a variant never means touching the
        per-appearance color mapping (and vice versa). appearance="neutral" (the
        default) is set directly here rather than behind an attribute selector —
-       same "define the default, override the rest" pattern as elsewhere in this
-       codebase (see data-navigator.styles.ts's --selection-bg). */
+       "define the default, override the rest". */
     :host {
       font-weight: var(--ui-font-weight-normal);
       display: inline-block;
@@ -25,10 +24,12 @@ export const buttonStyles = [
       --btn-700: var(--ui-color-neutral-800);
       --btn-solid-text: white;
 
-      /* size="medium" (the default) */
+      /* size="medium" (the default) — 1em font-size + 0.5em padding on each
+         block side adds up to a round 2em button height (line-height: 1 on
+         .button below, so the content box is exactly 1em tall). */
       --btn-font-size: var(--ui-font-size-md);
-      --btn-padding-block: 0.55em;
-      --btn-padding-inline: 1em;
+      --btn-padding-block: 0.5em;
+      --btn-padding-inline: 0.9em;
       --btn-gap: var(--ui-spacing-sm);
     }
 

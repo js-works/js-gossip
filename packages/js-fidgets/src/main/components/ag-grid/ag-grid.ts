@@ -455,11 +455,10 @@ class RowSelectionCheckbox<T> implements ICellRendererComp<T> {
 }
 
 /**
- * This component's own column shape — deliberately not AG Grid's `ColDef`
- * (same rationale as `ui-data-navigator`'s `DataNavigatorColumn`: AG Grid is
- * an internal implementation detail, so a consumer of `ui-ag-grid` should
- * never need to import anything from `ag-grid-community` themselves, or learn
- * its property names).
+ * This component's own column shape — deliberately not AG Grid's `ColDef`:
+ * AG Grid is an internal implementation detail, so a consumer of `ui-ag-grid`
+ * should never need to import anything from `ag-grid-community` themselves,
+ * or learn its property names.
  */
 export interface AgGridColumn<T> {
   /** Which field of a row this column reads from. */
@@ -592,17 +591,17 @@ export type AgGridSelectionMode = "none" | "single" | "multi";
 export type AgGridSelectionAppearance = "neutral" | "primary";
 
 /**
- * A toolbar action, rendered as a subtle `ui-button` above the grid. AG Grid
- * does have its own `toolbar` grid option — but that's an Enterprise-only
- * feature (`ToolbarModule` isn't part of `ag-grid-community`), so there's no
- * AG Grid feature to hand this off to; this is a small hand-rolled bar
- * instead, reusing `ui-data-navigator`'s `DataNavigatorAction` shape and
- * visibility rule rather than inventing a third one: "general" always shows,
- * "single" only at exactly one selected row, "multi" only above that, so
- * e.g. an "Edit" action (needs exactly one target) and a "Delete selected"
- * action (needs several) can coexist without either ever showing when it
- * wouldn't make sense. Requires `selectionMode` to be something other than
- * `"none"` for "single"/"multi" actions to ever become visible.
+ * A toolbar action, rendered as an outlined `ui-button` above the grid. AG
+ * Grid does have its own `toolbar` grid option — but that's an
+ * Enterprise-only feature (`ToolbarModule` isn't part of `ag-grid-community`),
+ * so there's no AG Grid feature to hand this off to; this is a small
+ * hand-rolled bar instead, with a visibility rule that keeps toolbar clutter
+ * proportional to selection: "general" always shows, "single" only at
+ * exactly one selected row, "multi" only above that, so e.g. an "Edit"
+ * action (needs exactly one target) and a "Delete selected" action (needs
+ * several) can coexist without either ever showing when it wouldn't make
+ * sense. Requires `selectionMode` to be something other than `"none"` for
+ * "single"/"multi" actions to ever become visible.
  */
 export interface AgGridAction<T> {
   label: string;
@@ -614,8 +613,8 @@ export interface AgGridAction<T> {
 
 /**
  * A datagrid built directly on AG Grid Community (the open-source edition of
- * AG Grid) — unlike `ui-data-navigator`, which hand-rolls a table plus
- * TanStack Table, this component hands the rendering surface (rows, header,
+ * AG Grid) — unlike `ui-datagrid`, this library's own hand-rolled
+ * alternative, this component hands the rendering surface (rows, header,
  * the pagination bar) to AG Grid itself and only translates this component's
  * own small `columns`/`data` properties into AG Grid's `GridOptions`, via
  * `GridApi.setGridOption` on every change. Filtering is the one exception —
@@ -647,7 +646,7 @@ export interface AgGridAction<T> {
  * only translates its own `"none" | "single" | "multi"` property into that
  * option (see `#rowSelectionOption` below) and re-exposes the result as a
  * plain `selectedRows` getter plus a `row-selection-change` event carrying
- * this component's own row objects, the same shape `ui-data-navigator` uses,
+ * this component's own row objects, the same shape `ui-datagrid` uses,
  * so a caller never needs to import anything from `ag-grid-community` to
  * read a selection back. `actions` (see `AgGridAction`) reads that same
  * selection to decide which toolbar buttons are currently visible.
@@ -659,9 +658,9 @@ export interface AgGridAction<T> {
  * to its own row count — set via the `height` property (any CSS length).
  *
  * `title`/`subtitle` are an optional plain-text header above the toolbar —
- * same idea, same markup/styling, as `ui-data-navigator`'s own `title`/
- * `subtitle` (this component renders both, not AG Grid, which has no header
- * concept of its own beyond column headers).
+ * same idea as `ui-datagrid`'s own `title`/`subtitle` (this component
+ * renders both, not AG Grid, which has no header concept of its own beyond
+ * column headers).
  */
 @customElement("ui-ag-grid")
 export class AgGrid<T = unknown> extends LitElement {

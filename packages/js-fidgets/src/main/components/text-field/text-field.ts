@@ -125,9 +125,9 @@ export class TextField extends LitElement {
         flex-grow: 1;
         box-sizing: border-box;
         /* Per-side custom properties (rather than one border shorthand) so a
-           consumer can drop individual sides — e.g. data-navigator's global
-           filter, styled bottom-border-only — via a plain custom-property
-           override from outside, without reaching into the shadow root. */
+           consumer can drop individual sides — e.g. a global filter field
+           styled bottom-border-only — via a plain custom-property override
+           from outside, without reaching into the shadow root. */
         border-block-start: var(
           --field-border-block-start,
           1px solid var(--ui-field-border-color)

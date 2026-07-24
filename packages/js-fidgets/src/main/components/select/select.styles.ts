@@ -38,8 +38,8 @@ export const selectStyles = [
          medium) and read as way too wide once padding-block above shrank
          this far. A plain small→large progression instead. */
       --select-padding-inline: 8px;
-      /* Overridable by a consumer that needs a narrower trigger (e.g.
-         data-navigator's page-size picker). */
+      /* Overridable by a consumer that needs a narrower trigger (e.g. a
+         page-size picker). */
       --select-min-width: 12em;
     }
 

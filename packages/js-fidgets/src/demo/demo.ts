@@ -12,11 +12,6 @@ import "../main/components/combobox/combobox.js";
 import "../main/components/autocomplete/autocomplete.js";
 import { localFilter } from "../main/components/autocomplete/autocomplete.js";
 import type { AutocompleteItemGroup } from "../main/components/autocomplete/autocomplete.js";
-import "../main/components/data-navigator/data-navigator.js";
-import type {
-  DataNavigatorAction,
-  DataNavigatorColumn,
-} from "../main/components/data-navigator/data-navigator.js";
 import "../main/components/ag-grid/ag-grid.js";
 import type {
   AgGridAction,
@@ -24,6 +19,13 @@ import type {
   AgGridColumnFilter,
   AgGridDataSource,
 } from "../main/components/ag-grid/ag-grid.js";
+import "../main/components/datagrid/datagrid.js";
+import type {
+  DataGridAction,
+  DataGridColumn,
+  DataGridColumnFilter,
+  DataGridDataSource,
+} from "../main/components/datagrid/datagrid.js";
 import "../main/components/text-field/text-field.js";
 import "../main/components/number-field/number-field.js";
 import "../main/components/password-field/password-field.js";
@@ -89,7 +91,7 @@ const FRUITS: AutocompleteItemGroup[] = [
   { label: "Other", items: ["Apple", "Grape", "Pear"] },
 ];
 
-// Sample data for the ui-data-navigator demo below.
+// Sample data shared by the ui-ag-grid and ui-datagrid demos below.
 interface Employee {
   name: string;
   email: string;
@@ -187,38 +189,19 @@ const EMPLOYEES: Employee[] = Array.from({ length: 123 }, (_, i) => {
   };
 });
 
-// Demonstrates grouped column headers: "Name" and "Role" stand alone, while
-// "Email"/"Department" share a group header spanning both — 4 leaf columns,
-// 5 header cells total (3 in the top row: Name, the group, Role; 2 in the row
-// beneath the group: Email, Department).
-const employeeColumns: DataNavigatorColumn<Employee>[] = [
-  { accessorKey: "name", header: "Name" },
-  {
-    header: "Contact & Org",
-    columns: [
-      { accessorKey: "email", header: "Email" },
-      { accessorKey: "department", header: "Department" },
-    ],
-  },
-  { accessorKey: "role", header: "Role" },
-];
-
 // Every distinct department, computed once from the full in-memory dataset.
 // The "select" filter's dropdown needs this list, but employeeGridDataSource
 // (below) only ever sees the one page it was asked for — never the full
-// dataset — so unlike ui-data-navigator's columns above, this can't be
-// derived on the fly from `data` the way AgGridColumn.filter's default
-// behavior does; hence `selectOptions` below.
+// dataset — so this can't be derived on the fly from `data` the way
+// AgGridColumn.filter's default behavior does; hence `selectOptions` below.
 const employeeDepartmentOptions = [
   ...new Set(EMPLOYEES.map((employee) => employee.department)),
 ].sort();
 
-// Sample columns for the ui-ag-grid demo below — same Employee rows as
-// ui-data-navigator's demo above, but flat (ui-ag-grid doesn't support
-// grouped column headers yet). "Name"/"Email"/"Role" get the plain text
-// floating filter (a ui-text-field); "Department" gets the "select" dropdown
-// instead, since it's really a small fixed set of values rather than free
-// text.
+// Sample columns for the ui-ag-grid demo below. "Name"/"Email"/"Role" get
+// the plain text floating filter (a ui-text-field); "Department" gets the
+// "select" dropdown instead, since it's really a small fixed set of values
+// rather than free text.
 const employeeGridColumns: AgGridColumn<Employee>[] = [
   { field: "name", header: "Name", filter: true },
   { field: "email", header: "Email", width: 260, filter: true },
@@ -277,35 +260,9 @@ const trashIcon = html`
   </svg>
 `;
 
-// Action callbacks just console.log — this demo has no shared result log anymore.
-const employeeActions: DataNavigatorAction<Employee>[] = [
-  {
-    type: "general",
-    label: "Add employee",
-    icon: plusIcon,
-    onClick: () => console.log("Add employee"),
-  },
-  {
-    type: "single",
-    label: "Edit",
-    icon: pencilIcon,
-    onClick: (selected) => console.log("Edit", selected[0].name),
-  },
-  {
-    type: "multi",
-    label: "Delete selected",
-    icon: trashIcon,
-    onClick: (selected) =>
-      console.log(
-        "Delete selected",
-        selected.map((employee) => employee.name),
-      ),
-  },
-];
-
-// Same actions as ui-data-navigator's demo above, for ui-ag-grid — reads
-// selection off AG Grid's own selection state (see ui-ag-grid's
-// `selectionSnapshot`/`selectedRows`) rather than TanStack's.
+// Action callbacks just console.log — this demo has no shared result log.
+// Reads selection off AG Grid's own selection state (see ui-ag-grid's
+// `selectionSnapshot`/`selectedRows`).
 const employeeGridActions: AgGridAction<Employee>[] = [
   {
     type: "general",
@@ -353,6 +310,92 @@ const employeeGridDataSource: AgGridDataSource<Employee> = ({
       for (const [field, filter] of Object.entries(filters) as [
         keyof Employee & string,
         AgGridColumnFilter,
+      ][]) {
+        rows =
+          "values" in filter
+            ? rows.filter((row) => filter.values.includes(String(row[field])))
+            : rows.filter((row) =>
+                String(row[field])
+                  .toLowerCase()
+                  .includes(filter.value.toLowerCase()),
+              );
+      }
+
+      for (const { field, direction } of sort.slice().reverse()) {
+        rows.sort((a, b) => {
+          const cmp = String(a[field]).localeCompare(String(b[field]));
+          return direction === "desc" ? -cmp : cmp;
+        });
+      }
+
+      resolve({ rows: rows.slice(startRow, endRow), rowCount: rows.length });
+    }, 1000);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    });
+  });
+
+// Same idea as employeeGridColumns above, for the ui-datagrid demo below —
+// ui-datagrid's own `width` is a fraction of the sum of every column's
+// width (default 100), not a pixel value like ui-ag-grid's, so "Email"
+// getting more room than the rest is expressed as a bigger share (200) here
+// rather than a fixed 260px.
+const employeeDataGridColumns: DataGridColumn<Employee>[] = [
+  { field: "name", header: "Name", filter: true },
+  { field: "email", header: "Email", width: 200, filter: true },
+  {
+    field: "department",
+    header: "Department",
+    filter: "select",
+    selectOptions: employeeDepartmentOptions,
+  },
+  { field: "role", header: "Role", filter: true },
+];
+
+// Same actions as employeeGridActions above, for ui-datagrid.
+const employeeDataGridActions: DataGridAction<Employee>[] = [
+  {
+    type: "general",
+    label: "Add employee",
+    icon: plusIcon,
+    onClick: () => console.log("Add employee"),
+  },
+  {
+    type: "single",
+    label: "Edit",
+    icon: pencilIcon,
+    onClick: (selected) => console.log("Edit", selected[0].name),
+  },
+  {
+    type: "multi",
+    label: "Delete selected",
+    icon: trashIcon,
+    onClick: (selected) =>
+      console.log(
+        "Delete selected",
+        selected.map((employee) => employee.name),
+      ),
+  },
+];
+
+// Same idea as employeeGridDataSource above, for ui-datagrid's own
+// `dataSource` — every sort/filter/page change is a simulated ~1000ms
+// server round trip here too, against the same in-memory EMPLOYEES array.
+const employeeDataGridDataSource: DataGridDataSource<Employee> = ({
+  startRow,
+  endRow,
+  sort,
+  filters,
+  signal,
+}) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      let rows = EMPLOYEES.slice();
+
+      for (const [field, filter] of Object.entries(filters) as [
+        keyof Employee & string,
+        DataGridColumnFilter,
       ][]) {
         rows =
           "values" in filter
@@ -900,23 +943,6 @@ function autocompleteTab() {
   `;
 }
 
-function dataNavigatorTab() {
-  return html`
-    <section>
-      <h2>Data navigator</h2>
-      <ui-data-navigator
-        title="Employees"
-        subtitle="All employees across every department"
-        selection-mode="multi"
-        selection-appearance="primary"
-        .columns=${employeeColumns}
-        .data=${EMPLOYEES}
-        .actions=${employeeActions}
-      ></ui-data-navigator>
-    </section>
-  `;
-}
-
 function agGridTab() {
   return html`
     <section>
@@ -936,6 +962,29 @@ function agGridTab() {
             event.detail.selected.map((employee) => employee.name),
           )}
       ></ui-ag-grid>
+    </section>
+  `;
+}
+
+function dataGridTab() {
+  return html`
+    <section>
+      <h2>Datagrid</h2>
+      <ui-datagrid
+        title="Employees"
+        subtitle="All employees across every department"
+        .columns=${employeeDataGridColumns}
+        .dataSource=${employeeDataGridDataSource}
+        .actions=${employeeDataGridActions}
+        .pageSizeOptions=${[50, 100, 150, 250, 500]}
+        page-size="50"
+        selection-mode="multi"
+        @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
+          console.log(
+            "Selected:",
+            event.detail.selected.map((employee) => employee.name),
+          )}
+      ></ui-datagrid>
     </section>
   `;
 }
@@ -968,8 +1017,8 @@ const tabs: Tab[] = [
     label: "Native date field",
     content: nativeDateFieldTab,
   },
-  { id: "data-navigator", label: "Data navigator", content: dataNavigatorTab },
   { id: "ag-grid", label: "AG Grid", content: agGridTab },
+  { id: "datagrid", label: "Datagrid", content: dataGridTab },
   { id: "upload", label: "Upload", content: uploadTab },
 ];
 

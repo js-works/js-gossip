@@ -42,7 +42,6 @@
   },
   "devDependencies": {
     "@awesome.me/webawesome": "^3.10.0",
-    "@tanstack/lit-table": "^8.21.3",
     "@types/archiver": "7.0.0",
     "archiver": "7.0.1",
     "sloc": "0.3.2",

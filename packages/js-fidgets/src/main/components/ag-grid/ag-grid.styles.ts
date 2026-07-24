@@ -87,9 +87,9 @@ export const agGridStyles = [
       }
     }
 
-    /* Title/subtitle (ui-data-navigator's own text styling — AG Grid has no
-       header concept of its own beyond column headers, so this component
-       renders both) and the toolbar actions share one row: \`.toolbar\`'s
+    /* Title/subtitle (AG Grid has no header concept of its own beyond
+       column headers, so this component renders both) and the toolbar
+       actions share one row: \`.toolbar\`'s
        \`margin-inline-start: auto\` pushes it to the far end regardless of
        whether \`.header-text\` is present, so actions still end up on the
        right even with no title/subtitle set. */
