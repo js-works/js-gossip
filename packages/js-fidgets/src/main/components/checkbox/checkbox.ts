@@ -16,7 +16,9 @@ import { dashIcon } from "./icons/dash.icon.js";
  *
  * Label content is the default slot: `<ui-checkbox name="subscribe">Subscribe to
  * updates</ui-checkbox>`, rather than a separate wrapping `<label>` element the way
- * a plain native checkbox needs — one less thing for a consumer to wire up.
+ * a plain native checkbox needs — one less thing for a consumer to wire up. The
+ * `label` property is a shorthand for the plain-text case that needs no slotted
+ * children at all: `<ui-checkbox name="subscribe" label="Subscribe to updates">`.
  */
 @customElement("ui-checkbox")
 export class Checkbox extends LitElement {
@@ -31,6 +33,13 @@ export class Checkbox extends LitElement {
 
   @property()
   accessor name = "";
+
+  // A convenience shorthand for the common plain-text case — equivalent to
+  // (and rendered alongside) the default slot the class doc above describes,
+  // so `<ui-checkbox label="Subscribe">` works without a light-DOM child.
+  // Richer label content (links, formatting) still goes through the slot.
+  @property()
+  accessor label = "";
 
   // Matches native `<input type="checkbox">`'s own default `value` of "on" — the
   // value submitted when checked; unchecked never submits anything, same as native.
@@ -171,7 +180,7 @@ export class Checkbox extends LitElement {
         >
           ${this.indeterminate ? dashIcon : this.checked ? checkIcon : nothing}
         </span>
-        <span class="label"><slot></slot></span>
+        <span class="label">${this.label}<slot></slot></span>
       </label>
     `;
   }

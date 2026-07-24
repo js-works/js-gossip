@@ -3,6 +3,10 @@ import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
+import {
+  renderFieldLabel,
+  fieldLabelStyles,
+} from "../../shared/field-label/field-label.js";
 
 /**
  * A themed `<input type="number">` — min/max/step/required validity comes
@@ -20,6 +24,11 @@ export class NumberField extends LitElement {
 
   @property()
   accessor name = "";
+
+  // Renders as a real <label for="input"> above the field when set — its own
+  // accessible name and click-to-focus, no ARIA wiring needed on our part.
+  @property()
+  accessor label = "";
 
   @property()
   accessor value = "";
@@ -59,31 +68,37 @@ export class NumberField extends LitElement {
 
   static styles = [
     defaultTheme,
+    fieldLabelStyles,
     css`
       :host {
+        font-weight: var(--ui-font-weight-normal);
         display: block;
 
         /* size="medium" (the default). Set on :host so a consumer overriding
            this element's font-size from outside scales consistently. */
         font-size: var(--field-font-size);
         --field-font-size: var(--ui-font-size-md);
-        --field-padding: 0.5rem;
+        /* Was 0.25rem (same as small below) at one point — collapsed medium
+           and small to the same overall height, which read as broken rather
+           than "compact". 0.4rem keeps a real, visible step between all
+           three sizes. */
+        --field-padding: 0.4rem;
       }
 
       :host([size="small"]) {
         --field-font-size: var(--ui-font-size-sm);
-        --field-padding: 0.35rem;
+        --field-padding: 0.25rem;
       }
 
       :host([size="large"]) {
         --field-font-size: var(--ui-font-size-lg);
-        --field-padding: 0.65rem;
+        --field-padding: 0.55rem;
       }
 
       .wrapper {
         display: flex;
         align-items: center;
-        border: 1px solid var(--ui-color-neutral-600);
+        border: 1px solid var(--ui-field-border-color);
         border-radius: var(--ui-radius-sm);
         background: var(--ui-bg);
         box-sizing: border-box;
@@ -107,6 +122,12 @@ export class NumberField extends LitElement {
            native spin buttons would otherwise overlap long placeholder/value
            text, since nothing reserves room for them. */
         appearance: textfield;
+      }
+
+      input::placeholder {
+        color: var(--ui-color-neutral-400);
+        font-weight: 400;
+        font-size: var(--field-font-size);
       }
 
       input::-webkit-outer-spin-button,
@@ -243,8 +264,10 @@ export class NumberField extends LitElement {
 
   render() {
     return html`
+      ${renderFieldLabel(this.label, "input")}
       <div class="wrapper">
         <input
+          id="input"
           .value=${this.value}
           name=${this.name}
           type="number"

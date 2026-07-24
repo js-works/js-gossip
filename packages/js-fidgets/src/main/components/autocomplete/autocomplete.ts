@@ -5,6 +5,8 @@ import type { PropertyValues } from "lit";
 import { autocompleteStyles } from "./autocomplete.styles.js";
 import { checkIcon } from "./icons/check.icon.js";
 import { chevronDownIcon } from "./icons/chevron.icon.js";
+import { renderPills } from "../../shared/pills/pills.js";
+import { renderFieldLabel } from "../../shared/field-label/field-label.js";
 import {
   injectAutocomplete,
   localFilter,
@@ -82,6 +84,11 @@ export class Autocomplete extends LitElement {
   @property()
   accessor name = "";
 
+  // Renders as a real <label for="input"> above the field when set — its own
+  // accessible name and click-to-focus, no ARIA wiring needed on our part.
+  @property()
+  accessor label = "";
+
   @property()
   accessor value = "";
 
@@ -90,6 +97,13 @@ export class Autocomplete extends LitElement {
 
   @property({ type: Array })
   accessor values: string[] = [];
+
+  // Caps how many pills `multiple` mode actually renders — the rest collapse
+  // into one trailing "+N" pill (see shared/pills/pills.ts's renderPills)
+  // instead of ballooning the field's width. Unset (the default) renders
+  // every pick as its own pill, unlimited.
+  @property({ type: Number, attribute: "max-options-visible" })
+  accessor maxOptionsVisible: number | undefined = undefined;
 
   @property()
   accessor placeholder = "";
@@ -139,10 +153,25 @@ export class Autocomplete extends LitElement {
   @state()
   accessor footerContent: string | undefined = undefined;
 
+  #spellcheckDefaulted = false;
+
   constructor() {
     super();
     this.#internals = this.attachInternals();
-    this.spellcheck = false;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (!this.#spellcheckDefaulted) {
+      this.#spellcheckDefaulted = true;
+      // `spellcheck` is a native HTMLElement property/attribute (default
+      // true); flip the default here, not the constructor — see
+      // ui-text-field's own connectedCallback for why (constructor
+      // invariant violation when created from within another custom
+      // element's reaction). Guarded so a later reconnect never clobbers a
+      // consumer's own explicit override.
+      this.spellcheck = false;
+    }
   }
 
   static styles = autocompleteStyles;
@@ -268,25 +297,21 @@ export class Autocomplete extends LitElement {
       !this.multiple && activeRow ? activeRow.item : this.value;
 
     return html`
+      ${renderFieldLabel(this.label, "input")}
       <div class="wrapper">
         <div class="content">
           ${this.multiple
-            ? this.values.map(
-                (item) => html`<span class="pill">
-                  <span class="pill-label">${item}</span>
-                  <button
-                    type="button"
-                    class="pill-remove"
-                    aria-label="Remove ${item}"
-                    @pointerdown=${(event: Event) =>
-                      this.#removePill(item, event)}
-                  >
-                    ×
-                  </button>
-                </span>`,
+            ? renderPills(
+                // Autocomplete's own picks are plain strings (no separate
+                // value/label the way ui-select's <ui-option>-backed picks
+                // have) — value and label are just the same string.
+                this.values.map((item) => ({ value: item, label: item })),
+                (value, event) => this.#removePill(value, event),
+                this.maxOptionsVisible,
               )
             : nothing}
           <input
+            id="input"
             type="text"
             role="combobox"
             aria-autocomplete="list"

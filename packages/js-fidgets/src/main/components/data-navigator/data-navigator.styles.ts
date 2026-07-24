@@ -6,6 +6,7 @@ export const dataNavigatorStyles = [
   defaultTheme,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: flex;
       flex-direction: column;
       max-height: 600px;

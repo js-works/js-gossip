@@ -1,6 +1,8 @@
 import { css } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
+import { pillsStyles } from "../../shared/pills/pills.js";
+import { fieldLabelStyles } from "../../shared/field-label/field-label.js";
 
 // shared/popup-layout/popup-layout.ts's trackPopupLayout (used by
 // autocomplete-core.ts) sets the popup's positioning (position/inset/
@@ -9,23 +11,47 @@ import { defaultTheme } from "../../theming/theme.js";
 // the .popup rule below).
 export const autocompleteStyles = [
   defaultTheme,
+  pillsStyles,
+  fieldLabelStyles,
   css`
     :host {
-      display: inline-block;
+      font-weight: var(--ui-font-weight-normal);
+      /* inline-flex, not inline-block — still an inline-level box, but a flex
+         container too, so the optional .field-label stacks above .wrapper
+         (flex-direction: column) instead of sitting beside it. With no
+         label, a single flex-column child behaves identically to before. */
+      display: inline-flex;
+      flex-direction: column;
 
-      /* size="medium" (the default) */
+      /* size="medium" (the default). Padding-block values across all three
+         sizes (also small/large below, and ui-select/ui-combobox's own
+         copies, kept in sync by hand) are picked to land this control's
+         overall height on ui-text-field/ui-number-field/etc.'s own natural
+         height at the same size — not a round token, since matching an
+         unrelated component's height is the actual goal here, not the
+         spacing scale. */
       font-size: var(--ui-font-size-md);
-      --autocomplete-padding-block: var(--ui-spacing-sm);
+      /* Was 0px (same as small below) at one point — collapsed medium and
+         small to the same overall height, which read as broken rather than
+         "compact". 2px keeps a real, visible step between the three sizes. */
+      --autocomplete-padding-block: 2px;
+      /* Was a flat var(--ui-spacing-md) (16px) on the <input> directly,
+         regardless of size — same ui-select's own padding-inline had before
+         it got a small→large progression; matched to that same progression
+         here instead. */
+      --autocomplete-padding-inline: 8px;
     }
 
     :host([size="small"]) {
       font-size: var(--ui-font-size-sm);
-      --autocomplete-padding-block: 2px;
+      --autocomplete-padding-block: 0px;
+      --autocomplete-padding-inline: 4px;
     }
 
     :host([size="large"]) {
       font-size: var(--ui-font-size-lg);
-      --autocomplete-padding-block: 8px;
+      --autocomplete-padding-block: 5px;
+      --autocomplete-padding-inline: 12px;
     }
 
     /* Two columns: .content (pills/input, flex-grow, wraps its own lines
@@ -41,7 +67,7 @@ export const autocompleteStyles = [
       gap: var(--ui-spacing-sm);
       padding-block: var(--autocomplete-padding-block);
       box-sizing: border-box;
-      border: 1px solid var(--ui-color-neutral-600);
+      border: 1px solid var(--ui-field-border-color);
       border-radius: var(--ui-radius-sm);
       background: var(--ui-bg);
       color: var(--ui-text);
@@ -54,46 +80,24 @@ export const autocompleteStyles = [
       gap: var(--ui-spacing-sm);
       flex: 1;
       min-width: 0;
+      /* Without this, .wrapper's height comes from whichever is taller: the
+         plain input, or (once multiple mode has picks) a row of pills — so
+         adding the first pill visibly grows the box. Floored to a pill's own
+         height instead (shared/pills/pills.ts's .pill: 1px padding-block × 2
+         + 1px border × 2, and .pill-remove's 1.4em/line-height:1 as the
+         tallest child — same formula as ui-select's own .content, kept in
+         sync by hand) so the empty and "has pills" states render the same
+         height. */
+      min-height: calc(1.4 * var(--ui-font-size-sm) + 4px);
+      /* Breathing room around the pills themselves — .wrapper's own
+         padding-block (above) is intentionally near-zero to keep the plain
+         (no pills) state compact, so this is the pills' own vertical margin
+         from the border, not the whole control's. */
+      padding-block: 2px;
     }
 
     .wrapper:has(.pill) {
       padding-inline-start: var(--ui-spacing-sm);
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex: none;
-      background: var(--ui-color-neutral-200);
-      color: var(--ui-color-neutral-800);
-      border: 1px solid var(--ui-color-neutral-300);
-      border-radius: 3px;
-      padding-block: 2px;
-      padding-inline-start: 6px;
-      padding-inline-end: var(--ui-spacing-sm);
-      font-size: var(--ui-font-size-sm);
-      line-height: 1;
-    }
-
-    .pill-remove {
-      flex: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      font-size: 1.6em;
-      line-height: 1;
-      padding: 0;
-      cursor: pointer;
-      opacity: 0.7;
-    }
-
-    .pill-remove:hover {
-      opacity: 1;
     }
 
     :host([invalid]) .wrapper {
@@ -105,12 +109,18 @@ export const autocompleteStyles = [
       min-width: 0;
       box-sizing: border-box;
       padding-block: 0;
-      padding-inline: var(--ui-spacing-md);
+      padding-inline: var(--autocomplete-padding-inline);
       font-family: var(--ui-font-sans);
       font-size: inherit;
       border: none;
       background: transparent;
       color: inherit;
+    }
+
+    input::placeholder {
+      color: var(--ui-color-neutral-400);
+      font-weight: 400;
+      font-size: inherit;
     }
 
     input:focus {
@@ -135,9 +145,9 @@ export const autocompleteStyles = [
       display: flex;
       align-items: center;
       margin-inline-end: var(--ui-spacing-md);
-      opacity: 0.6;
+      color: var(--ui-text);
       cursor: pointer;
-      transition: transform 120ms ease;
+      transition: transform 250ms ease;
     }
 
     .chevron-open {
@@ -198,7 +208,8 @@ export const autocompleteStyles = [
       align-items: center;
       gap: var(--ui-spacing-sm);
       box-sizing: border-box;
-      padding: var(--ui-spacing-sm);
+      padding-block: 3px;
+      padding-inline: var(--ui-spacing-sm);
       /* Transparent by default (rather than only added on .active) so the border
          doesn't change the row's size and shift layout when it becomes active. */
       border: 2px solid transparent;

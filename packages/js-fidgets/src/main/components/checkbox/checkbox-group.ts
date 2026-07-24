@@ -1,10 +1,14 @@
-import { LitElement, html } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
 import { checkboxGroupStyles } from "./checkbox-group.styles.js";
 import "./checkbox.js";
 import type { Checkbox } from "./checkbox.js";
+import {
+  renderGroupLabel,
+  fieldLabelStyles,
+} from "../../shared/field-label/field-label.js";
 
 /**
  * Aggregates a set of independent `<ui-checkbox>` children into one `values`
@@ -27,6 +31,12 @@ export class CheckboxGroup extends LitElement {
 
   @property()
   accessor name = "";
+
+  // Renders as a plain caption above the group when set, wired to the group
+  // via aria-labelledby (not a <label for>, since there's no single control
+  // to point at — see shared/field-label/field-label.ts's renderGroupLabel).
+  @property()
+  accessor label = "";
 
   @property({ type: Boolean, reflect: true })
   accessor disabled = false;
@@ -51,7 +61,7 @@ export class CheckboxGroup extends LitElement {
     });
   }
 
-  static styles = checkboxGroupStyles;
+  static styles = [checkboxGroupStyles, fieldLabelStyles];
 
   protected firstUpdated() {
     this.#syncChecked();
@@ -164,7 +174,12 @@ export class CheckboxGroup extends LitElement {
 
   render() {
     return html`
-      <div class="group" role="group">
+      ${renderGroupLabel(this.label, "group-label")}
+      <div
+        class="group"
+        role="group"
+        aria-labelledby=${this.label ? "group-label" : nothing}
+      >
         <slot @slotchange=${this.#onSlotChange}></slot>
       </div>
     `;

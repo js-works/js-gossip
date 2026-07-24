@@ -6,6 +6,7 @@ export const checkboxGroupStyles = [
   defaultTheme,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: inline-block;
       font-family: var(--ui-font-sans);
     }

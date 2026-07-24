@@ -5,6 +5,10 @@ import type { PropertyValues } from "lit";
 import { defaultTheme } from "../../theming/theme.js";
 import { eyeIcon } from "./icons/eye.icon.js";
 import { eyeSlashIcon } from "./icons/eye-slash.icon.js";
+import {
+  renderFieldLabel,
+  fieldLabelStyles,
+} from "../../shared/field-label/field-label.js";
 
 @customElement("ui-password-field")
 export class PasswordField extends LitElement {
@@ -15,6 +19,11 @@ export class PasswordField extends LitElement {
 
   @property()
   accessor name = "";
+
+  // Renders as a real <label for="input"> above the field when set — its own
+  // accessible name and click-to-focus, no ARIA wiring needed on our part.
+  @property()
+  accessor label = "";
 
   @property()
   accessor value = "";
@@ -46,21 +55,34 @@ export class PasswordField extends LitElement {
   accessor size: "small" | "medium" | "large" = "medium";
 
   #visible = false;
+  #spellcheckDefaulted = false;
 
   constructor() {
     super();
 
     this.#internals = this.attachInternals();
-    // `spellcheck` is a native HTMLElement property/attribute (default true); flip
-    // the default here rather than redeclaring it as a reactive property (its type
-    // is fixed to boolean by the platform, and it rarely needs to react to changes).
-    this.spellcheck = false;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (!this.#spellcheckDefaulted) {
+      this.#spellcheckDefaulted = true;
+      // `spellcheck` is a native HTMLElement property/attribute (default
+      // true); flip the default here, not the constructor — see
+      // ui-text-field's own connectedCallback for why (constructor
+      // invariant violation when created from within another custom
+      // element's reaction). Guarded so a later reconnect never clobbers a
+      // consumer's own explicit override.
+      this.spellcheck = false;
+    }
   }
 
   static styles = [
     defaultTheme,
+    fieldLabelStyles,
     css`
       :host {
+        font-weight: var(--ui-font-weight-normal);
         display: block;
 
         /* size="medium" (the default). Set on :host (not just the input) so
@@ -68,17 +90,21 @@ export class PasswordField extends LitElement {
            own, scales the same way. */
         font-size: var(--field-font-size);
         --field-font-size: var(--ui-font-size-md);
-        --field-padding: 0.5rem;
+        /* Was 0.25rem (same as small below) at one point — collapsed medium
+           and small to the same overall height, which read as broken rather
+           than "compact". 0.4rem keeps a real, visible step between all
+           three sizes. */
+        --field-padding: 0.4rem;
       }
 
       :host([size="small"]) {
         --field-font-size: var(--ui-font-size-sm);
-        --field-padding: 0.35rem;
+        --field-padding: 0.25rem;
       }
 
       :host([size="large"]) {
         --field-font-size: var(--ui-font-size-lg);
-        --field-padding: 0.65rem;
+        --field-padding: 0.55rem;
       }
 
       /* The border lives on the wrapper, surrounding both the input and the
@@ -87,7 +113,7 @@ export class PasswordField extends LitElement {
       .wrapper {
         display: flex;
         align-items: center;
-        border: 1px solid var(--ui-color-neutral-600);
+        border: 1px solid var(--ui-field-border-color);
         border-radius: var(--ui-radius-sm);
         background: var(--ui-bg);
         box-sizing: border-box;
@@ -107,6 +133,12 @@ export class PasswordField extends LitElement {
         border: none;
         background: transparent;
         color: inherit;
+      }
+
+      input::placeholder {
+        color: var(--ui-color-neutral-400);
+        font-weight: 400;
+        font-size: var(--field-font-size);
       }
 
       input:focus {
@@ -274,8 +306,10 @@ export class PasswordField extends LitElement {
 
   render() {
     return html`
+      ${renderFieldLabel(this.label, "input")}
       <div class="wrapper">
         <input
+          id="input"
           .value=${this.value}
           name=${this.name}
           placeholder=${this.placeholder}

@@ -1,18 +1,35 @@
 import { css } from "lit";
 
 import { defaultTheme } from "../../theming/theme.js";
+import { fieldLabelStyles } from "../../shared/field-label/field-label.js";
 
 export const dateFieldStyles = [
   defaultTheme,
+  fieldLabelStyles,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: block;
+
+      /* size="medium" (the default) — same --ui-font-size-* tokens as
+         ui-text-field/ui-select/etc., so "medium"/"small"/"large" mean the
+         same rendered size everywhere. */
+      font-size: var(--field-font-size);
+      --field-font-size: var(--ui-font-size-md);
+    }
+
+    :host([size="small"]) {
+      --field-font-size: var(--ui-font-size-sm);
+    }
+
+    :host([size="large"]) {
+      --field-font-size: var(--ui-font-size-lg);
     }
 
     .wrapper {
       display: flex;
       align-items: center;
-      border: 1px solid var(--ui-color-neutral-600);
+      border: 1px solid var(--ui-field-border-color);
       border-radius: var(--ui-radius-sm);
       box-sizing: border-box;
     }
@@ -22,7 +39,7 @@ export const dateFieldStyles = [
       min-width: 0;
       padding: 0.5rem;
       font-family: var(--ui-font-sans);
-      font-size: inherit;
+      font-size: var(--field-font-size);
       border: none;
       background: transparent;
       color: inherit;

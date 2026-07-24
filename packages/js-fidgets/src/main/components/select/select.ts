@@ -15,6 +15,7 @@ import {
   removePillValue,
   buildMultiFormData,
 } from "../../shared/pills/pills.js";
+import { renderFieldLabel } from "../../shared/field-label/field-label.js";
 
 // Mixed into every generated option id (see #setActive) alongside the
 // incrementing counter below, so ids stay collision-safe against another
@@ -54,6 +55,11 @@ export class Select extends LitElement {
   @property()
   accessor name = "";
 
+  // Renders as a real <label for="trigger"> above the field when set — its
+  // own accessible name and click-to-focus, no ARIA wiring needed on our part.
+  @property()
+  accessor label = "";
+
   @property()
   accessor value = "";
 
@@ -66,6 +72,21 @@ export class Select extends LitElement {
   @property({ type: Array })
   accessor values: string[] = [];
 
+  // How `multiple` mode's picks render: "pills" (the default) — one removable
+  // tag per pick, capped by maxOptionsVisible below — or "text", a single
+  // plain "Option 1, Option 2" comma list (like the closed-trigger text of a
+  // native `<select multiple>`, which has no per-pick chrome at all).
+  @property({ attribute: "multiple-value-display" })
+  accessor multipleValueDisplay: "pills" | "text" = "pills";
+
+  // Caps how many pills `multiple` mode actually renders — the rest collapse
+  // into one trailing "+N" pill (see shared/pills/pills.ts's renderPills)
+  // instead of ballooning the trigger's width. Unset (the default) renders
+  // every pick as its own pill, unlimited. Only applies when
+  // multipleValueDisplay is "pills" — "text" has no per-pick chrome to cap.
+  @property({ type: Number, attribute: "max-options-visible" })
+  accessor maxOptionsVisible: number | undefined = undefined;
+
   @property({ type: Boolean, reflect: true })
   accessor disabled = false;
 
@@ -74,6 +95,19 @@ export class Select extends LitElement {
 
   @property({ reflect: true })
   accessor size: "small" | "medium" | "large" = "medium";
+
+  // Escape hatch for embedding this component somewhere its popup would
+  // otherwise get clipped or buried — a scrolling container with
+  // `overflow: hidden`, or a stacking context the popup can't paint above
+  // (e.g. inside a data grid's header row). Promotes the popup into the
+  // browser's top layer via the Popover API instead of this component's
+  // normal locally-positioned `position: absolute` popup — see
+  // shared/popup-layout/popup-layout.ts's `usePopover` option for the full
+  // story. Left off by default since it costs a bit of extra recomputation
+  // (viewport-pixel repositioning on every scroll tick) most placements don't
+  // need.
+  @property({ type: Boolean, attribute: "popup-portal" })
+  accessor popupPortal = false;
 
   @state()
   accessor open = false;
@@ -99,6 +133,7 @@ export class Select extends LitElement {
       getHostElement: () =>
         this.renderRoot.querySelector<HTMLElement>(".wrapper"),
       getPopupElement: () => this.renderRoot.querySelector<HTMLElement>("#popup"),
+      usePopover: this.popupPortal,
     });
   }
 
@@ -377,26 +412,47 @@ export class Select extends LitElement {
   }
 
   render() {
-    // In multiple mode, the picks show as pills instead of this text — the
-    // placeholder still shows once there's nothing left to remove, same as
-    // combobox's <input placeholder> effect once its value is empty.
-    const pills = this.multiple
+    // In multiple mode, the picks show either as pills (own branch below) or,
+    // with multipleValueDisplay: "text", as a plain comma list rendered
+    // through this same .value span the single-select case already uses —
+    // the placeholder still shows once nothing's picked, same as combobox's
+    // <input placeholder> effect once its value is empty.
+    const showPills = this.multiple && this.multipleValueDisplay === "pills";
+    const showText = this.multiple && this.multipleValueDisplay === "text";
+
+    const pills = showPills
       ? this.values.map((value) => ({
           value,
           label: this.#options().find((o) => o.value === value)?.label ?? value,
         }))
       : [];
+    const multipleText = showText
+      ? this.values
+          .map(
+            (value) =>
+              this.#options().find((o) => o.value === value)?.label ?? value,
+          )
+          .join(", ")
+      : "";
     const singleLabel = this.#selectedOption?.label ?? "";
     const valueText = this.multiple
-      ? pills.length === 0
-        ? this.placeholder
-        : ""
+      ? showPills
+        ? pills.length === 0
+          ? this.placeholder
+          : ""
+        : multipleText || this.placeholder
       : singleLabel || this.placeholder;
-    const isPlaceholder = this.multiple ? pills.length === 0 : !singleLabel;
+    const isPlaceholder = this.multiple
+      ? showPills
+        ? pills.length === 0
+        : !multipleText
+      : !singleLabel;
 
     return html`
+      ${renderFieldLabel(this.label, "trigger")}
       <div class="wrapper">
         <div
+          id="trigger"
           class="trigger"
           role="combobox"
           tabindex=${this.disabled ? -1 : 0}
@@ -410,8 +466,12 @@ export class Select extends LitElement {
           @blur=${this.#onTriggerBlur}
         >
           <div class="content">
-            ${this.multiple
-              ? renderPills(pills, (value, event) => this.#removePill(value, event))
+            ${showPills
+              ? renderPills(
+                  pills,
+                  (value, event) => this.#removePill(value, event),
+                  this.maxOptionsVisible,
+                )
               : nothing}
             ${valueText
               ? html`<span class="value ${isPlaceholder ? "placeholder" : ""}">
@@ -425,7 +485,12 @@ export class Select extends LitElement {
             ></span
           >
         </div>
-        <div id="popup" class="popup" ?hidden=${!this.open}>
+        <div
+          id="popup"
+          class="popup"
+          ?hidden=${!this.open}
+          popover=${this.popupPortal ? "manual" : nothing}
+        >
           <div
             id="listbox"
             role="listbox"

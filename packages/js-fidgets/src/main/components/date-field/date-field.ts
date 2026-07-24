@@ -8,6 +8,7 @@ import { dateFieldStyles } from "./date-field.styles.js";
 import { calendarIcon } from "./icons/calendar.icon.js";
 import { chevronLeftIcon } from "./icons/chevron-left.icon.js";
 import { chevronRightIcon } from "./icons/chevron-right.icon.js";
+import { renderFieldLabel } from "../../shared/field-label/field-label.js";
 
 // ---- Locale, built from the platform's Intl data (see buildIntlLocale below) ----
 
@@ -153,6 +154,11 @@ export class DateField extends LitElement {
   @property()
   accessor name = "";
 
+  // Renders as a real <label for="input"> above the field when set — its own
+  // accessible name and click-to-focus, no ARIA wiring needed on our part.
+  @property()
+  accessor label = "";
+
   // ISO format (yyyy-mm-dd), or "" for no selection — matches native
   // `<input type="date">`, and keeps the value unambiguous regardless of locale.
   @property()
@@ -179,10 +185,28 @@ export class DateField extends LitElement {
   @property()
   accessor autocomplete = "off";
 
+  @property({ reflect: true })
+  accessor size: "small" | "medium" | "large" = "medium";
+
+  #spellcheckDefaulted = false;
+
   constructor() {
     super();
     this.#internals = this.attachInternals();
-    this.spellcheck = false;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (!this.#spellcheckDefaulted) {
+      this.#spellcheckDefaulted = true;
+      // `spellcheck` is a native HTMLElement property/attribute (default
+      // true); flip the default here, not the constructor — see
+      // ui-text-field's own connectedCallback for why (constructor
+      // invariant violation when created from within another custom
+      // element's reaction). Guarded so a later reconnect never clobbers a
+      // consumer's own explicit override.
+      this.spellcheck = false;
+    }
   }
 
   static styles = dateFieldStyles;
@@ -345,8 +369,10 @@ export class DateField extends LitElement {
 
   render() {
     return html`
+      ${renderFieldLabel(this.label, "input")}
       <div class="wrapper">
         <input
+          id="input"
           type="text"
           .value=${this.value}
           name=${this.name}

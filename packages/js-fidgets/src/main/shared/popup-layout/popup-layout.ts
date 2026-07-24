@@ -39,6 +39,23 @@ interface TrackPopupLayoutConfig {
   // Gap kept between the popup and the host, and reused as a small buffer
   // between the popup and the viewport edge on its far side. Defaults to 2.
   gapPx?: number;
+  // Promotes the popup into the browser's top layer via the Popover API
+  // (https://developer.mozilla.org/en-US/docs/Web/API/Popover_API) instead of
+  // the default `position: absolute` scheme below. The default scheme
+  // positions the popup relative to its own nearest positioned ancestor,
+  // which works fine floating over ordinary page content but gets clipped or
+  // buried the moment that ancestor chain crosses something like a scrolling
+  // container with `overflow: hidden` or its own stacking context (e.g. a
+  // data grid's virtualized header row) — the popup can't escape a box it's
+  // laid out inside of. The top layer sits above the entire document
+  // regardless of any of that, which is the whole point of the API. Opt-in
+  // (the caller must also set `popover="manual"` on the popup element itself
+  // — see `ensureOutOfFlow`/`apply` below for why "manual") since it changes
+  // the coordinate system from relative percentages to raw viewport pixels
+  // recomputed on every tick, not just when placement/height actually change
+  // — unnecessary work for the common case where the default scheme already
+  // works fine.
+  usePopover?: boolean;
 }
 
 interface PopupLayoutHandle {
@@ -57,6 +74,8 @@ interface PopupLayoutHandle {
 const MANAGED_PROPERTIES = [
   "position",
   "inset-inline",
+  "left",
+  "width",
   "z-index",
   "display",
   "flex-direction",
@@ -112,11 +131,37 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
     snapshot = undefined;
   }
 
-  function apply(popup: HTMLElement): void {
+  function apply(popup: HTMLElement, hostRect: DOMRect): void {
     popup.style.setProperty("display", "flex");
     popup.style.setProperty("flex-direction", "column");
     popup.style.setProperty("overflow", "hidden");
     popup.style.setProperty("max-height", `${maxHeightPx}px`);
+
+    if (config.usePopover) {
+      // Top-layer coordinates are viewport-relative pixels, not percentages
+      // of a local ancestor — recomputed from the host's own rect on every
+      // call (see the comment on the `usePopover` config option for why this
+      // can't just be "100%" the way the non-popover branch below gets away
+      // with).
+      popup.style.setProperty("left", `${hostRect.left}px`);
+      popup.style.setProperty("width", `${hostRect.width}px`);
+      if (placement === "bottom") {
+        popup.style.setProperty("top", `${hostRect.bottom + gapPx}px`);
+        popup.style.removeProperty("bottom");
+      } else {
+        popup.style.setProperty(
+          "bottom",
+          `${window.innerHeight - hostRect.top + gapPx}px`,
+        );
+        popup.style.removeProperty("top");
+      }
+      // showPopover() is what actually promotes the element into the top
+      // layer — merely giving it `display: flex` above does not, and calling
+      // it twice while already open throws, hence the guard.
+      if (!popup.matches(":popover-open")) popup.showPopover();
+      return;
+    }
+
     if (placement === "bottom") {
       popup.style.setProperty("top", `calc(100% + ${gapPx}px)`);
       popup.style.removeProperty("bottom");
@@ -139,7 +184,21 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
   // this eagerly — on the first update() call regardless of hidden state —
   // guarantees the popup is already out of flow well before that moment ever
   // arrives.
+  //
+  // `usePopover`'s `position: fixed` needs no `inset-inline` counterpart
+  // (`left`/`width` are set directly in apply() above, in pixels) — and no
+  // out-of-flow step is actually needed for top-layer promotion itself
+  // (that's what `showPopover()` in apply() does), but `position: fixed` is
+  // still set here so the very first rect measurement in update() below
+  // isn't thrown off by the popup still occupying normal flow space, same
+  // reasoning as the non-popover branch.
   function ensureOutOfFlow(popup: HTMLElement): void {
+    if (config.usePopover) {
+      popup.style.setProperty("position", "fixed");
+      popup.style.setProperty("z-index", "1");
+      popup.style.setProperty("box-sizing", "border-box");
+      return;
+    }
     popup.style.setProperty("position", "absolute");
     popup.style.setProperty("inset-inline", "0");
     popup.style.setProperty("z-index", "1");
@@ -170,6 +229,9 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
     if (popup.hidden) {
       if (domVisible) {
         popup.style.removeProperty("display");
+        if (config.usePopover && popup.matches(":popover-open")) {
+          popup.hidePopover();
+        }
         domVisible = false;
         detachLiveTracking();
       }
@@ -190,15 +252,21 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
     const available = nextPlacement === "top" ? spaceAbove : spaceBelow;
     const nextMaxHeightPx = Math.max(0, Math.min(maxHeightCap, available));
 
+    // `usePopover`'s coordinates are raw viewport pixels (not the "100%"
+    // relative-to-ancestor math the default scheme uses), so they go stale on
+    // every scroll even when placement/height themselves don't change —
+    // always reapply for that mode, not just on an actual placement/height
+    // change.
     if (
       !domVisible ||
       nextPlacement !== placement ||
-      nextMaxHeightPx !== maxHeightPx
+      nextMaxHeightPx !== maxHeightPx ||
+      config.usePopover
     ) {
       placement = nextPlacement;
       maxHeightPx = nextMaxHeightPx;
       domVisible = true;
-      apply(popup);
+      apply(popup, hostRect);
       attachLiveTracking();
     }
   }

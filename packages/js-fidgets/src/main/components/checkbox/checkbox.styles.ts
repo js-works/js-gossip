@@ -6,6 +6,7 @@ export const checkboxStyles = [
   defaultTheme,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: inline-flex;
       /* Default (baseline) alignment synthesizes the host's baseline from its
          content, which shifts depending on whether .box has an icon child

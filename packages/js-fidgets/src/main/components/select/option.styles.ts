@@ -6,6 +6,7 @@ export const optionStyles = [
   defaultTheme,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: block;
       font-family: var(--ui-font-sans);
       font-size: inherit;
@@ -28,7 +29,8 @@ export const optionStyles = [
       align-items: center;
       gap: var(--ui-spacing-sm);
       box-sizing: border-box;
-      padding: var(--ui-spacing-sm);
+      padding-block: 3px;
+      padding-inline: var(--ui-spacing-sm);
       /* Transparent by default (rather than only added on [active]) so the
          border doesn't change the row's size and shift layout when it becomes
          active — same reasoning as ui-combobox's own option rows. */

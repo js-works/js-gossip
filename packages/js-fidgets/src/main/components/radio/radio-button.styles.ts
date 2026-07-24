@@ -6,6 +6,7 @@ export const radioButtonStyles = [
   defaultTheme,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: inline-flex;
       /* Same synthesized-baseline dependence as ui-checkbox — see its own
          :host comment for the full explanation. */

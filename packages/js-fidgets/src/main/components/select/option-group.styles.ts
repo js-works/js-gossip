@@ -6,6 +6,7 @@ export const optionGroupStyles = [
   defaultTheme,
   css`
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: block;
       font-family: var(--ui-font-sans);
     }

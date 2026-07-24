@@ -15,6 +15,7 @@ import {
   removePillValue,
   buildMultiFormData,
 } from "../../shared/pills/pills.js";
+import { renderFieldLabel } from "../../shared/field-label/field-label.js";
 
 // Mixed into every generated option id (see #setActiveIndex) alongside the
 // incrementing counter below, so ids stay collision-safe against another
@@ -65,6 +66,11 @@ export class Combobox extends LitElement {
   @property()
   accessor name = "";
 
+  // Renders as a real <label for="input"> above the field when set — its own
+  // accessible name and click-to-focus, no ARIA wiring needed on our part.
+  @property()
+  accessor label = "";
+
   @property()
   accessor value = "";
 
@@ -73,6 +79,13 @@ export class Combobox extends LitElement {
 
   @property({ type: Array })
   accessor values: string[] = [];
+
+  // Caps how many pills `multiple` mode actually renders — the rest collapse
+  // into one trailing "+N" pill (see shared/pills/pills.ts's renderPills)
+  // instead of ballooning the field's width. Unset (the default) renders
+  // every pick as its own pill, unlimited.
+  @property({ type: Number, attribute: "max-options-visible" })
+  accessor maxOptionsVisible: number | undefined = undefined;
 
   @property()
   accessor placeholder = "";
@@ -530,12 +543,18 @@ export class Combobox extends LitElement {
     const popupVisible = showListbox || showNoMatches;
 
     return html`
+      ${renderFieldLabel(this.label, "input")}
       <div class="wrapper">
         <div class="content">
           ${this.multiple
-            ? renderPills(pills, (value, event) => this.#removePill(value, event))
+            ? renderPills(
+                pills,
+                (value, event) => this.#removePill(value, event),
+                this.maxOptionsVisible,
+              )
             : nothing}
           <input
+            id="input"
             type="text"
             role="combobox"
             aria-autocomplete="list"

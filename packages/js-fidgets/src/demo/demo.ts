@@ -17,12 +17,25 @@ import type {
   DataNavigatorAction,
   DataNavigatorColumn,
 } from "../main/components/data-navigator/data-navigator.js";
+import "../main/components/ag-grid/ag-grid.js";
+import type {
+  AgGridAction,
+  AgGridColumn,
+  AgGridColumnFilter,
+  AgGridDataSource,
+} from "../main/components/ag-grid/ag-grid.js";
 import "../main/components/text-field/text-field.js";
 import "../main/components/number-field/number-field.js";
 import "../main/components/password-field/password-field.js";
 import "../main/components/email-field/email-field.js";
 import "../main/components/date-field/date-field.js";
 import "../main/components/native-date-field/native-date-field.js";
+import "../main/components/upload/upload.js";
+import type {
+  Upload,
+  UploadFileRejectDetail,
+  UploadRequestDetail,
+} from "../main/components/upload/upload.js";
 
 // Adopts the library's own theme tokens (--ui-bg, --ui-text, --ui-color-*, ...)
 // at the document level (see theme.ts's `:root` selector) so the demo page's own
@@ -190,6 +203,34 @@ const employeeColumns: DataNavigatorColumn<Employee>[] = [
   { accessorKey: "role", header: "Role" },
 ];
 
+// Every distinct department, computed once from the full in-memory dataset.
+// The "select" filter's dropdown needs this list, but employeeGridDataSource
+// (below) only ever sees the one page it was asked for — never the full
+// dataset — so unlike ui-data-navigator's columns above, this can't be
+// derived on the fly from `data` the way AgGridColumn.filter's default
+// behavior does; hence `selectOptions` below.
+const employeeDepartmentOptions = [
+  ...new Set(EMPLOYEES.map((employee) => employee.department)),
+].sort();
+
+// Sample columns for the ui-ag-grid demo below — same Employee rows as
+// ui-data-navigator's demo above, but flat (ui-ag-grid doesn't support
+// grouped column headers yet). "Name"/"Email"/"Role" get the plain text
+// floating filter (a ui-text-field); "Department" gets the "select" dropdown
+// instead, since it's really a small fixed set of values rather than free
+// text.
+const employeeGridColumns: AgGridColumn<Employee>[] = [
+  { field: "name", header: "Name", filter: true },
+  { field: "email", header: "Email", width: 260, filter: true },
+  {
+    field: "department",
+    header: "Department",
+    filter: "select",
+    selectOptions: employeeDepartmentOptions,
+  },
+  { field: "role", header: "Role", filter: true },
+];
+
 const plusIcon = html`
   <svg
     viewBox="0 0 16 16"
@@ -262,6 +303,82 @@ const employeeActions: DataNavigatorAction<Employee>[] = [
   },
 ];
 
+// Same actions as ui-data-navigator's demo above, for ui-ag-grid — reads
+// selection off AG Grid's own selection state (see ui-ag-grid's
+// `selectionSnapshot`/`selectedRows`) rather than TanStack's.
+const employeeGridActions: AgGridAction<Employee>[] = [
+  {
+    type: "general",
+    label: "Add employee",
+    icon: plusIcon,
+    onClick: () => console.log("Add employee"),
+  },
+  {
+    type: "single",
+    label: "Edit",
+    icon: pencilIcon,
+    onClick: (selected) => console.log("Edit", selected[0].name),
+  },
+  {
+    type: "multi",
+    label: "Delete selected",
+    icon: trashIcon,
+    onClick: (selected) =>
+      console.log(
+        "Delete selected",
+        selected.map((employee) => employee.name),
+      ),
+  },
+];
+
+// Simulates a real server endpoint for ui-ag-grid's own `dataSource` — every
+// sort and page change re-invokes this (not just the initial load), each one
+// taking a simulated 1000ms round trip, so the grid genuinely waits on a
+// "request" for every interaction rather than just the first render.
+// Filtering/sorting/pagination all happen here, against the same in-memory
+// EMPLOYEES array a real server would instead run against a database — see
+// AgGridDataSource's own doc for why this switches ui-ag-grid onto AG Grid's
+// Infinite Row Model instead of its Client-Side Row Model.
+const employeeGridDataSource: AgGridDataSource<Employee> = ({
+  startRow,
+  endRow,
+  sort,
+  filters,
+  signal,
+}) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      let rows = EMPLOYEES.slice();
+
+      for (const [field, filter] of Object.entries(filters) as [
+        keyof Employee & string,
+        AgGridColumnFilter,
+      ][]) {
+        rows =
+          "values" in filter
+            ? rows.filter((row) => filter.values.includes(String(row[field])))
+            : rows.filter((row) =>
+                String(row[field])
+                  .toLowerCase()
+                  .includes(filter.value.toLowerCase()),
+              );
+      }
+
+      for (const { field, direction } of sort.slice().reverse()) {
+        rows.sort((a, b) => {
+          const cmp = String(a[field]).localeCompare(String(b[field]));
+          return direction === "desc" ? -cmp : cmp;
+        });
+      }
+
+      resolve({ rows: rows.slice(startRow, endRow), rowCount: rows.length });
+    }, 1000);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    });
+  });
+
 function buttonsTab() {
   return html`
     <section class="button-showcase">
@@ -327,7 +444,7 @@ function selectTab() {
     <section>
       <h2>Select</h2>
       <div class="row">
-        <ui-select placeholder="Choose a fruit…">
+        <ui-select label="Fruit">
           <ui-option value="apple">Apple</ui-option>
           <ui-option value="banana">Banana</ui-option>
           <ui-option-group label="Citrus">
@@ -339,24 +456,44 @@ function selectTab() {
         </ui-select>
       </div>
       <div class="row">
-        <ui-select size="small" placeholder="Small">
+        <ui-select size="small" label="Small">
           <ui-option value="a">Option A</ui-option>
           <ui-option value="b">Option B</ui-option>
         </ui-select>
-        <ui-select size="medium" placeholder="Medium">
+        <ui-select size="medium" label="Medium">
           <ui-option value="a">Option A</ui-option>
           <ui-option value="b">Option B</ui-option>
         </ui-select>
-        <ui-select size="large" placeholder="Large">
+        <ui-select size="large" label="Large">
           <ui-option value="a">Option A</ui-option>
           <ui-option value="b">Option B</ui-option>
         </ui-select>
-        <ui-select disabled placeholder="Disabled">
+        <ui-select disabled label="Disabled">
           <ui-option value="a">Option A</ui-option>
         </ui-select>
       </div>
       <div class="row">
-        <ui-select multiple placeholder="Choose fruits…">
+        <ui-select
+          multiple
+          max-options-visible="2"
+          label="Fruits"
+        >
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
+        </ui-select>
+      </div>
+      <div class="row">
+        <ui-select
+          multiple
+          multiple-value-display="text"
+          label="Fruits (text display)"
+        >
           <ui-option value="apple">Apple</ui-option>
           <ui-option value="banana">Banana</ui-option>
           <ui-option-group label="Citrus">
@@ -439,19 +576,20 @@ function textFieldTab() {
     <section>
       <h2>Text field</h2>
       <div class="row">
-        <ui-text-field placeholder="Full name"></ui-text-field>
+        <ui-text-field label="Full name"></ui-text-field>
       </div>
       <div class="row">
-        <ui-text-field size="small" placeholder="Small"></ui-text-field>
-        <ui-text-field size="medium" placeholder="Medium"></ui-text-field>
-        <ui-text-field size="large" placeholder="Large"></ui-text-field>
-        <ui-text-field disabled placeholder="Disabled"></ui-text-field>
+        <ui-text-field size="small" label="Small"></ui-text-field>
+        <ui-text-field size="medium" label="Medium"></ui-text-field>
+        <ui-text-field size="large" label="Large"></ui-text-field>
+        <ui-text-field disabled label="Disabled"></ui-text-field>
       </div>
       <div class="row">
         <ui-text-field
           required
           minlength="3"
           maxlength="20"
+          label="Username"
           placeholder="3-20 characters"
         ></ui-text-field>
       </div>
@@ -464,13 +602,13 @@ function numberFieldTab() {
     <section>
       <h2>Number field</h2>
       <div class="row">
-        <ui-number-field placeholder="Quantity"></ui-number-field>
+        <ui-number-field label="Quantity"></ui-number-field>
       </div>
       <div class="row">
-        <ui-number-field size="small" placeholder="Small"></ui-number-field>
-        <ui-number-field size="medium" placeholder="Medium"></ui-number-field>
-        <ui-number-field size="large" placeholder="Large"></ui-number-field>
-        <ui-number-field disabled placeholder="Disabled"></ui-number-field>
+        <ui-number-field size="small" label="Small"></ui-number-field>
+        <ui-number-field size="medium" label="Medium"></ui-number-field>
+        <ui-number-field size="large" label="Large"></ui-number-field>
+        <ui-number-field disabled label="Disabled"></ui-number-field>
       </div>
       <div class="row">
         <ui-number-field
@@ -478,6 +616,7 @@ function numberFieldTab() {
           min="0"
           max="10"
           step="1"
+          label="Amount"
           placeholder="0 to 10"
         ></ui-number-field>
       </div>
@@ -490,18 +629,19 @@ function passwordFieldTab() {
     <section>
       <h2>Password field</h2>
       <div class="row">
-        <ui-password-field placeholder="Password"></ui-password-field>
+        <ui-password-field label="Password"></ui-password-field>
       </div>
       <div class="row">
-        <ui-password-field size="small" placeholder="Small"></ui-password-field>
-        <ui-password-field size="medium" placeholder="Medium"></ui-password-field>
-        <ui-password-field size="large" placeholder="Large"></ui-password-field>
-        <ui-password-field disabled placeholder="Disabled"></ui-password-field>
+        <ui-password-field size="small" label="Small"></ui-password-field>
+        <ui-password-field size="medium" label="Medium"></ui-password-field>
+        <ui-password-field size="large" label="Large"></ui-password-field>
+        <ui-password-field disabled label="Disabled"></ui-password-field>
       </div>
       <div class="row">
         <ui-password-field
           required
           minlength="8"
+          label="Password"
           placeholder="At least 8 characters"
         ></ui-password-field>
       </div>
@@ -514,16 +654,16 @@ function emailFieldTab() {
     <section>
       <h2>Email field</h2>
       <div class="row">
-        <ui-email-field placeholder="you@example.com"></ui-email-field>
+        <ui-email-field label="Email address" placeholder="you@example.com"></ui-email-field>
       </div>
       <div class="row">
-        <ui-email-field size="small" placeholder="Small"></ui-email-field>
-        <ui-email-field size="medium" placeholder="Medium"></ui-email-field>
-        <ui-email-field size="large" placeholder="Large"></ui-email-field>
-        <ui-email-field disabled placeholder="Disabled"></ui-email-field>
+        <ui-email-field size="small" label="Small"></ui-email-field>
+        <ui-email-field size="medium" label="Medium"></ui-email-field>
+        <ui-email-field size="large" label="Large"></ui-email-field>
+        <ui-email-field disabled label="Disabled"></ui-email-field>
       </div>
       <div class="row">
-        <ui-email-field required placeholder="Required"></ui-email-field>
+        <ui-email-field required label="Email address"></ui-email-field>
       </div>
     </section>
   `;
@@ -535,16 +675,20 @@ function dateFieldTab() {
       <h2>Date field</h2>
       <p>Custom calendar popup, built on vanillajs-datepicker.</p>
       <div class="row">
-        <ui-date-field></ui-date-field>
+        <ui-date-field label="Date"></ui-date-field>
       </div>
       <div class="row">
-        <ui-date-field disabled></ui-date-field>
+        <ui-date-field size="small" label="Small"></ui-date-field>
+        <ui-date-field size="medium" label="Medium"></ui-date-field>
+        <ui-date-field size="large" label="Large"></ui-date-field>
+        <ui-date-field disabled label="Disabled"></ui-date-field>
       </div>
       <div class="row">
         <ui-date-field
           required
           min="2026-01-01"
           max="2026-12-31"
+          label="Date of birth"
         ></ui-date-field>
       </div>
     </section>
@@ -557,23 +701,111 @@ function nativeDateFieldTab() {
       <h2>Native date field</h2>
       <p>Thin themed wrapper around the browser's own native date picker.</p>
       <div class="row">
-        <ui-native-date-field></ui-native-date-field>
+        <ui-native-date-field label="Date"></ui-native-date-field>
       </div>
       <div class="row">
-        <ui-native-date-field type="datetime-local"></ui-native-date-field>
+        <ui-native-date-field
+          type="datetime-local"
+          label="Date & time"
+        ></ui-native-date-field>
       </div>
       <div class="row">
-        <ui-native-date-field size="small"></ui-native-date-field>
-        <ui-native-date-field size="medium"></ui-native-date-field>
-        <ui-native-date-field size="large"></ui-native-date-field>
-        <ui-native-date-field disabled></ui-native-date-field>
+        <ui-native-date-field size="small" label="Small"></ui-native-date-field>
+        <ui-native-date-field size="medium" label="Medium"></ui-native-date-field>
+        <ui-native-date-field size="large" label="Large"></ui-native-date-field>
+        <ui-native-date-field disabled label="Disabled"></ui-native-date-field>
       </div>
       <div class="row">
         <ui-native-date-field
           required
           min="2026-01-01"
           max="2026-12-31"
+          label="Date of birth"
         ></ui-native-date-field>
+      </div>
+    </section>
+  `;
+}
+
+// Fakes an upload for the ui-upload demos below: whenever the component fires
+// upload-request (immediately per file in auto mode, or on demand — a row's
+// own Start/Retry button or "Upload all" — in manual mode), ramps that file's
+// progress up over ~1.5s, then marks it done. A real integration would drive
+// setFileProgress from an actual fetch/XHR upload-progress handler instead —
+// ui-upload itself never touches the network, it only tells the caller when
+// to start.
+function simulateUpload(event: CustomEvent<UploadRequestDetail>) {
+  const upload = event.currentTarget as Upload;
+  const { file } = event.detail;
+
+  let progress = 0;
+  const timer = setInterval(() => {
+    progress = Math.min(100, progress + 20);
+    upload.setFileProgress(file, progress);
+    if (progress >= 100) {
+      clearInterval(timer);
+      upload.setFileDone(file);
+    }
+  }, 300);
+}
+
+function uploadTab() {
+  return html`
+    <section>
+      <h2>Upload</h2>
+      <p>
+        Files ride along in the enclosing form's <code>FormData</code>, same
+        as a native <code>&lt;input type="file"&gt;</code> — no network calls
+        happen inside the component itself.
+        <code>setFileProgress</code>/<code>setFileDone</code>/<code
+          >setFileError</code
+        >
+        let a caller running its own upload drive the progress UI per file,
+        started via the <code>upload-request</code> event (simulated below).
+      </p>
+      <p>
+        Auto-start (default): each file fires <code>upload-request</code> as
+        soon as it's added.
+      </p>
+      <div class="row">
+        <ui-upload
+          name="attachments"
+          multiple
+          accept="image/*,.pdf"
+          max-files="5"
+          max-file-size="5242880"
+          @upload-request=${simulateUpload}
+          @file-reject=${(event: CustomEvent<UploadFileRejectDetail>) =>
+            console.log(
+              "Rejected:",
+              event.detail.file.name,
+              event.detail.reason,
+            )}
+        ></ui-upload>
+      </div>
+      <p>
+        Manual: files wait until Start/Retry (per row) or "Upload all" is
+        clicked.
+      </p>
+      <div class="row">
+        <ui-upload
+          name="manual-attachments"
+          multiple
+          manual
+          @upload-request=${simulateUpload}
+        ></ui-upload>
+      </div>
+      <div class="row">
+        <ui-upload name="single-file"></ui-upload>
+      </div>
+      <div class="row">
+        <ui-upload size="small" name="small"></ui-upload>
+        <ui-upload size="medium" name="medium"></ui-upload>
+        <ui-upload size="large" name="large"></ui-upload>
+        <ui-upload disabled name="disabled"></ui-upload>
+      </div>
+      <div class="row">
+        <ui-upload required name="required"></ui-upload>
       </div>
     </section>
   `;
@@ -599,16 +831,23 @@ function comboboxTab() {
     <section>
       <h2>Combobox</h2>
       <div class="row">
-        <ui-combobox class="combobox-demo" placeholder="Search fruits…">
+        <ui-combobox class="combobox-demo" label="Fruit">
           ${fruitOptions()}
         </ui-combobox>
       </div>
       <div class="row">
-        <ui-combobox
-          class="combobox-demo"
-          multiple
-          placeholder="Search fruits…"
-        >
+        <ui-combobox class="combobox-demo" size="small" label="Small">
+          ${fruitOptions()}
+        </ui-combobox>
+        <ui-combobox class="combobox-demo" size="medium" label="Medium">
+          ${fruitOptions()}
+        </ui-combobox>
+        <ui-combobox class="combobox-demo" size="large" label="Large">
+          ${fruitOptions()}
+        </ui-combobox>
+      </div>
+      <div class="row">
+        <ui-combobox class="combobox-demo" multiple label="Fruits">
           ${fruitOptions()}
         </ui-combobox>
       </div>
@@ -623,6 +862,7 @@ function autocompleteTab() {
       <div class="row">
         <ui-autocomplete
           class="combobox-demo"
+          label="Fruit"
           placeholder="Search fruits…"
           .dataSource=${localFilter(FRUITS, 1000)}
         ></ui-autocomplete>
@@ -630,7 +870,28 @@ function autocompleteTab() {
       <div class="row">
         <ui-autocomplete
           class="combobox-demo"
+          size="small"
+          label="Small"
+          .dataSource=${localFilter(FRUITS, 1000)}
+        ></ui-autocomplete>
+        <ui-autocomplete
+          class="combobox-demo"
+          size="medium"
+          label="Medium"
+          .dataSource=${localFilter(FRUITS, 1000)}
+        ></ui-autocomplete>
+        <ui-autocomplete
+          class="combobox-demo"
+          size="large"
+          label="Large"
+          .dataSource=${localFilter(FRUITS, 1000)}
+        ></ui-autocomplete>
+      </div>
+      <div class="row">
+        <ui-autocomplete
+          class="combobox-demo"
           multiple
+          label="Fruits"
           placeholder="Search fruits…"
           .dataSource=${localFilter(FRUITS, 1000)}
         ></ui-autocomplete>
@@ -652,6 +913,29 @@ function dataNavigatorTab() {
         .data=${EMPLOYEES}
         .actions=${employeeActions}
       ></ui-data-navigator>
+    </section>
+  `;
+}
+
+function agGridTab() {
+  return html`
+    <section>
+      <h2>AG Grid</h2>
+      <ui-ag-grid
+        title="Employees"
+        subtitle="All employees across every department"
+        .columns=${employeeGridColumns}
+        .dataSource=${employeeGridDataSource}
+        .actions=${employeeGridActions}
+        page-size="10"
+        selection-mode="multi"
+        selection-appearance="neutral"
+        @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
+          console.log(
+            "Selected:",
+            event.detail.selected.map((employee) => employee.name),
+          )}
+      ></ui-ag-grid>
     </section>
   `;
 }
@@ -685,6 +969,8 @@ const tabs: Tab[] = [
     content: nativeDateFieldTab,
   },
   { id: "data-navigator", label: "Data navigator", content: dataNavigatorTab },
+  { id: "ag-grid", label: "AG Grid", content: agGridTab },
+  { id: "upload", label: "Upload", content: uploadTab },
 ];
 
 // The active tab is driven by the URL hash (e.g. #combobox) rather than local

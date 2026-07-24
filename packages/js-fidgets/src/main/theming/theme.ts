@@ -81,12 +81,25 @@ export const defaultTheme = css`
     --ui-font-size-lg: 1.125rem;
     --ui-font-size-xl: 1.5rem;
 
+    --ui-font-weight-light: 300;
+    --ui-font-weight-normal: 400;
+    --ui-font-weight-semibold: 600;
+    --ui-font-weight-bold: 700;
+
     --ui-radius-xs: 2px;
     --ui-radius-sm: 4px;
     --ui-radius-md: 6px;
     --ui-radius-lg: 12px;
 
     --ui-button-radius: var(--ui-radius-sm);
+
+    /* The border color shared by every input-like field (text/number/
+       password/email/date fields, select, combobox, autocomplete — and,
+       matching it, their chevron icon where they have one). Deliberately its
+       own token rather than a --ui-color-neutral-* ramp step — history:
+       #545454 → lightened to #6b6b6b → lightened too far to #999999 →
+       darkened back a bit to this. */
+    --ui-field-border-color: #808080;
 
     --ui-focus-ring-width: 2px;
     --ui-focus-ring-offset: 1px;

@@ -12,6 +12,7 @@ export const buttonStyles = [
        same "define the default, override the rest" pattern as elsewhere in this
        codebase (see data-navigator.styles.ts's --selection-bg). */
     :host {
+      font-weight: var(--ui-font-weight-normal);
       display: inline-block;
       vertical-align: middle;
       font-family: var(--ui-font-sans);
