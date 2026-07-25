@@ -10,6 +10,7 @@ import { chevronRightIcon } from "./icons/chevron-right.icon.js";
 import { chevronsLeftIcon } from "./icons/chevrons-left.icon.js";
 import { chevronsRightIcon } from "./icons/chevrons-right.icon.js";
 import { checkSquareIcon } from "./icons/check-square.icon.js";
+import { plusIcon } from "./icons/plus.icon.js";
 import "../button/button.js";
 import "../checkbox/checkbox.js";
 import type { Checkbox } from "../checkbox/checkbox.js";
@@ -66,6 +67,16 @@ export interface DataGridColumn<T> {
  * clicking anywhere on a row toggles its own selection.
  */
 export type DataGridSelectionMode = "none" | "single" | "multi";
+
+/**
+ * Per-row expandable detail content — return a `TemplateResult` to give
+ * `row` an expander toggle, or `undefined` for rows that have none (a mixed
+ * page is fine: only rows this resolves a template for get a toggle). The
+ * expander column itself only appears at all when at least one row on the
+ * *current* page resolves one — a page with no expandable rows shows no
+ * empty leading column.
+ */
+export type DataGridRowDetails<T> = (row: T) => TemplateResult | undefined;
 
 /**
  * A toolbar action, rendered as an outlined `ui-button` above the grid.
@@ -197,6 +208,9 @@ export class DataGrid<T = unknown> extends LitElement {
   @property()
   accessor height = "480px";
 
+  @property({ attribute: false })
+  accessor rowDetails: DataGridRowDetails<T> | undefined = undefined;
+
   // --- internal state -------------------------------------------------------
 
   /** The current page's rows — computed locally (`data` mode) or resolved from `dataSource`. */
@@ -220,6 +234,10 @@ export class DataGrid<T = unknown> extends LitElement {
 
   @state()
   accessor selected: Set<T> = new Set();
+
+  /** Which rows currently have their `rowDetails` panel open — same by-identity tracking as `selected`. */
+  @state()
+  accessor expandedRows: Set<T> = new Set();
 
   // Delayed 200ms so a fast `dataSource` request never flashes this.
   @state()
@@ -449,11 +467,51 @@ export class DataGrid<T = unknown> extends LitElement {
     }
   }
 
-  #gridTemplateColumns(): string {
+  // Whether the current *page* has anything to expand — not just whether
+  // `rowDetails` is set, since a mixed dataset can have some rows resolve a
+  // template and others not. Drives whether the expander column renders at
+  // all (see `DataGridRowDetails`'s own doc).
+  #hasRowDetails(): boolean {
+    const rowDetails = this.rowDetails;
+    return (
+      rowDetails !== undefined &&
+      this.rows.some((row) => rowDetails(row) !== undefined)
+    );
+  }
+
+  #toggleRowDetails(row: T): void {
+    const next = new Set(this.expandedRows);
+    if (next.has(row)) {
+      next.delete(row);
+    } else {
+      next.add(row);
+    }
+    this.expandedRows = next;
+  }
+
+  // Expands every expandable row on the current page if any of them are
+  // currently collapsed, otherwise collapses them all — same "expand
+  // whatever isn't already" rule `#setVisibleRowsSelected`'s own "select
+  // all" checkbox uses.
+  #toggleAllRowDetails(expandableRows: T[], allExpanded: boolean): void {
+    const next = new Set(this.expandedRows);
+    for (const row of expandableRows) {
+      if (allExpanded) {
+        next.delete(row);
+      } else {
+        next.add(row);
+      }
+    }
+    this.expandedRows = next;
+  }
+
+  #gridTemplateColumns(hasRowDetails: boolean): string {
     const widths = this.columns.map((column) => `${column.width ?? 100}fr`);
-    return this.selectionMode === "multi"
-      ? ["2.5em", ...widths].join(" ")
-      : widths.join(" ");
+    const leading = [
+      ...(this.selectionMode === "multi" ? ["2.5em"] : []),
+      ...(hasRowDetails ? ["2.5em"] : []),
+    ];
+    return [...leading, ...widths].join(" ");
   }
 
   protected firstUpdated(): void {
@@ -510,10 +568,20 @@ export class DataGrid<T = unknown> extends LitElement {
     });
 
     const hasFilters = this.columns.some((column) => column.filter);
-    const gridTemplateColumns = this.#gridTemplateColumns();
+    const hasRowDetails = this.#hasRowDetails();
+    const detailsColumnStart =
+      (hasRowDetails ? 1 : 0) + (this.selectionMode === "multi" ? 1 : 0) + 1;
+    const gridTemplateColumns = this.#gridTemplateColumns(hasRowDetails);
     const allVisibleSelected =
       this.rows.length > 0 && this.rows.every((row) => this.#isSelected(row));
     const someVisibleSelected = this.rows.some((row) => this.#isSelected(row));
+
+    const expandableRows = hasRowDetails
+      ? this.rows.filter((row) => this.rowDetails!(row) !== undefined)
+      : [];
+    const allRowDetailsExpanded =
+      expandableRows.length > 0 &&
+      expandableRows.every((row) => this.expandedRows.has(row));
 
     const pageSize = this.#effectivePageSize();
     const pageCount = Math.max(1, Math.ceil(this.rowCount / pageSize));
@@ -589,6 +657,27 @@ export class DataGrid<T = unknown> extends LitElement {
                       ></ui-checkbox>
                     </div>`
                   : nothing}
+                ${hasRowDetails
+                  ? html`<div class="cell expander-cell">
+                      <button
+                        type="button"
+                        class="expander-toggle ${allRowDetailsExpanded
+                          ? "expanded"
+                          : ""}"
+                        aria-expanded=${allRowDetailsExpanded}
+                        aria-label=${allRowDetailsExpanded
+                          ? "Collapse all row details"
+                          : "Expand all row details"}
+                        @click=${() =>
+                          this.#toggleAllRowDetails(
+                            expandableRows,
+                            allRowDetailsExpanded,
+                          )}
+                      >
+                        ${plusIcon}
+                      </button>
+                    </div>`
+                  : nothing}
                 ${this.columns.map((column) => {
                   const sortable = column.sortable ?? true;
                   const sortDirection =
@@ -623,6 +712,9 @@ export class DataGrid<T = unknown> extends LitElement {
                     style="grid-template-columns: ${gridTemplateColumns}"
                   >
                     ${this.selectionMode === "multi"
+                      ? html`<div class="cell"></div>`
+                      : nothing}
+                    ${hasRowDetails
                       ? html`<div class="cell"></div>`
                       : nothing}
                     ${this.columns.map((column) => {
@@ -681,6 +773,9 @@ export class DataGrid<T = unknown> extends LitElement {
                   </div>`
                 : this.rows.map((row) => {
                     const isSelected = this.#isSelected(row);
+                    const details = this.rowDetails?.(row);
+                    const isExpanded =
+                      details !== undefined && this.expandedRows.has(row);
                     return html`
                       <div
                         class="row body-row ${isSelected ? "selected" : ""}"
@@ -702,6 +797,28 @@ export class DataGrid<T = unknown> extends LitElement {
                               ></ui-checkbox>
                             </div>`
                           : nothing}
+                        ${hasRowDetails
+                          ? html`<div class="cell expander-cell">
+                              ${details !== undefined
+                                ? html`<button
+                                    type="button"
+                                    class="expander-toggle ${isExpanded
+                                      ? "expanded"
+                                      : ""}"
+                                    aria-expanded=${isExpanded}
+                                    aria-label=${isExpanded
+                                      ? "Collapse row details"
+                                      : "Expand row details"}
+                                    @click=${(event: Event) => {
+                                      event.stopPropagation();
+                                      this.#toggleRowDetails(row);
+                                    }}
+                                  >
+                                    ${plusIcon}
+                                  </button>`
+                                : nothing}
+                            </div>`
+                          : nothing}
                         ${this.columns.map((column) => {
                           const raw = (row as Record<string, unknown>)[
                             column.field
@@ -714,6 +831,23 @@ export class DataGrid<T = unknown> extends LitElement {
                           </div>`;
                         })}
                       </div>
+                      ${details !== undefined
+                        ? html`<div
+                            class="row row-details ${isExpanded
+                              ? "expanded"
+                              : ""}"
+                            role="row"
+                            style="grid-template-columns: ${gridTemplateColumns}"
+                          >
+                            <div
+                              class="row-details-content"
+                              role="cell"
+                              style="grid-column: ${detailsColumnStart} / -1"
+                            >
+                              <div class="row-details-inner">${details}</div>
+                            </div>
+                          </div>`
+                        : nothing}
                     `;
                   })}
             </div>
@@ -733,6 +867,9 @@ export class DataGrid<T = unknown> extends LitElement {
                     >${checkSquareIcon}${selected.length}</span
                   >`
                 : nothing}
+              <span class="page-range"
+                >${rangeStart} to ${rangeEnd} of ${this.rowCount}</span
+              >
               <div class="page-size-group">
                 <span class="page-label">Page Size:</span>
                 <ui-select
@@ -749,14 +886,11 @@ export class DataGrid<T = unknown> extends LitElement {
                   )}
                 </ui-select>
               </div>
-              <span class="page-range"
-                >${rangeStart} to ${rangeEnd} of ${this.rowCount}</span
-              >
               <div class="page-nav">
                 <ui-button
                   appearance="neutral"
                   variant="link"
-                  style="--btn-font-size: 1.3em; --btn-padding-block: 0.3em; --btn-padding-inline: 0.4em;"
+                  style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="First page"
                   ?disabled=${currentPage === 0}
                   @click=${() => {
@@ -768,7 +902,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 <ui-button
                   appearance="neutral"
                   variant="link"
-                  style="--btn-font-size: 1.3em; --btn-padding-block: 0.3em; --btn-padding-inline: 0.4em;"
+                  style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Previous page"
                   ?disabled=${currentPage === 0}
                   @click=${() => {
@@ -799,7 +933,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 <ui-button
                   appearance="neutral"
                   variant="link"
-                  style="--btn-font-size: 1.3em; --btn-padding-block: 0.3em; --btn-padding-inline: 0.4em;"
+                  style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Next page"
                   ?disabled=${currentPage >= pageCount - 1}
                   @click=${() => {
@@ -811,7 +945,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 <ui-button
                   appearance="neutral"
                   variant="link"
-                  style="--btn-font-size: 1.3em; --btn-padding-block: 0.3em; --btn-padding-inline: 0.4em;"
+                  style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Last page"
                   ?disabled=${currentPage >= pageCount - 1}
                   @click=${() => {

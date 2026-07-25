@@ -173,7 +173,12 @@ export const datagridStyles = [
       border-bottom: 1px solid var(--ui-color-neutral-200);
     }
 
-    .body-row:last-child {
+    /* A row's own trailing border, not \`.row-details\`'s (added below) — the
+       actual last element in \`.body\` is whichever of the two a given row
+       ends with, so both are covered here to avoid a doubled line against
+       \`.grid-panel\`'s own outer border. */
+    .body-row:last-child,
+    .row-details:last-child {
       border-bottom: none;
     }
 
@@ -203,6 +208,70 @@ export const datagridStyles = [
       align-items: center;
       justify-content: center;
       padding: 0;
+    }
+
+    .expander-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    /* The plus glyph itself never changes — only this button's own rotation
+       animates, turning it into a cross when expanded. */
+    .expander-toggle {
+      all: unset;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5em;
+      height: 1.5em;
+      border-radius: var(--ui-radius-sm);
+      color: var(--ui-color-neutral-600);
+      cursor: pointer;
+      transition:
+        transform 200ms ease,
+        background-color 120ms ease;
+    }
+
+    .expander-toggle:hover {
+      background: var(--ui-color-neutral-100);
+    }
+
+    .expander-toggle.expanded {
+      transform: rotate(45deg);
+    }
+
+    /* A CSS-only expand/collapse animation for content of unknown height:
+       a single-row grid track animated between 0fr and 1fr (rather than a
+       fixed max-height guess), clipped via the content cell's own
+       \`overflow: hidden\` + \`min-height: 0\` (grid items default to
+       \`min-height: auto\`, which would otherwise refuse to shrink below the
+       content's own intrinsic height regardless of the track's size). Always
+       rendered (even collapsed) for any row \`rowDetails\` resolves a template
+       for, not just currently-expanded ones — an element toggling between
+       these two states, rather than being added/removed from the DOM, is
+       what makes the transition play both ways. */
+    .row-details {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 200ms ease;
+      border-bottom: 1px solid var(--ui-color-neutral-200);
+    }
+
+    .row-details.expanded {
+      grid-template-rows: 1fr;
+    }
+
+    .row-details-content {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .row-details-inner {
+      padding: var(--ui-spacing-md);
+      background: var(--ui-color-neutral-50);
     }
 
     .empty-message {
@@ -257,9 +326,9 @@ export const datagridStyles = [
       font-size: var(--ui-font-size-md);
     }
 
-    /* Sits before \`.page-size-group\` (whose own auto margin pushes
-       everything from there on to the right), so this is the one thing
-       left pinned to the bar's near edge. */
+    /* Sits before \`.page-range\` (whose own auto margin pushes everything
+       from there on to the right), so this is the one thing left pinned to
+       the bar's near edge. */
     .selection-badge {
       display: inline-flex;
       align-items: center;
@@ -273,19 +342,38 @@ export const datagridStyles = [
       white-space: nowrap;
     }
 
-    /* Pushed to the far end of the bar via its own auto margin, rather than
-       \`.page-range\`'s — so the size picker, the range text, and the nav
-       buttons that follow all end up grouped together on the right, instead
-       of the size picker sitting alone on the left. */
-    .page-size-group {
-      margin-inline-start: auto;
-    }
-
     .page-size-group,
     .page-nav {
       display: flex;
       align-items: center;
       gap: var(--ui-spacing-sm);
+    }
+
+    /* Same idea as the header's own column divider — a fixed 1.25em, 2px
+       line, not a full-height border. An extra 1em margin (on top of the
+       bar's own \`gap\`) gives a full 1em of breathing room on each side of
+       the line itself; the offset centers it in that combined space (bar
+       \`gap\` + the added 1em) via \`calc()\` rather than assuming the two
+       happen to match. Scoped to \`.page-range\`/\`.page-size-group\`
+       specifically (not \`.selection-badge\`, whose own gap to \`.page-range\`
+       is a wide, variable auto-margin push rather than the bar's uniform
+       \`gap\` — centering a line in *that* would leave it floating). */
+    .pagination-bar > .page-range,
+    .pagination-bar > .page-size-group {
+      position: relative;
+      margin-inline-end: 1em;
+    }
+
+    .pagination-bar > .page-range::after,
+    .pagination-bar > .page-size-group::after {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: calc((var(--ui-spacing-md) + 1em) / -2);
+      margin-block: auto;
+      width: 2px;
+      height: 1.25em;
+      background: var(--ui-color-neutral-200);
     }
 
     .page-label {
@@ -297,8 +385,12 @@ export const datagridStyles = [
       --select-min-width: 4.5em;
     }
 
+    /* Pushed to the far end of the bar via its own auto margin — so the
+       range text, the size picker, and the nav buttons that follow all end
+       up grouped together on the right, instead of \`.page-range\` sitting
+       alone on the left. */
     .page-range {
-      margin-inline: var(--ui-spacing-md);
+      margin-inline-start: auto;
       opacity: 0.7;
       white-space: nowrap;
     }

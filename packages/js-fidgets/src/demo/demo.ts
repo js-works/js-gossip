@@ -25,6 +25,7 @@ import type {
   DataGridColumn,
   DataGridColumnFilter,
   DataGridDataSource,
+  DataGridRowDetails,
 } from "../main/components/datagrid/datagrid.js";
 import "../main/components/text-field/text-field.js";
 import "../main/components/number-field/number-field.js";
@@ -352,6 +353,19 @@ const employeeDataGridColumns: DataGridColumn<Employee>[] = [
   },
   { field: "role", header: "Role", filter: true },
 ];
+
+// Only Engineering rows get an expander — demonstrates the "some rows may
+// have none" case (DataGridRowDetails returns undefined for the rest).
+const employeeRowDetails: DataGridRowDetails<Employee> = (employee) =>
+  employee.department === "Engineering"
+    ? html`
+        <p>
+          <strong>${employee.name}</strong> — additional detail shown only
+          for Engineering rows, to demonstrate a mixed page (rows without
+          any get no expander at all).
+        </p>
+      `
+    : undefined;
 
 // Same actions as employeeGridActions above, for ui-datagrid.
 const employeeDataGridActions: DataGridAction<Employee>[] = [
@@ -976,6 +990,7 @@ function dataGridTab() {
         .columns=${employeeDataGridColumns}
         .dataSource=${employeeDataGridDataSource}
         .actions=${employeeDataGridActions}
+        .rowDetails=${employeeRowDetails}
         .pageSizeOptions=${[50, 100, 150, 250, 500]}
         page-size="50"
         selection-mode="multi"
