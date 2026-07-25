@@ -489,14 +489,14 @@ export class DataGrid<T = unknown> extends LitElement {
     this.expandedRows = next;
   }
 
-  // Expands every expandable row on the current page if any of them are
-  // currently collapsed, otherwise collapses them all — same "expand
-  // whatever isn't already" rule `#setVisibleRowsSelected`'s own "select
-  // all" checkbox uses.
-  #toggleAllRowDetails(expandableRows: T[], allExpanded: boolean): void {
+  // Collapses every expandable row on the current page if any of them are
+  // currently open, otherwise expands them all — matches the toggle's own
+  // rotation, which flips as soon as *any* row is open rather than waiting
+  // for all of them.
+  #toggleAllRowDetails(expandableRows: T[], anyExpanded: boolean): void {
     const next = new Set(this.expandedRows);
     for (const row of expandableRows) {
-      if (allExpanded) {
+      if (anyExpanded) {
         next.delete(row);
       } else {
         next.add(row);
@@ -579,9 +579,13 @@ export class DataGrid<T = unknown> extends LitElement {
     const expandableRows = hasRowDetails
       ? this.rows.filter((row) => this.rowDetails!(row) !== undefined)
       : [];
-    const allRowDetailsExpanded =
-      expandableRows.length > 0 &&
-      expandableRows.every((row) => this.expandedRows.has(row));
+    // Drives both the "expand/collapse all" toggle's own rotation (open as
+    // soon as *any* row's details are — not waiting for all of them) and
+    // what clicking it does: collapse everything if anything's open,
+    // otherwise expand everything.
+    const anyRowDetailsExpanded = expandableRows.some((row) =>
+      this.expandedRows.has(row),
+    );
 
     const pageSize = this.#effectivePageSize();
     const pageCount = Math.max(1, Math.ceil(this.rowCount / pageSize));
@@ -661,17 +665,17 @@ export class DataGrid<T = unknown> extends LitElement {
                   ? html`<div class="cell expander-cell">
                       <button
                         type="button"
-                        class="expander-toggle ${allRowDetailsExpanded
+                        class="expander-toggle ${anyRowDetailsExpanded
                           ? "expanded"
                           : ""}"
-                        aria-expanded=${allRowDetailsExpanded}
-                        aria-label=${allRowDetailsExpanded
+                        aria-expanded=${anyRowDetailsExpanded}
+                        aria-label=${anyRowDetailsExpanded
                           ? "Collapse all row details"
                           : "Expand all row details"}
                         @click=${() =>
                           this.#toggleAllRowDetails(
                             expandableRows,
-                            allRowDetailsExpanded,
+                            anyRowDetailsExpanded,
                           )}
                       >
                         ${plusIcon}
