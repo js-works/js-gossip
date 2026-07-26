@@ -60,7 +60,6 @@ export const datagridStyles = [
        bar), not just the table, while a \`dataSource\` request is in flight. */
     .grid-panel {
       position: relative;
-      border: 1px solid var(--ui-color-neutral-200);
       border-radius: var(--ui-radius-sm);
       overflow: hidden;
     }
@@ -100,13 +99,6 @@ export const datagridStyles = [
       white-space: nowrap;
     }
 
-    /* Column-header row and filter row share one background — same visual
-       group as a native <thead>, which .thead's own role="rowgroup" mirrors
-       semantically. */
-    .thead {
-      background: var(--ui-color-neutral-50);
-    }
-
     .header-row {
       flex: none;
       border-bottom: 1px solid var(--ui-color-neutral-200);
@@ -135,6 +127,14 @@ export const datagridStyles = [
       inset-inline-end: 0;
       width: 2px;
       background: var(--ui-color-neutral-200);
+    }
+
+    /* No vertical dividers at all in the header when there's no grouping —
+       only a grouped header needs them, to mark where one group's columns
+       end and the next column/group starts; a plain single-row header
+       reads fine without them. */
+    .header-row:not(.grouped) .cell:not(:last-child)::after {
+      content: none;
     }
 
     /* Grouped columns get a thinner divider — set once here rather than
@@ -200,9 +200,21 @@ export const datagridStyles = [
        never sortable (no single field to sort by). The bottom border marks
        the boundary with its children's own row below, the same way
        \`.header-row\`'s own border-bottom marks the boundary with whatever
-       comes after the whole header. */
+       comes after the whole header — as a \`::before\` (not a plain
+       \`border-bottom\`) inset from both sides the same way the vertical
+       dividers are inset from top/bottom, so it doesn't run flush into
+       them at the corners. \`::after\` is already spoken for (see the
+       \`content: none\` opt-out above), hence \`::before\` here. */
+    .group-header-cell::before {
+      content: "";
+      position: absolute;
+      inset-inline: 0.5em;
+      inset-block-end: 0;
+      height: 1px;
+      background: var(--ui-color-neutral-200);
+    }
+
     .group-header-cell {
-      border-bottom: 1px solid var(--ui-color-neutral-200);
       cursor: default;
     }
 
@@ -229,7 +241,7 @@ export const datagridStyles = [
     }
 
     .filter-cell {
-      padding: var(--ui-spacing-sm) var(--ui-spacing-md);
+      padding: calc(var(--ui-spacing-sm) * 2) var(--ui-spacing-md);
     }
 
     .filter-cell ui-text-field,
@@ -249,7 +261,9 @@ export const datagridStyles = [
 
     /* Reserved transparent (not omitted) on both, so a selected/hovered
        row's own left/right edge (below) is a pure color change rather than
-       one that also nudges the row's width by the border's own space. */
+       one that also nudges the row's width by the border's own space. Safe
+       to show now that \`.grid-panel\` no longer has its own competing
+       left/right border immediately next to it. */
     .body-row,
     .row-details {
       border-inline: 1px solid transparent;
@@ -296,33 +310,28 @@ export const datagridStyles = [
       border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
-    /* The first/last row's own "top"/"bottom" edge isn't another
-       \`.body-row\`'s border at all — the first row's top edge is really
-       \`.thead\`'s own trailing border-bottom (whichever of \`.header-row\`/
-       \`.filter-row\` is actually last inside it, depending on whether any
-       column has a filter), and the last row's bottom edge is
-       \`.pagination-bar\`'s own border-top when pagination is showing, or
-       \`.grid-panel\`'s own outer border when it isn't. A selected row can
-       be the actual last child of \`.body\` itself, or — same wrinkle as
-       above — have its own trailing \`row-details\` be the last child
-       instead; \`row-details\` picks up its own row's \`selected\` class too
-       (see the row template) so that case can be matched directly here,
-       rather than needing a \`:has()\` nested inside this \`:has()\` (which
-       CSS disallows) to look it up via the row it belongs to. */
-    .thead:has(+ .body .body-row:first-child.selected) > *:last-child {
-      border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+    /* \`.thead\`'s own trailing border and \`.pagination-bar\`'s own border-top
+       stay plain gray always, regardless of whether the first/last row is
+       selected — unlike a row in the middle, the first/last row has no
+       neighboring \`.body-row\` border to borrow for its own top/bottom
+       edge, so it gets one of its own instead: a reserved (always present,
+       just transparent by default) \`border-top\` for the first row, and
+       its otherwise-suppressed \`border-bottom\` re-enabled for the last
+       row (see \`.row-details.selected:last-child\` further below for why
+       that half specifically has to live after \`.row-details.expanded\`'s
+       own rule). Scrolled all the way to an edge, this means seeing the
+       plain gray \`.thead\`/\`.pagination-bar\` border directly next to this
+       accent one — that's the intended look, not a bug. */
+    .body-row:first-child {
+      border-top: 1px solid transparent;
     }
 
-    .grid-panel:has(.body-row.selected:last-child, .row-details.selected:last-child)
-      .pagination-bar {
+    .body-row:first-child.selected {
       border-top-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
-    .grid-panel:not(:has(.pagination-bar)):has(
-        .body-row.selected:last-child,
-        .row-details.selected:last-child
-      ) {
-      border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+    .body-row.selected:last-child {
+      border-bottom: 1px solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     :host([selection-mode="single"]) .body-row,
@@ -369,37 +378,29 @@ export const datagridStyles = [
       border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
-    /* Same first-row/last-row edge cases as the selected ones above, for a
-       hovered row — except the last-row case only matches a \`.body-row\`
-       that's genuinely \`:last-child\` (no trailing \`row-details\`). Unlike
-       \`.selected\`, \`:hover\` is a live pseudo-class with no template-time
-       equivalent to mirror onto \`row-details\` the way \`.selected\` is
-       above, and reaching it purely in CSS would need a \`:has()\` nested
-       inside this \`:has()\`, which isn't allowed — so a row whose own
-       \`rowDetails\` trails it (collapsed or expanded) doesn't tint the
-       pagination bar on hover, only on selection. */
+    /* Same first-row/last-row edge treatment as the selected one above, for
+       a hovered row — except this only matches a \`.body-row\` that's
+       genuinely \`:first-child\`/\`:last-child\` (no trailing \`row-details\`
+       case): unlike \`.selected\`, \`:hover\` is a live pseudo-class with no
+       template-time equivalent to mirror onto \`row-details\`, so a row
+       whose own \`rowDetails\` trails it doesn't get its accent border on
+       hover, only on selection. */
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
-      .thead:has(+ .body .body-row:first-child:hover)
-      > *:last-child {
-      border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
-    }
-
-    :host(:is([selection-mode="single"], [selection-mode="multi"]))
-      .grid-panel:has(.body-row:hover:last-child)
-      .pagination-bar {
+      .body-row:first-child:hover {
       border-top-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
-      .grid-panel:not(:has(.pagination-bar)):has(.body-row:hover:last-child) {
-      border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+      .body-row:hover:last-child {
+      border-bottom: 1px solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     .select-cell {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 0;
+      padding-block: 0;
+      padding-inline: calc(var(--ui-spacing-sm) / 2);
     }
 
     .expander-cell {
@@ -451,6 +452,25 @@ export const datagridStyles = [
     .body-row .row-actions-cell {
       background: transparent;
       border-inline-start: 1px solid var(--ui-color-neutral-200);
+    }
+
+    /* A selected/hovered row reads as one solid tinted block — its own
+       internal column dividers (the select/expander gutter's own divider
+       above, and the row-actions gutter's left border above) would cut
+       across that and are hidden for the duration. */
+    .body-row.selected .select-cell,
+    .body-row.selected .expander-cell,
+    .body-row.selected .row-actions-cell,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:hover
+      .select-cell,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:hover
+      .expander-cell,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:hover
+      .row-actions-cell {
+      border-inline-color: transparent;
     }
 
     /* The plus glyph itself never changes — only this button's own rotation
@@ -508,10 +528,20 @@ export const datagridStyles = [
     /* Same specificity as .row-details.expanded above (two classes) — needs
        the extra :last-child to outrank it, otherwise an expanded last row's
        own border-bottom would win on source order and double up against
-       .grid-panel's outer border, the exact doubling .body-row:last-child/
-       .row-details:last-child above already guards against. */
+       whatever comes after .body (.pagination-bar's own border-top, or
+       nothing), the exact doubling .body-row:last-child/.row-details:last-child
+       above already guards against. */
     .row-details.expanded:last-child {
       border-bottom: none;
+    }
+
+    /* Re-enables that suppressed border, accented, for a selected last row
+       whose own rowDetails trails it (collapsed or expanded — this matches
+       either way, see .selected's own doc further up). Has to live after
+       the rule directly above: same (three-class) specificity, so this
+       only reliably wins the tie by coming later in the file. */
+    .row-details.selected:last-child {
+      border-bottom: 1px solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     .row-details-content {
@@ -572,7 +602,7 @@ export const datagridStyles = [
       display: flex;
       align-items: center;
       gap: var(--ui-spacing-md);
-      padding: calc(var(--ui-spacing-sm) * 3) var(--ui-spacing-md);
+      padding: calc(var(--ui-spacing-sm) * 2.5) var(--ui-spacing-md);
       border-top: 1px solid var(--ui-color-neutral-200);
       font-size: var(--ui-font-size-md);
     }

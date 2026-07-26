@@ -344,8 +344,23 @@ const employeeGridDataSource: AgGridDataSource<Employee> = ({
 // width (default 100), not a pixel value like ui-ag-grid's, so "Email"
 // getting more room than the rest is expressed as a bigger share (200) here
 // rather than a fixed 260px.
-// "Name" and "Role" stand alone (their own header cell spans both header
-// rows); "Email"/"Department" share a "Contact & Org" group header instead.
+// Flat version — every column stands alone, no grouping. Demonstrates the
+// ungrouped (single header row) layout.
+const employeeDataGridColumnsFlat: DataGridColumnOrGroup<Employee>[] = [
+  { field: "name", header: "Name", filter: textFilter() },
+  { field: "email", header: "Email", width: 200, filter: textFilter() },
+  {
+    field: "department",
+    header: "Department",
+    filter: selectFilter({ options: employeeDepartmentOptions }),
+  },
+  { field: "role", header: "Role", filter: textFilter() },
+];
+
+// Same columns as the flat version above, except "Email"/"Department" share
+// a "Contact & Org" group header instead of standing alone — demonstrates
+// the grouped (two header row) layout ("Name" and "Role" still stand
+// alone, their own header cell spanning both header rows).
 const employeeDataGridColumns: DataGridColumnOrGroup<Employee>[] = [
   { field: "name", header: "Name", filter: textFilter() },
   {
@@ -1008,7 +1023,33 @@ function agGridTab() {
   `;
 }
 
-function dataGridTab() {
+function dataGridFlatTab() {
+  return html`
+    <section>
+      <h2>Datagrid</h2>
+      <ui-datagrid
+        title="Employees"
+        subtitle="All employees across every department"
+        .columns=${employeeDataGridColumnsFlat}
+        .dataSource=${employeeDataGridDataSource}
+        .actions=${employeeDataGridActions}
+        .rowDetails=${employeeRowDetails}
+        .rowActions=${employeeRowActions}
+        .pageSizeOptions=${[50, 100, 150, 250, 500]}
+        page-size="50"
+        selection-mode="multi"
+        selection-appearance="primary"
+        @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
+          console.log(
+            "Selected:",
+            event.detail.selected.map((employee) => employee.name),
+          )}
+      ></ui-datagrid>
+    </section>
+  `;
+}
+
+function dataGridGroupedTab() {
   return html`
     <section>
       <h2>Datagrid</h2>
@@ -1063,7 +1104,16 @@ const tabs: Tab[] = [
     content: nativeDateFieldTab,
   },
   { id: "ag-grid", label: "AG Grid", content: agGridTab },
-  { id: "datagrid", label: "Datagrid", content: dataGridTab },
+  {
+    id: "datagrid-flat",
+    label: "Datagrid 1",
+    content: dataGridFlatTab,
+  },
+  {
+    id: "datagrid-grouped",
+    label: "Datagrid 2",
+    content: dataGridGroupedTab,
+  },
   { id: "upload", label: "Upload", content: uploadTab },
 ];
 
