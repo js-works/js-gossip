@@ -221,6 +221,18 @@ export const datagridStyles = [
       border-bottom: 1px solid var(--ui-color-neutral-200);
     }
 
+    /* Zebra striping — "of .body-row" (not a redundant ".body-row" prefix
+       too, which would just add unneeded specificity) counts only actual
+       rows, skipping any interspersed \`.row-details\` siblings, so the
+       stripe stays tied to alternating *rows* rather than alternating DOM
+       children. Same specificity as \`.selected\`'s own background (one
+       pseudo-class + one class each) — \`.selected\` is declared later, so
+       it still wins the tie on rows where both apply; \`:hover\`'s own
+       background is more specific regardless, via \`:host(:is(...))\`. */
+    :nth-child(even of .body-row) {
+      background: var(--ui-color-neutral-50);
+    }
+
     /* A row's own trailing border, not \`.row-details\`'s (added below) — the
        actual last element in \`.body\` is whichever of the two a given row
        ends with, so both are covered here to avoid a doubled line against
@@ -384,13 +396,7 @@ export const datagridStyles = [
        \`.select-cell\` — so it's always the rightmost gutter cell and always
        gets the border; \`.select-cell\` only gets it when there's no
        \`.expander-cell\` right after it to hand the border off to instead
-       (both otherwise show doubled, immediately-adjacent borders). Neither
-       ever gets a left border. */
-    .body-row .select-cell,
-    .body-row .expander-cell {
-      border-inline-start: none;
-    }
-
+       (both otherwise show doubled, immediately-adjacent borders). */
     .body-row .expander-cell,
     .body-row .select-cell:not(:has(+ .expander-cell)) {
       border-inline-end: 1px solid var(--ui-color-neutral-200);

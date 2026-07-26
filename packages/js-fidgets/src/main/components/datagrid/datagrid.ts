@@ -588,11 +588,11 @@ export class DataGrid<T = unknown> extends LitElement {
   protected updated(changed: Map<PropertyKey, unknown>): void {
     if (!this.#ready) return;
 
-    // A page-size change reshuffles which rows land on which page, so a
-    // selection made under the old page size no longer means the same
-    // thing — clear it rather than leave a stale, effectively-arbitrary
-    // set of rows selected.
-    if (changed.has("pageSize") && this.selected.size > 0) {
+    // A page-size or sort change reshuffles which rows land on which page
+    // (or where on the page), so a selection made beforehand no longer
+    // means the same thing — clear it rather than leave a stale,
+    // effectively-arbitrary set of rows selected.
+    if ((changed.has("pageSize") || changed.has("sort")) && this.selected.size > 0) {
       this.selected = new Set();
       this.#emitSelectionChange();
     }
