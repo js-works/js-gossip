@@ -55,18 +55,22 @@ export const datagridStyles = [
     }
 
     /* The one border/radius around both the table and the pagination bar
-       below it, wrapping the pair as a single card — and the anchor for
-       \`.loading-overlay\`, which covers this whole panel (table + pagination
-       bar), not just the table, while a \`dataSource\` request is in flight. */
+       below it, wrapping the pair as a single card. */
     .grid-panel {
       position: relative;
       border-radius: var(--ui-radius-sm);
       overflow: hidden;
     }
 
-    /* Dims everything (table + pagination bar) except \`.loading-overlay\`
-       itself, which stays at full opacity on top of them. */
-    .grid-panel.loading > *:not(.loading-overlay) {
+    /* \`.thead\` (header + filter row) deliberately isn't touched by any of
+       this — it stays fully opaque and interactive throughout a
+       \`dataSource\` request, so sorting/filtering the *next* request stays
+       available while the current one is still in flight. Only \`.body\`
+       (dimmed via its own children, so \`.loading-overlay\` inside it below
+       isn't included) and \`.pagination-bar\` go transparent and (via
+       \`?inert\` in datagrid.ts) non-interactive. */
+    .grid-panel.loading .body > *:not(.loading-overlay),
+    .grid-panel.loading .pagination-bar {
       opacity: 0.25;
     }
 
@@ -83,9 +87,19 @@ export const datagridStyles = [
       min-height: 0;
     }
 
+    /* border-inline: 1px solid transparent (not omitted) on every row type
+       — header, filter, and body alike — even though only a selected/
+       hovered \`.body-row\`/\`.row-details\` ever colors it in (see below).
+       Reserving it everywhere, rather than just there, keeps every row's
+       content box (where \`grid-template-columns\` actually distributes its
+       tracks) the same width regardless of row type; reserving it on only
+       some rows would leave those 2px narrower than the others internally
+       even while their own outer widths still matched, throwing columns
+       out of alignment between e.g. \`.header-row\` and \`.body-row\`. */
     .row {
       display: grid;
       align-items: stretch;
+      border-inline: 1px solid transparent;
     }
 
     /* The base cell rule — kept ahead of \`.header-cell\`/\`.filter-cell\`/
@@ -179,24 +193,32 @@ export const datagridStyles = [
       width: 100%;
     }
 
+    /* position: relative — the anchor for \`.loading-overlay\`, now scoped to
+       just \`.body\` (not the whole \`.grid-panel\`) so it never covers
+       \`.thead\`. */
     .body {
+      position: relative;
       flex: 1;
       min-height: 0;
       overflow-y: auto;
+      scrollbar-gutter: stable;
+    }
+
+    /* \`.thead\` never scrolls, so — unlike \`.body\` — it's always exactly
+       the container's full width; without a matching reserved gutter, its
+       \`grid-template-columns\` (the same fractions as \`.body\`'s own rows)
+       would resolve to different actual pixel widths than \`.body\`'s,
+       which has that scrollbar's width to spare. \`scrollbar-gutter\` only
+       takes effect on an element that's already a scroll container (a
+       non-\`visible\` \`overflow\`), hence \`overflow: hidden\` here — harmless,
+       since \`.thead\`'s own content never actually overflows it anyway. */
+    .thead {
+      overflow: hidden;
+      scrollbar-gutter: stable;
     }
 
     .body-row {
       border-bottom: 1px solid var(--ui-color-neutral-200);
-    }
-
-    /* Reserved transparent (not omitted) on both, so a selected/hovered
-       row's own left/right edge (below) is a pure color change rather than
-       one that also nudges the row's width by the border's own space. Safe
-       to show now that \`.grid-panel\` no longer has its own competing
-       left/right border immediately next to it. */
-    .body-row,
-    .row-details {
-      border-inline: 1px solid transparent;
     }
 
     /* A row's own trailing border, not \`.row-details\`'s (added below) — the
@@ -232,11 +254,16 @@ export const datagridStyles = [
        above has \`rowDetails\`, and whether that panel is currently expanded
        (an expanded panel's own border-bottom is the real visual boundary;
        collapsed, it has none, so the row above's own border-bottom still
-       is). */
+       is). \`.row-details.expanded.selected\` covers the selected row's
+       *own* expanded panel, when that panel isn't the boundary for some
+       other (differently-selected) row below it — the accented box then
+       wraps the whole selected row + its open details as one unit, not
+       just the collapsed row itself. */
     .body-row.selected,
     .body-row:has(+ .body-row.selected),
     .body-row:has(+ .row-details:not(.expanded) + .body-row.selected),
-    .row-details.expanded:has(+ .body-row.selected) {
+    .row-details.expanded:has(+ .body-row.selected),
+    .row-details.expanded.selected {
       border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
@@ -292,11 +319,11 @@ export const datagridStyles = [
     }
 
     /* Same top/bottom-edge treatment as \`.body-row.selected\` above, for a
-       hovered row — same three cases (plain row above, collapsed
-       \`rowDetails\` above, expanded \`rowDetails\` above), just keyed off
-       \`:hover\` instead and gated by \`selection-mode\` the same way the
-       hover background above already is (rows aren't hover-interactive at
-       all otherwise). */
+       hovered row — same four cases (plain row above, collapsed
+       \`rowDetails\` above, expanded \`rowDetails\` above, and the hovered
+       row's own expanded panel below it), just keyed off \`:hover\` instead
+       and gated by \`selection-mode\` the same way the hover background
+       above already is (rows aren't hover-interactive at all otherwise). */
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover,
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
@@ -304,7 +331,10 @@ export const datagridStyles = [
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:has(+ .row-details:not(.expanded) + .body-row:hover),
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
-      .row-details.expanded:has(+ .body-row:hover) {
+      .row-details.expanded:has(+ .body-row:hover),
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:hover
+      + .row-details.expanded {
       border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 

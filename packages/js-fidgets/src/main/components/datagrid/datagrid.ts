@@ -684,10 +684,12 @@ export class DataGrid<T = unknown> extends LitElement {
     // Explicit grid-column/grid-row placement for every header cell (rather
     // than relying on implicit auto-placement) — the only way to express a
     // group's own cell spanning several columns in just the first row,
-    // while every actual leaf column (grouped or standalone) sits in the
-    // second. `col` walks the same leading (select/expander) + leaf +
-    // trailing (row actions) tracks `gridTemplateColumns` itself describes,
-    // so the indices always line up with it.
+    // while every other header cell (leaf column, grouped or standalone,
+    // and the leading/trailing select/expander/actions cells alike) sits
+    // in the second, so they all share one baseline. `col` walks the same
+    // leading (select/expander) + leaf + trailing (row actions) tracks
+    // `gridTemplateColumns` itself describes, so the indices always line
+    // up with it.
     let col = 1;
     const checkboxCol = this.selectionMode === "multi" ? col++ : undefined;
     const expanderCol = hasRowDetails ? col++ : undefined;
@@ -773,10 +775,7 @@ export class DataGrid<T = unknown> extends LitElement {
           </div>`
         : nothing}
 
-      <div
-        class="grid-panel ${this.showLoadingSpinner ? "loading" : ""}"
-        ?inert=${this.showLoadingSpinner}
-      >
+      <div class="grid-panel ${this.showLoadingSpinner ? "loading" : ""}">
         <div class="grid-wrapper" style="height: ${this.height}">
           <div class="table" role="table">
             <div class="thead" role="rowgroup">
@@ -788,7 +787,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 ${checkboxCol
                   ? html`<div
                       class="cell select-cell"
-                      style="grid-column: ${checkboxCol}; grid-row: 1 / 3"
+                      style="grid-column: ${checkboxCol}; grid-row: 2"
                     >
                       <ui-checkbox
                         .checked=${allVisibleSelected}
@@ -804,7 +803,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 ${expanderCol
                   ? html`<div
                       class="cell expander-cell"
-                      style="grid-column: ${expanderCol}; grid-row: 1 / 3"
+                      style="grid-column: ${expanderCol}; grid-row: 2"
                     >
                       ${expandableRows.length > 0
                         ? html`<button
@@ -898,7 +897,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 ${actionsCol
                   ? html`<div
                       class="cell header-cell actions-header-cell"
-                      style="grid-column: ${actionsCol}; grid-row: 1 / 3"
+                      style="grid-column: ${actionsCol}; grid-row: 2"
                     >
                       ${this.rowActionsHeader}
                     </div>`
@@ -939,7 +938,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 : nothing}
             </div>
 
-            <div class="body" role="rowgroup">
+            <div class="body" role="rowgroup" ?inert=${this.showLoadingSpinner}>
               ${this.rows.length === 0
                 ? html`<div class="empty-message">
                     ${this.showLoadingSpinner ? "" : "No rows"}
@@ -1050,18 +1049,20 @@ export class DataGrid<T = unknown> extends LitElement {
                         : nothing}
                     `;
                   })}
+              ${this.showLoadingSpinner
+                ? html`<div class="loading-overlay">
+                    <span class="spinner"></span>
+                  </div>`
+                : nothing}
             </div>
           </div>
         </div>
 
-        ${this.showLoadingSpinner
-          ? html`<div class="loading-overlay">
-              <span class="spinner"></span>
-            </div>`
-          : nothing}
-
         ${this.pagination
-          ? html`<div class="pagination-bar">
+          ? html`<div
+              class="pagination-bar"
+              ?inert=${this.showLoadingSpinner}
+            >
               ${this.selectionMode === "multi"
                 ? html`<span class="selection-badge"
                     >${checkSquareIcon}${selected.length}</span
