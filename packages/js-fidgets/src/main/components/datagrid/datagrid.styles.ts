@@ -109,56 +109,6 @@ export const datagridStyles = [
       position: relative;
     }
 
-    /* inset-block (not a fixed height + margin-block: auto) so the line
-       grows with whatever height its own cell actually has — a standalone
-       column's cell spans both header rows already (tall), so this alone
-       reads as full-height for it. A group's own cell and its children
-       *don't* each span both rows though (the group's cell is row 1 only,
-       its children row 2 only) — drawing this same per-cell divider on
-       both would produce two independently-inset segments with a visible
-       gap between them where the rows meet, rather than one continuous
-       line. Those two cases (.group-header-cell, a group's last child)
-       opt out below and get the continuous .header-divider element
-       instead. */
-    .header-row .cell:not(:last-child)::after {
-      content: "";
-      position: absolute;
-      inset-block: 0.5em;
-      inset-inline-end: 0;
-      width: 2px;
-      background: var(--ui-color-neutral-200);
-    }
-
-    /* No vertical dividers at all in the header when there's no grouping —
-       only a grouped header needs them, to mark where one group's columns
-       end and the next column/group starts; a plain single-row header
-       reads fine without them. */
-    .header-row:not(.grouped) .cell:not(:last-child)::after {
-      content: none;
-    }
-
-    /* Grouped columns get a thinner divider — set once here rather than
-       per-cell, so it can't drift out of sync between the group's own
-       divider and its children's. */
-    .header-row.grouped .cell:not(:last-child)::after {
-      width: 1px;
-    }
-
-    /* Opts out of the per-cell divider above — see that rule's own doc for
-       why these two specifically would otherwise draw one broken half of a
-       divider each instead of one continuous line. */
-    .header-row .cell.group-header-cell::after,
-    .header-row .cell.group-child-last::after {
-      content: none;
-    }
-
-    /* No divider between the checkbox and expander header cells specifically
-       — they read as one combined leading gutter rather than two separate
-       columns, unlike every other adjacent pair of header cells. */
-    .header-row .cell.select-cell:has(+ .expander-cell)::after {
-      content: none;
-    }
-
     /* Explicitly transparent (not the \`.thead\` neutral-50 tint some other
        header cell might end up with) — the checkbox/expander/actions header
        cells are the three "non-data" columns and stay plain. */
@@ -166,24 +116,6 @@ export const datagridStyles = [
     .header-row .expander-cell,
     .header-row .actions-header-cell {
       background: transparent;
-    }
-
-    /* The continuous replacement for the two opted-out halves above — a
-       single element (not nested in either cell) placed directly on the
-       header row's own grid, spanning both header rows in one piece. Same
-       sizing/inset convention as the per-cell divider (0.5em inset, 2px/1px
-       width) so it's indistinguishable from it other than not being split. */
-    .header-divider {
-      grid-row: 1 / 3;
-      width: 2px;
-      margin-block: 0.5em;
-      align-self: stretch;
-      justify-self: start;
-      background: var(--ui-color-neutral-200);
-    }
-
-    .header-row.grouped .header-divider {
-      width: 1px;
     }
 
     .header-cell {
@@ -200,11 +132,9 @@ export const datagridStyles = [
        never sortable (no single field to sort by). The bottom border marks
        the boundary with its children's own row below, the same way
        \`.header-row\`'s own border-bottom marks the boundary with whatever
-       comes after the whole header — as a \`::before\` (not a plain
-       \`border-bottom\`) inset from both sides the same way the vertical
-       dividers are inset from top/bottom, so it doesn't run flush into
-       them at the corners. \`::after\` is already spoken for (see the
-       \`content: none\` opt-out above), hence \`::before\` here. */
+       comes after the whole header — as a \`::before\` inset from both sides
+       (rather than a plain edge-to-edge \`border-bottom\`) so it doesn't run
+       flush into the group's own left/right edge. */
     .group-header-cell::before {
       content: "";
       position: absolute;

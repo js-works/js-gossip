@@ -56,10 +56,11 @@ export interface DataGridColumn<T> {
  * A group of leaf columns sharing one header label, spanning their combined
  * width — one level only, `columns` are always leaf columns, never nested
  * groups. Has no `width` of its own: a group is exactly as wide as its
- * children's own `width`s sum to. Every column *not* inside any group still
- * gets its own header cell, spanning both header rows (the CSS-grid analog
- * of a `rowspan="2"`) rather than leaving an empty cell dangling beneath it
- * just because some sibling happens to be grouped.
+ * children's own `width`s sum to. Every leaf column's own header cell —
+ * whether it's inside a group or stands alone — sits in the same (second,
+ * bottom) header row; a standalone column just leaves the row above it
+ * blank, the same space a sibling group's own label occupies, so every
+ * column header lines up on one shared baseline regardless of grouping.
  */
 export interface DataGridColumnGroup<T> {
   header: string;
@@ -93,9 +94,10 @@ export type DataGridSelectionAppearance = "neutral" | "primary";
  * Per-row expandable detail content — return a `TemplateResult` to give
  * `row` an expander toggle, or `undefined` for rows that have none (a mixed
  * page is fine: only rows this resolves a template for get a toggle). The
- * expander column itself only appears at all when at least one row on the
- * *current* page resolves one — a page with no expandable rows shows no
- * empty leading column.
+ * expander column itself appears whenever this is set at all, whether or
+ * not any row on the *current* page actually resolves one — only the
+ * header's "expand/collapse all" toggle depends on the current page, and
+ * disappears when none of its rows have anything to expand.
  */
 export type DataGridRowDetails<T> = (row: T) => TemplateResult | undefined;
 
@@ -521,16 +523,14 @@ export class DataGrid<T = unknown> extends LitElement {
     }
   }
 
-  // Whether the current *page* has anything to expand — not just whether
-  // `rowDetails` is set, since a mixed dataset can have some rows resolve a
-  // template and others not. Drives whether the expander column renders at
-  // all (see `DataGridRowDetails`'s own doc).
+  // Whether the expander column itself should exist at all — purely
+  // whether `rowDetails` is configured, independent of the current page's
+  // own rows (see `DataGridRowDetails`'s own doc). Whether the current
+  // page actually has anything to expand is a separate question, answered
+  // by `expandableRows` in render() — that one drives the header's own
+  // "expand/collapse all" toggle, not the column's existence.
   #hasRowDetails(): boolean {
-    const rowDetails = this.rowDetails;
-    return (
-      rowDetails !== undefined &&
-      this.rows.some((row) => rowDetails(row) !== undefined)
-    );
+    return this.rowDetails !== undefined;
   }
 
   #toggleRowDetails(row: T): void {
@@ -642,7 +642,6 @@ export class DataGrid<T = unknown> extends LitElement {
     });
 
     const leafColumns = this.#leafColumns();
-    const hasGroups = this.columns.some(isColumnGroup);
     const hasFilters = leafColumns.some((column) => column.filter);
     const hasRowDetails = this.#hasRowDetails();
     const hasRowActions = this.rowActions.length > 0;
@@ -684,21 +683,20 @@ export class DataGrid<T = unknown> extends LitElement {
 
     // Explicit grid-column/grid-row placement for every header cell (rather
     // than relying on implicit auto-placement) — the only way to express a
-    // standalone column's cell spanning both header rows (this grid's
-    // analog of a `rowspan="2"`) as well as a group's cell spanning several
-    // columns in just the first row. `col` walks the same leading (select/
-    // expander) + leaf + trailing (row actions) tracks `gridTemplateColumns`
-    // itself describes, so the indices always line up with it.
+    // group's own cell spanning several columns in just the first row,
+    // while every actual leaf column (grouped or standalone) sits in the
+    // second. `col` walks the same leading (select/expander) + leaf +
+    // trailing (row actions) tracks `gridTemplateColumns` itself describes,
+    // so the indices always line up with it.
     let col = 1;
     const checkboxCol = this.selectionMode === "multi" ? col++ : undefined;
     const expanderCol = hasRowDetails ? col++ : undefined;
     const headerEntries = this.columns.map((entry) => {
       if (isColumnGroup(entry)) {
         const startCol = col;
-        const children = entry.columns.map((column, index) => ({
+        const children = entry.columns.map((column) => ({
           column,
           col: col++,
-          isLastInGroup: index === entry.columns.length - 1,
         }));
         return {
           kind: "group" as const,
@@ -783,7 +781,7 @@ export class DataGrid<T = unknown> extends LitElement {
           <div class="table" role="table">
             <div class="thead" role="rowgroup">
               <div
-                class="row header-row ${hasGroups ? "grouped" : ""}"
+                class="row header-row"
                 role="row"
                 style="grid-template-columns: ${gridTemplateColumns}"
               >
@@ -808,36 +806,29 @@ export class DataGrid<T = unknown> extends LitElement {
                       class="cell expander-cell"
                       style="grid-column: ${expanderCol}; grid-row: 1 / 3"
                     >
-                      <button
-                        type="button"
-                        class="expander-toggle ${anyRowDetailsExpanded
-                          ? "expanded"
-                          : ""}"
-                        aria-expanded=${anyRowDetailsExpanded}
-                        aria-label=${anyRowDetailsExpanded
-                          ? "Collapse all row details"
-                          : "Expand all row details"}
-                        @click=${() =>
-                          this.#toggleAllRowDetails(
-                            expandableRows,
-                            anyRowDetailsExpanded,
-                          )}
-                      >
-                        ${plusIcon}
-                      </button>
+                      ${expandableRows.length > 0
+                        ? html`<button
+                            type="button"
+                            class="expander-toggle ${anyRowDetailsExpanded
+                              ? "expanded"
+                              : ""}"
+                            aria-expanded=${anyRowDetailsExpanded}
+                            aria-label=${anyRowDetailsExpanded
+                              ? "Collapse all row details"
+                              : "Expand all row details"}
+                            @click=${() =>
+                              this.#toggleAllRowDetails(
+                                expandableRows,
+                                anyRowDetailsExpanded,
+                              )}
+                          >
+                            ${plusIcon}
+                          </button>`
+                        : nothing}
                     </div>`
                   : nothing}
-                ${headerEntries.map((entry, index) => {
+                ${headerEntries.map((entry) => {
                   if (entry.kind === "group") {
-                    // The group's own cell and its last child each span only
-                    // one header row, so neither can draw the "after this
-                    // group" divider itself (see `.group-header-cell`/
-                    // `.group-child-last` in the styles) — this element
-                    // draws it once, continuously, across both rows. Skipped
-                    // only when nothing at all follows the group (the true
-                    // last cell of the header row already gets no divider).
-                    const isTrulyLastCell =
-                      index === headerEntries.length - 1 && !hasRowActions;
                     return html`
                       <div
                         class="cell header-cell group-header-cell"
@@ -848,7 +839,7 @@ export class DataGrid<T = unknown> extends LitElement {
                           >${entry.group.header}</span
                         >
                       </div>
-                      ${entry.children.map(({ column, col, isLastInGroup }) => {
+                      ${entry.children.map(({ column, col }) => {
                         const sortable = column.sortable ?? true;
                         const sortDirection =
                           this.sort?.field === column.field
@@ -858,7 +849,7 @@ export class DataGrid<T = unknown> extends LitElement {
                           <div
                             class="cell header-cell ${sortable
                               ? "sortable"
-                              : ""} ${isLastInGroup ? "group-child-last" : ""}"
+                              : ""}"
                             role="columnheader"
                             style="grid-column: ${col}; grid-row: 2"
                             @click=${() => this.#toggleSort(column)}
@@ -876,12 +867,6 @@ export class DataGrid<T = unknown> extends LitElement {
                           </div>
                         `;
                       })}
-                      ${isTrulyLastCell
-                        ? nothing
-                        : html`<div
-                            class="header-divider"
-                            style="grid-column: ${entry.endCol}"
-                          ></div>`}
                     `;
                   }
                   const column = entry.column;
@@ -894,7 +879,7 @@ export class DataGrid<T = unknown> extends LitElement {
                     <div
                       class="cell header-cell ${sortable ? "sortable" : ""}"
                       role="columnheader"
-                      style="grid-column: ${entry.col}; grid-row: 1 / 3"
+                      style="grid-column: ${entry.col}; grid-row: 2"
                       @click=${() => this.#toggleSort(column)}
                     >
                       <span class="header-cell-text"
