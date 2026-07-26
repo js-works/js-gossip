@@ -11,11 +11,10 @@ import { chevronsLeftIcon } from "./icons/chevrons-left.icon.js";
 import { chevronsRightIcon } from "./icons/chevrons-right.icon.js";
 import { checkSquareIcon } from "./icons/check-square.icon.js";
 import { plusIcon } from "./icons/plus.icon.js";
+import type { DataGridFilterType } from "./filters.js";
 import "../button/button.js";
 import "../checkbox/checkbox.js";
 import type { Checkbox } from "../checkbox/checkbox.js";
-import "../text-field/text-field.js";
-import type { TextField } from "../text-field/text-field.js";
 import "../number-field/number-field.js";
 import type { NumberField } from "../number-field/number-field.js";
 import "../select/select.js";
@@ -44,21 +43,36 @@ export interface DataGridColumn<T> {
   sortable?: boolean;
   /**
    * Enables filtering for this column, as a plain control directly beneath
-   * the header — `true` for a `ui-text-field` doing a case-insensitive
-   * "contains" match (debounced ~300ms), or `"select"` for a `ui-select`
-   * multi-picker matching any of the values currently chosen. Defaults to
-   * false.
+   * the header — a `DataGridFilterType` (see `filters.ts`'s `textFilter()`/
+   * `selectFilter()` for the two built-ins, or implement the interface
+   * directly for a custom one). Omit for no filter on this column.
    */
-  filter?: boolean | "select";
-  /**
-   * Explicit dropdown values for a `"select"` filter — only needed when
-   * `dataSource` is used instead of `data`, since then there's no complete
-   * local dataset to scan for "every distinct value seen". Falls back to
-   * scanning `data` when omitted.
-   */
-  selectOptions?: string[];
+  filter?: DataGridFilterType<T>;
   /** Formats the raw cell value for display; defaults to printing it as-is. */
   valueFormatter?: (value: unknown, row: T) => string;
+}
+
+/**
+ * A group of leaf columns sharing one header label, spanning their combined
+ * width — one level only, `columns` are always leaf columns, never nested
+ * groups. Has no `width` of its own: a group is exactly as wide as its
+ * children's own `width`s sum to. Every column *not* inside any group still
+ * gets its own header cell, spanning both header rows (the CSS-grid analog
+ * of a `rowspan="2"`) rather than leaving an empty cell dangling beneath it
+ * just because some sibling happens to be grouped.
+ */
+export interface DataGridColumnGroup<T> {
+  header: string;
+  columns: DataGridColumn<T>[];
+}
+
+/** One entry of `DataGridColumn.columns` — either a leaf column or a group of them. */
+export type DataGridColumnOrGroup<T> = DataGridColumn<T> | DataGridColumnGroup<T>;
+
+function isColumnGroup<T>(
+  entry: DataGridColumnOrGroup<T>,
+): entry is DataGridColumnGroup<T> {
+  return "columns" in entry;
 }
 
 /**
@@ -67,6 +81,13 @@ export interface DataGridColumn<T> {
  * clicking anywhere on a row toggles its own selection.
  */
 export type DataGridSelectionMode = "none" | "single" | "multi";
+
+/**
+ * The color selected/hovered rows are tinted — "neutral" (default) or
+ * "primary". Same idea (and same two values) as `ui-ag-grid`'s own
+ * `AgGridSelectionAppearance`.
+ */
+export type DataGridSelectionAppearance = "neutral" | "primary";
 
 /**
  * Per-row expandable detail content — return a `TemplateResult` to give
@@ -95,14 +116,42 @@ export interface DataGridAction<T> {
   disabled?: boolean;
 }
 
+/**
+ * A per-row action, rendered as a `ui-button` (`variant="link"`) directly in
+ * the row itself — a trailing column (header labeled `rowActionsHeader`)
+ * that only appears when `rowActions` is non-empty. Unlike `DataGridAction`,
+ * this never depends on selection: it always acts on the one row it's
+ * rendered in, so there's no "single"/"multi" distinction to make. `disabled`
+ * is a predicate (not a static boolean) since whether an action makes sense
+ * typically depends on that row's own data.
+ */
+export interface DataGridRowAction<T> {
+  label: string;
+  icon?: TemplateResult;
+  /**
+   * The action button's `ui-button` appearance — defaults to "neutral".
+   * Set to "danger" for a destructive action (e.g. "Delete") to flag it as
+   * such, the same convention `DataGridAction`'s own toolbar buttons use.
+   */
+  appearance?: "neutral" | "primary" | "danger" | "warning" | "success";
+  onClick: (row: T) => void;
+  disabled?: (row: T) => boolean;
+}
+
 /** One column's current sort — part of a `DataGridDataRequest`. */
 export interface DataGridSort<T> {
   field: keyof T & string;
   direction: "asc" | "desc";
 }
 
-/** One column's current filter value, keyed by field in `DataGridDataRequest.filters`. */
-export type DataGridColumnFilter = { value: string } | { values: string[] };
+/**
+ * One column's current filter value, keyed by field in
+ * `DataGridDataRequest.filters` — opaque to the grid itself (whatever shape
+ * that column's own `DataGridFilterType` produces via `setValue`; a built-in
+ * `textFilter` gives a `string`, `selectFilter` a `string[]`, a custom type
+ * whatever it defines).
+ */
+export type DataGridColumnFilter = unknown;
 
 /**
  * What `DataGridDataSource` is called with for one request: the row range
@@ -147,11 +196,9 @@ export type DataGridDataSource<T> = (
  * Community): columns, sorting, per-column filters (plain text or a
  * multi-select dropdown), pagination, row selection, and toolbar actions,
  * hand-rolled from a plain CSS Grid rather than handed off to a third-party
- * grid engine. No column resizing, no cell focus/keyboard navigation, no
- * `selectionAppearance` choice (selected/hovered rows are always a grayish
- * neutral tint, not configurable) — this is meant to stay the simple,
- * dependency-free option; reach for `ui-ag-grid` when a use case needs more
- * than this covers.
+ * grid engine. No column resizing, no cell focus/keyboard navigation — this
+ * is meant to stay the simple, dependency-free option; reach for
+ * `ui-ag-grid` when a use case needs more than this covers.
  *
  * Rows come from either `data` (a plain, already-loaded array — filtering,
  * sorting, and pagination all happen locally, synchronously, against that
@@ -167,7 +214,10 @@ export type DataGridDataSource<T> = (
  * "same" row; this matters most for `dataSource`, where each request
  * resolves independently — a `dataSource` backed by a stable in-memory store
  * naturally satisfies this by returning slices of the same row objects
- * every time.
+ * every time. `selectionAppearance` (see `DataGridSelectionAppearance`) is
+ * unrelated to any of the above — it only changes the color selected/
+ * hovered rows are tinted, not selection behavior itself; same idea as
+ * `ui-ag-grid`'s own `selectionAppearance`.
  *
  * This grid needs an explicit height on its container — it does not
  * auto-size to its own row count — set via the `height` property (any CSS
@@ -176,7 +226,7 @@ export type DataGridDataSource<T> = (
 @customElement("ui-datagrid")
 export class DataGrid<T = unknown> extends LitElement {
   @property({ attribute: false })
-  accessor columns: DataGridColumn<T>[] = [];
+  accessor columns: DataGridColumnOrGroup<T>[] = [];
 
   @property({ attribute: false })
   accessor data: T[] = [];
@@ -202,6 +252,14 @@ export class DataGrid<T = unknown> extends LitElement {
   @property({ attribute: "selection-mode", reflect: true })
   accessor selectionMode: DataGridSelectionMode = "none";
 
+  // reflect: true — datagrid.styles.ts's --datagrid-row-accent swap is a
+  // plain :host([selection-appearance="primary"]) CSS rule, which needs the
+  // live property value mirrored onto the actual DOM attribute (Lit doesn't
+  // do that by default; same reason ui-ag-grid's own selectionAppearance
+  // reflects too).
+  @property({ attribute: "selection-appearance", reflect: true })
+  accessor selectionAppearance: DataGridSelectionAppearance = "neutral";
+
   @property({ attribute: false })
   accessor actions: DataGridAction<T>[] = [];
 
@@ -210,6 +268,12 @@ export class DataGrid<T = unknown> extends LitElement {
 
   @property({ attribute: false })
   accessor rowDetails: DataGridRowDetails<T> | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor rowActions: DataGridRowAction<T>[] = [];
+
+  @property({ attribute: "row-actions-header" })
+  accessor rowActionsHeader = "Actions";
 
   // --- internal state -------------------------------------------------------
 
@@ -258,7 +322,6 @@ export class DataGrid<T = unknown> extends LitElement {
 
   #activeRequest?: AbortController;
   #loadingSpinnerTimer?: ReturnType<typeof setTimeout>;
-  #filterDebounce = new Map<string, ReturnType<typeof setTimeout>>();
   #ready = false;
 
   static styles = datagridStyles;
@@ -272,10 +335,20 @@ export class DataGrid<T = unknown> extends LitElement {
     return this.pagination ? this.pageSize : Number.MAX_SAFE_INTEGER;
   }
 
-  // The distinct values a "select" filter column offers when `selectOptions`
-  // isn't given — every value actually present in `data` for that field.
-  // Only meaningful in `data` mode; `dataSource` mode has no complete local
-  // dataset to scan, so `selectOptions` is effectively required there.
+  // Grouping is purely a header-display concern — filtering, sorting,
+  // widths, and data cells all still work off this flat leaf list exactly
+  // as if `columns` had never had any groups in it at all.
+  #leafColumns(): DataGridColumn<T>[] {
+    return this.columns.flatMap((entry) =>
+      isColumnGroup(entry) ? entry.columns : [entry],
+    );
+  }
+
+  // The `distinctValues` a filter type's own `render()` is passed — every
+  // value actually present in `data` for that field. Only meaningful in
+  // `data` mode; `dataSource` mode has no complete local dataset to scan
+  // (a filter type needing options there takes them as its own config
+  // instead, e.g. `selectFilter({ options: [...] })`).
   #distinctValues(field: string): string[] {
     const values = new Set<string>();
     for (const row of this.data) {
@@ -287,20 +360,18 @@ export class DataGrid<T = unknown> extends LitElement {
 
   #applyFilters(rows: T[]): T[] {
     let result = rows;
-    for (const entry of Object.entries(this.filters)) {
-      const [field, filter] = entry as [keyof T & string, DataGridColumnFilter];
-      result =
-        "values" in filter
-          ? result.filter((row) =>
-              filter.values.includes(
-                String((row as Record<string, unknown>)[field] ?? ""),
-              ),
-            )
-          : result.filter((row) =>
-              String((row as Record<string, unknown>)[field] ?? "")
-                .toLowerCase()
-                .includes(filter.value.toLowerCase()),
-            );
+    for (const column of this.#leafColumns()) {
+      const filterType = column.filter;
+      if (!filterType) continue;
+      const value = this.filters[column.field];
+      if (value === undefined) continue;
+      result = result.filter((row) =>
+        filterType.matches(
+          value,
+          (row as Record<string, unknown>)[column.field],
+          row,
+        ),
+      );
     }
     return result;
   }
@@ -391,31 +462,14 @@ export class DataGrid<T = unknown> extends LitElement {
     this.page = Math.min(Math.max(parsed, 1), pageCount) - 1;
   }
 
-  #setFilter(
-    field: keyof T & string,
-    filter: DataGridColumnFilter | undefined,
-  ): void {
+  #setFilter(field: keyof T & string, value: DataGridColumnFilter): void {
     const next = { ...this.filters };
-    if (filter) {
-      next[field] = filter;
+    if (value !== undefined) {
+      next[field] = value;
     } else {
       delete next[field];
     }
     this.filters = next;
-  }
-
-  #onTextFilterInput(field: keyof T & string, value: string): void {
-    clearTimeout(this.#filterDebounce.get(field));
-    this.#filterDebounce.set(
-      field,
-      setTimeout(() => {
-        this.#setFilter(field, value === "" ? undefined : { value });
-      }, 300),
-    );
-  }
-
-  #onSelectFilterChange(field: keyof T & string, values: string[]): void {
-    this.#setFilter(field, values.length === 0 ? undefined : { values });
   }
 
   #isSelected(row: T): boolean {
@@ -505,13 +559,25 @@ export class DataGrid<T = unknown> extends LitElement {
     this.expandedRows = next;
   }
 
-  #gridTemplateColumns(hasRowDetails: boolean): string {
-    const widths = this.columns.map((column) => `${column.width ?? 100}fr`);
+  // `rowActionsWidth` (undefined when `rowActions` is empty) is computed
+  // once in `render()` from the header label + every action's own label —
+  // not sized via CSS `auto`/`max-content`, since each row here is its own
+  // independent grid (a separate `display: grid` `.row`, not one shared
+  // table grid); an intrinsic-content track size would drift out of sync
+  // between the header, filter, and body rows, each sizing it off only
+  // their own (different) cell content.
+  #gridTemplateColumns(
+    leafColumns: DataGridColumn<T>[],
+    hasRowDetails: boolean,
+    rowActionsWidth: string | undefined,
+  ): string {
+    const widths = leafColumns.map((column) => `${column.width ?? 100}fr`);
     const leading = [
       ...(this.selectionMode === "multi" ? ["2.5em"] : []),
       ...(hasRowDetails ? ["2.5em"] : []),
     ];
-    return [...leading, ...widths].join(" ");
+    const trailing = rowActionsWidth ? [rowActionsWidth] : [];
+    return [...leading, ...widths, ...trailing].join(" ");
   }
 
   protected firstUpdated(): void {
@@ -521,6 +587,15 @@ export class DataGrid<T = unknown> extends LitElement {
 
   protected updated(changed: Map<PropertyKey, unknown>): void {
     if (!this.#ready) return;
+
+    // A page-size change reshuffles which rows land on which page, so a
+    // selection made under the old page size no longer means the same
+    // thing — clear it rather than leave a stale, effectively-arbitrary
+    // set of rows selected.
+    if (changed.has("pageSize") && this.selected.size > 0) {
+      this.selected = new Set();
+      this.#emitSelectionChange();
+    }
 
     // Sort/filter/page-size/pagination-mode changes jump back to page 0 —
     // staying on, say, page 5 of a now-much-smaller filtered result would
@@ -551,7 +626,6 @@ export class DataGrid<T = unknown> extends LitElement {
     super.disconnectedCallback();
     this.#activeRequest?.abort();
     clearTimeout(this.#loadingSpinnerTimer);
-    for (const timer of this.#filterDebounce.values()) clearTimeout(timer);
   }
 
   render() {
@@ -567,11 +641,76 @@ export class DataGrid<T = unknown> extends LitElement {
       }
     });
 
-    const hasFilters = this.columns.some((column) => column.filter);
+    const leafColumns = this.#leafColumns();
+    const hasGroups = this.columns.some(isColumnGroup);
+    const hasFilters = leafColumns.some((column) => column.filter);
     const hasRowDetails = this.#hasRowDetails();
+    const hasRowActions = this.rowActions.length > 0;
+    // The text portion (header label vs. the row's own buttons, whichever is
+    // wider — all row-action buttons render side by side in the same row, so
+    // it's their labels' *sum*, not their max) is measured in `ch`; the
+    // per-button icon (always 1em, see the icon files) + its
+    // `size="small"` gap (0.3em, `button.styles.ts`), the `.row-actions-cell`
+    // flex gap between multiple buttons, and the cell's own inline padding
+    // are all real CSS lengths, not character counts, so they're added via
+    // `calc()` against the actual custom properties rather than guessed as
+    // more `ch`. `variant="link"` itself contributes no padding/border of
+    // its own (see `:host([variant="link"])` in button.styles.ts), so
+    // there's no per-button chrome term to add here.
+    const rowActionsWidth = hasRowActions
+      ? (() => {
+          const textCh = Math.max(
+            this.rowActionsHeader.length,
+            this.rowActions.reduce(
+              (sum, action) => sum + action.label.length,
+              0,
+            ),
+          );
+          const iconCount = this.rowActions.filter(
+            (action) => action.icon,
+          ).length;
+          const buttonGaps = this.rowActions.length - 1;
+          return `calc(${textCh}ch + ${iconCount} * 1.3em + ${buttonGaps} * (var(--ui-spacing-sm) * 2 + 0.5em) + 2 * var(--ui-spacing-md))`;
+        })()
+      : undefined;
     const detailsColumnStart =
       (hasRowDetails ? 1 : 0) + (this.selectionMode === "multi" ? 1 : 0) + 1;
-    const gridTemplateColumns = this.#gridTemplateColumns(hasRowDetails);
+    const detailsColumnEnd = hasRowActions ? -2 : -1;
+    const gridTemplateColumns = this.#gridTemplateColumns(
+      leafColumns,
+      hasRowDetails,
+      rowActionsWidth,
+    );
+
+    // Explicit grid-column/grid-row placement for every header cell (rather
+    // than relying on implicit auto-placement) — the only way to express a
+    // standalone column's cell spanning both header rows (this grid's
+    // analog of a `rowspan="2"`) as well as a group's cell spanning several
+    // columns in just the first row. `col` walks the same leading (select/
+    // expander) + leaf + trailing (row actions) tracks `gridTemplateColumns`
+    // itself describes, so the indices always line up with it.
+    let col = 1;
+    const checkboxCol = this.selectionMode === "multi" ? col++ : undefined;
+    const expanderCol = hasRowDetails ? col++ : undefined;
+    const headerEntries = this.columns.map((entry) => {
+      if (isColumnGroup(entry)) {
+        const startCol = col;
+        const children = entry.columns.map((column, index) => ({
+          column,
+          col: col++,
+          isLastInGroup: index === entry.columns.length - 1,
+        }));
+        return {
+          kind: "group" as const,
+          group: entry,
+          startCol,
+          endCol: col,
+          children,
+        };
+      }
+      return { kind: "column" as const, column: entry, col: col++ };
+    });
+    const actionsCol = hasRowActions ? col : undefined;
     const allVisibleSelected =
       this.rows.length > 0 && this.rows.every((row) => this.#isSelected(row));
     const someVisibleSelected = this.rows.some((row) => this.#isSelected(row));
@@ -644,12 +783,15 @@ export class DataGrid<T = unknown> extends LitElement {
           <div class="table" role="table">
             <div class="thead" role="rowgroup">
               <div
-                class="row header-row"
+                class="row header-row ${hasGroups ? "grouped" : ""}"
                 role="row"
                 style="grid-template-columns: ${gridTemplateColumns}"
               >
-                ${this.selectionMode === "multi"
-                  ? html`<div class="cell select-cell">
+                ${checkboxCol
+                  ? html`<div
+                      class="cell select-cell"
+                      style="grid-column: ${checkboxCol}; grid-row: 1 / 3"
+                    >
                       <ui-checkbox
                         .checked=${allVisibleSelected}
                         .indeterminate=${someVisibleSelected && !allVisibleSelected}
@@ -661,8 +803,11 @@ export class DataGrid<T = unknown> extends LitElement {
                       ></ui-checkbox>
                     </div>`
                   : nothing}
-                ${hasRowDetails
-                  ? html`<div class="cell expander-cell">
+                ${expanderCol
+                  ? html`<div
+                      class="cell expander-cell"
+                      style="grid-column: ${expanderCol}; grid-row: 1 / 3"
+                    >
                       <button
                         type="button"
                         class="expander-toggle ${anyRowDetailsExpanded
@@ -682,7 +827,64 @@ export class DataGrid<T = unknown> extends LitElement {
                       </button>
                     </div>`
                   : nothing}
-                ${this.columns.map((column) => {
+                ${headerEntries.map((entry, index) => {
+                  if (entry.kind === "group") {
+                    // The group's own cell and its last child each span only
+                    // one header row, so neither can draw the "after this
+                    // group" divider itself (see `.group-header-cell`/
+                    // `.group-child-last` in the styles) — this element
+                    // draws it once, continuously, across both rows. Skipped
+                    // only when nothing at all follows the group (the true
+                    // last cell of the header row already gets no divider).
+                    const isTrulyLastCell =
+                      index === headerEntries.length - 1 && !hasRowActions;
+                    return html`
+                      <div
+                        class="cell header-cell group-header-cell"
+                        role="columnheader"
+                        style="grid-column: ${entry.startCol} / ${entry.endCol}; grid-row: 1"
+                      >
+                        <span class="header-cell-text"
+                          >${entry.group.header}</span
+                        >
+                      </div>
+                      ${entry.children.map(({ column, col, isLastInGroup }) => {
+                        const sortable = column.sortable ?? true;
+                        const sortDirection =
+                          this.sort?.field === column.field
+                            ? this.sort.direction
+                            : undefined;
+                        return html`
+                          <div
+                            class="cell header-cell ${sortable
+                              ? "sortable"
+                              : ""} ${isLastInGroup ? "group-child-last" : ""}"
+                            role="columnheader"
+                            style="grid-column: ${col}; grid-row: 2"
+                            @click=${() => this.#toggleSort(column)}
+                          >
+                            <span class="header-cell-text"
+                              >${column.header ?? column.field}</span
+                            >
+                            ${sortDirection
+                              ? html`<span class="sort-icon">
+                                  ${sortDirection === "asc"
+                                    ? chevronUpIcon
+                                    : chevronDownIcon}
+                                </span>`
+                              : nothing}
+                          </div>
+                        `;
+                      })}
+                      ${isTrulyLastCell
+                        ? nothing
+                        : html`<div
+                            class="header-divider"
+                            style="grid-column: ${entry.endCol}"
+                          ></div>`}
+                    `;
+                  }
+                  const column = entry.column;
                   const sortable = column.sortable ?? true;
                   const sortDirection =
                     this.sort?.field === column.field
@@ -692,6 +894,7 @@ export class DataGrid<T = unknown> extends LitElement {
                     <div
                       class="cell header-cell ${sortable ? "sortable" : ""}"
                       role="columnheader"
+                      style="grid-column: ${entry.col}; grid-row: 1 / 3"
                       @click=${() => this.#toggleSort(column)}
                     >
                       <span class="header-cell-text"
@@ -707,8 +910,16 @@ export class DataGrid<T = unknown> extends LitElement {
                     </div>
                   `;
                 })}
+                ${actionsCol
+                  ? html`<div
+                      class="cell header-cell actions-header-cell"
+                      style="grid-column: ${actionsCol}; grid-row: 1 / 3"
+                    >
+                      ${this.rowActionsHeader}
+                    </div>`
+                  : nothing}
               </div>
-    
+
               ${hasFilters
                 ? html`<div
                     class="row filter-row"
@@ -721,51 +932,24 @@ export class DataGrid<T = unknown> extends LitElement {
                     ${hasRowDetails
                       ? html`<div class="cell"></div>`
                       : nothing}
-                    ${this.columns.map((column) => {
-                      const filter = this.filters[column.field];
+                    ${leafColumns.map((column) => {
                       return html`
                         <div class="cell filter-cell">
-                          ${column.filter === "select"
-                            ? html`<ui-select
-                                size="small"
-                                multiple
-                                popup-portal
-                                placeholder="(All)"
-                                max-options-visible="1"
-                                .values=${(filter as { values: string[] } | undefined)
-                                  ?.values ?? []}
-                                @change=${(event: Event) =>
-                                  this.#onSelectFilterChange(
-                                    column.field,
-                                    (event.target as Select).values,
-                                  )}
-                              >
-                                ${(
-                                  column.selectOptions ??
-                                  this.#distinctValues(column.field)
-                                ).map(
-                                  (value) =>
-                                    html`<ui-option value=${value}
-                                      >${value}</ui-option
-                                    >`,
-                                )}
-                              </ui-select>`
-                            : column.filter
-                              ? html`<ui-text-field
-                                  size="small"
-                                  placeholder="Filter…"
-                                  .value=${(filter as { value: string } | undefined)
-                                    ?.value ?? ""}
-                                  @input=${(event: Event) =>
-                                    this.#onTextFilterInput(
-                                      column.field,
-                                      (event.target as TextField).value,
-                                    )}
-                                ></ui-text-field>`
-                              : nothing}
+                          ${column.filter
+                            ? column.filter.render({
+                                column,
+                                value: this.filters[column.field],
+                                setValue: (value) =>
+                                  this.#setFilter(column.field, value),
+                                distinctValues: this.#distinctValues(
+                                  column.field,
+                                ),
+                              })
+                            : nothing}
                         </div>
                       `;
                     })}
+                    ${hasRowActions ? html`<div class="cell"></div>` : nothing}
                   </div>`
                 : nothing}
             </div>
@@ -823,7 +1007,7 @@ export class DataGrid<T = unknown> extends LitElement {
                                 : nothing}
                             </div>`
                           : nothing}
-                        ${this.columns.map((column) => {
+                        ${leafColumns.map((column) => {
                           const raw = (row as Record<string, unknown>)[
                             column.field
                           ];
@@ -834,19 +1018,46 @@ export class DataGrid<T = unknown> extends LitElement {
                             ${value}
                           </div>`;
                         })}
+                        ${hasRowActions
+                          ? html`<div class="cell row-actions-cell">
+                              ${this.rowActions.map(
+                                (action) => html`
+                                  <ui-button
+                                    appearance=${action.appearance ??
+                                    "neutral"}
+                                    variant="link"
+                                    size="small"
+                                    ?disabled=${action.disabled?.(row) ??
+                                    false}
+                                    @click=${(event: Event) => {
+                                      event.stopPropagation();
+                                      action.onClick(row);
+                                    }}
+                                  >
+                                    ${action.icon
+                                      ? html`<span slot="prefix"
+                                          >${action.icon}</span
+                                        >`
+                                      : nothing}
+                                    ${action.label}
+                                  </ui-button>
+                                `,
+                              )}
+                            </div>`
+                          : nothing}
                       </div>
                       ${details !== undefined
                         ? html`<div
                             class="row row-details ${isExpanded
                               ? "expanded"
-                              : ""}"
+                              : ""} ${isSelected ? "selected" : ""}"
                             role="row"
                             style="grid-template-columns: ${gridTemplateColumns}"
                           >
                             <div
                               class="row-details-content"
                               role="cell"
-                              style="grid-column: ${detailsColumnStart} / -1"
+                              style="grid-column: ${detailsColumnStart} / ${detailsColumnEnd}"
                             >
                               <div class="row-details-inner">${details}</div>
                             </div>
@@ -893,7 +1104,7 @@ export class DataGrid<T = unknown> extends LitElement {
               <div class="page-nav">
                 <ui-button
                   appearance="neutral"
-                  variant="link"
+                  variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="First page"
                   ?disabled=${currentPage === 0}
@@ -905,7 +1116,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 </ui-button>
                 <ui-button
                   appearance="neutral"
-                  variant="link"
+                  variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Previous page"
                   ?disabled=${currentPage === 0}
@@ -936,7 +1147,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 <span class="page-label">of ${pageCount}</span>
                 <ui-button
                   appearance="neutral"
-                  variant="link"
+                  variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Next page"
                   ?disabled=${currentPage >= pageCount - 1}
@@ -948,7 +1159,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 </ui-button>
                 <ui-button
                   appearance="neutral"
-                  variant="link"
+                  variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Last page"
                   ?disabled=${currentPage >= pageCount - 1}

@@ -22,11 +22,13 @@ import type {
 import "../main/components/datagrid/datagrid.js";
 import type {
   DataGridAction,
-  DataGridColumn,
   DataGridColumnFilter,
+  DataGridColumnOrGroup,
   DataGridDataSource,
   DataGridRowDetails,
+  DataGridRowAction,
 } from "../main/components/datagrid/datagrid.js";
+import { textFilter, selectFilter } from "../main/components/datagrid/filters.js";
 import "../main/components/text-field/text-field.js";
 import "../main/components/number-field/number-field.js";
 import "../main/components/password-field/password-field.js";
@@ -342,16 +344,22 @@ const employeeGridDataSource: AgGridDataSource<Employee> = ({
 // width (default 100), not a pixel value like ui-ag-grid's, so "Email"
 // getting more room than the rest is expressed as a bigger share (200) here
 // rather than a fixed 260px.
-const employeeDataGridColumns: DataGridColumn<Employee>[] = [
-  { field: "name", header: "Name", filter: true },
-  { field: "email", header: "Email", width: 200, filter: true },
+// "Name" and "Role" stand alone (their own header cell spans both header
+// rows); "Email"/"Department" share a "Contact & Org" group header instead.
+const employeeDataGridColumns: DataGridColumnOrGroup<Employee>[] = [
+  { field: "name", header: "Name", filter: textFilter() },
   {
-    field: "department",
-    header: "Department",
-    filter: "select",
-    selectOptions: employeeDepartmentOptions,
+    header: "Contact & Org",
+    columns: [
+      { field: "email", header: "Email", width: 200, filter: textFilter() },
+      {
+        field: "department",
+        header: "Department",
+        filter: selectFilter({ options: employeeDepartmentOptions }),
+      },
+    ],
   },
-  { field: "role", header: "Role", filter: true },
+  { field: "role", header: "Role", filter: textFilter() },
 ];
 
 // Only Engineering rows get an expander — demonstrates the "some rows may
@@ -393,6 +401,27 @@ const employeeDataGridActions: DataGridAction<Employee>[] = [
   },
 ];
 
+// Per-row inline actions, rendered directly in the row (unlike the toolbar
+// actions above, which need a selection). "Edit" disables itself for
+// Marketing rows, demonstrating the per-row `disabled` predicate; "Edit"
+// leaves `appearance` at its "primary" default while "Delete" opts into
+// "danger", demonstrating the per-action override. Like every other action
+// in this demo, both just console.log — no shared result log.
+const employeeRowActions: DataGridRowAction<Employee>[] = [
+  {
+    label: "Edit",
+    icon: pencilIcon,
+    disabled: (employee) => employee.department === "Marketing",
+    onClick: (employee) => console.log("Edit", employee.name),
+  },
+  {
+    label: "Delete",
+    icon: trashIcon,
+    appearance: "danger",
+    onClick: (employee) => console.log("Delete", employee.name),
+  },
+];
+
 // Same idea as employeeGridDataSource above, for ui-datagrid's own
 // `dataSource` — every sort/filter/page change is a simulated ~1000ms
 // server round trip here too, against the same in-memory EMPLOYEES array.
@@ -411,14 +440,13 @@ const employeeDataGridDataSource: DataGridDataSource<Employee> = ({
         keyof Employee & string,
         DataGridColumnFilter,
       ][]) {
-        rows =
-          "values" in filter
-            ? rows.filter((row) => filter.values.includes(String(row[field])))
-            : rows.filter((row) =>
-                String(row[field])
-                  .toLowerCase()
-                  .includes(filter.value.toLowerCase()),
-              );
+        rows = Array.isArray(filter)
+          ? rows.filter((row) => filter.includes(String(row[field])))
+          : rows.filter((row) =>
+              String(row[field])
+                .toLowerCase()
+                .includes(String(filter).toLowerCase()),
+            );
       }
 
       for (const { field, direction } of sort.slice().reverse()) {
@@ -991,9 +1019,11 @@ function dataGridTab() {
         .dataSource=${employeeDataGridDataSource}
         .actions=${employeeDataGridActions}
         .rowDetails=${employeeRowDetails}
+        .rowActions=${employeeRowActions}
         .pageSizeOptions=${[50, 100, 150, 250, 500]}
         page-size="50"
         selection-mode="multi"
+        selection-appearance="primary"
         @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
           console.log(
             "Selected:",

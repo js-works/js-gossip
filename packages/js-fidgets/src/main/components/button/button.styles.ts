@@ -12,7 +12,17 @@ export const buttonStyles = [
        "define the default, override the rest". */
     :host {
       font-weight: var(--ui-font-weight-normal);
-      display: inline-block;
+      /* inline-flex, not inline-block: an inline-block's single inline-level
+         child (.button, display: inline-flex below) would otherwise sit in
+         an anonymous line box of its own, baseline-aligned against a strut
+         based on this host's inherited font metrics — leaving an invisible
+         gap under the button that throws off vertical centering next to
+         sibling elements of a similar height (e.g. the datagrid pagination
+         bar's nav buttons next to its page-size/page-input fields). Making
+         the host itself a flex container sizes it to exactly wrap .button
+         instead, the same way ui-select's :host avoids the same trap. */
+      display: inline-flex;
+      align-items: center;
       vertical-align: middle;
       font-family: var(--ui-font-sans);
 
