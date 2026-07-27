@@ -1,4 +1,4 @@
-import { html, render } from "lit";
+import { html, nothing, render } from "lit";
 
 import { defaultTheme } from "../main/theming/theme.js";
 import "../main/components/checkbox/checkbox.js";
@@ -36,6 +36,8 @@ import "../main/components/email-field/email-field.js";
 import "../main/components/date-field/date-field.js";
 import "../main/components/native-date-field/native-date-field.js";
 import "../main/components/upload/upload.js";
+import "../main/components/tabs/tabs.js";
+import type { Tabs } from "../main/components/tabs/tabs.js";
 import type {
   Upload,
   UploadFileRejectDetail,
@@ -849,6 +851,99 @@ function simulateUpload(event: CustomEvent<UploadRequestDetail>) {
   }, 300);
 }
 
+function tabsTab() {
+  return html`
+    <section>
+      <h2>Tabs</h2>
+      <div class="row">
+        <ui-tabs value="account" style="width: 100%">
+          <ui-tab value="account">Account</ui-tab>
+          <ui-tab value="security">Security</ui-tab>
+          <ui-tab value="billing" disabled>Billing</ui-tab>
+
+          <ui-tab-panel slot="panel" value="account">
+            <p>Account settings — name, email, avatar.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="security">
+            <p>Security settings — password, two-factor authentication.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="billing">
+            <p>Billing — unavailable on the free plan.</p>
+          </ui-tab-panel>
+        </ui-tabs>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tabs (horizontal, right-aligned)</h2>
+      <div class="row">
+        <ui-tabs tab-align="end" value="account" style="width: 100%">
+          <ui-tab value="account">Account</ui-tab>
+          <ui-tab value="security">Security</ui-tab>
+          <ui-tab value="billing" disabled>Billing</ui-tab>
+
+          <ui-tab-panel slot="panel" value="account">
+            <p>Account settings — name, email, avatar.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="security">
+            <p>Security settings — password, two-factor authentication.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="billing">
+            <p>Billing — unavailable on the free plan.</p>
+          </ui-tab-panel>
+        </ui-tabs>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tabs (vertical)</h2>
+      <div class="row">
+        <ui-tabs orientation="vertical" value="profile" style="width: 100%">
+          <ui-tab value="profile">Profile</ui-tab>
+          <ui-tab value="notifications">Notifications</ui-tab>
+          <ui-tab value="integrations">Integrations</ui-tab>
+
+          <ui-tab-panel slot="panel" value="profile">
+            <p>Profile — display name, bio, avatar.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="notifications">
+            <p>Notifications — email digests, push alerts.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="integrations">
+            <p>Integrations — connected apps and API keys.</p>
+          </ui-tab-panel>
+        </ui-tabs>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tabs (vertical, left-aligned)</h2>
+      <div class="row">
+        <ui-tabs
+          orientation="vertical"
+          tab-align="start"
+          value="profile"
+          style="width: 100%"
+        >
+          <ui-tab value="profile">Profile</ui-tab>
+          <ui-tab value="notifications">Notifications</ui-tab>
+          <ui-tab value="integrations">Integrations</ui-tab>
+
+          <ui-tab-panel slot="panel" value="profile">
+            <p>Profile — display name, bio, avatar.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="notifications">
+            <p>Notifications — email digests, push alerts.</p>
+          </ui-tab-panel>
+          <ui-tab-panel slot="panel" value="integrations">
+            <p>Integrations — connected apps and API keys.</p>
+          </ui-tab-panel>
+        </ui-tabs>
+      </div>
+    </section>
+  `;
+}
+
 function uploadTab() {
   return html`
     <section>
@@ -1039,6 +1134,7 @@ function dataGridFlatTab() {
         page-size="50"
         selection-mode="multi"
         selection-appearance="primary"
+        stripes
         @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
           console.log(
             "Selected:",
@@ -1080,19 +1176,23 @@ function dataGridGroupedTab() {
 // list rendered alongside the content (see renderApp() below).
 // -------------------------------------------------------------------
 
-interface Tab {
+// Named DemoPage (not Tab) to keep it visually distinct from the actual
+// <ui-tab>/<ui-tabs> components below, now that this file both defines this
+// plain data shape *and* renders real tab elements from it.
+interface DemoPage {
   id: string;
   label: string;
   content: () => unknown;
 }
 
-const tabs: Tab[] = [
+const demoPages: DemoPage[] = [
   { id: "buttons", label: "Buttons", content: buttonsTab },
   { id: "select", label: "Select", content: selectTab },
   { id: "combobox", label: "Combobox", content: comboboxTab },
   { id: "autocomplete", label: "Autocomplete", content: autocompleteTab },
   { id: "radio", label: "Radio group", content: radioTab },
   { id: "checkbox", label: "Checkbox group", content: checkboxTab },
+  { id: "tabs", label: "Tabs", content: tabsTab },
   { id: "text-field", label: "Text field", content: textFieldTab },
   { id: "number-field", label: "Number field", content: numberFieldTab },
   { id: "password-field", label: "Password field", content: passwordFieldTab },
@@ -1117,45 +1217,52 @@ const tabs: Tab[] = [
   { id: "upload", label: "Upload", content: uploadTab },
 ];
 
-// The active tab is driven by the URL hash (e.g. #combobox) rather than local
-// state, so a reload — or a shared/bookmarked link — lands back on the same
-// tab instead of always resetting to the first one.
-function readTabFromHash(): string {
+// The active page is driven by the URL hash (e.g. #combobox) rather than
+// local state, so a reload — or a shared/bookmarked link — lands back on
+// the same page instead of always resetting to the first one.
+function readPageFromHash(): string {
   const id = location.hash.slice(1);
-  return tabs.some((tab) => tab.id === id) ? id : tabs[0].id;
+  return demoPages.some((page) => page.id === id) ? id : demoPages[0].id;
 }
 
-let activeTabId: string = readTabFromHash();
+let activePageId: string = readPageFromHash();
 
-function activateTab(id: string): void {
+function activatePage(id: string): void {
   location.hash = id;
 }
 
 window.addEventListener("hashchange", () => {
-  activeTabId = readTabFromHash();
+  activePageId = readPageFromHash();
   renderApp();
 });
 
 function renderApp(): void {
-  const activeTab = tabs.find((tab) => tab.id === activeTabId)!;
   render(
     html`
       <main class="page">
-        <nav class="tab-nav" aria-orientation="vertical" role="tablist">
-          ${tabs.map(
-            (tab) => html`
-              <button
-                class="tab-btn"
-                role="tab"
-                aria-selected=${tab.id === activeTab.id ? "true" : "false"}
-                @click=${() => activateTab(tab.id)}
-              >
-                ${tab.label}
-              </button>
+        <ui-tabs
+          orientation="vertical"
+          .value=${activePageId}
+          @change=${(event: Event) => {
+            // change bubbles, so a nested <ui-tabs> inside a demo page's own
+            // content (see the Tabs demo page) would otherwise be mistaken
+            // for this outer nav's own change.
+            if (event.target === event.currentTarget) {
+              activatePage((event.currentTarget as Tabs).value);
+            }
+          }}
+        >
+          ${demoPages.map(
+            (page) => html`<ui-tab value=${page.id}>${page.label}</ui-tab>`,
+          )}
+          ${demoPages.map(
+            (page) => html`
+              <ui-tab-panel slot="panel" value=${page.id}>
+                ${page.id === activePageId ? page.content() : nothing}
+              </ui-tab-panel>
             `,
           )}
-        </nav>
-        <div class="tab-content" role="tabpanel">${activeTab.content()}</div>
+        </ui-tabs>
       </main>
     `,
     document.getElementById("app")!,

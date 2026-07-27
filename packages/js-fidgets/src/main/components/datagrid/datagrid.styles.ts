@@ -221,15 +221,20 @@ export const datagridStyles = [
       border-bottom: 1px solid var(--ui-color-neutral-200);
     }
 
-    /* Zebra striping — "of .body-row" (not a redundant ".body-row" prefix
-       too, which would just add unneeded specificity) counts only actual
-       rows, skipping any interspersed \`.row-details\` siblings, so the
-       stripe stays tied to alternating *rows* rather than alternating DOM
-       children. Same specificity as \`.selected\`'s own background (one
-       pseudo-class + one class each) — \`.selected\` is declared later, so
-       it still wins the tie on rows where both apply; \`:hover\`'s own
-       background is more specific regardless, via \`:host(:is(...))\`. */
-    :nth-child(even of .body-row) {
+    /* Zebra striping — opt-in via the \`stripes\` property, off by default.
+       Gated on \`:where(:host([stripes]))\`, not plain \`:host([stripes])\` —
+       \`:where()\` always contributes zero specificity, so this stays exactly
+       as specific as an ungated \`:nth-child(even of .body-row)\` would be
+       (one pseudo-class + \`.body-row\`'s own class — "of .body-row", not a
+       redundant \`.body-row\` prefix too, which would just add unneeded
+       specificity). That keeps it tied with \`.selected\`'s own background
+       (one pseudo-class + one class); \`.selected\` is declared later, so it
+       still wins the tie on rows where both apply — a plain
+       \`:host([stripes])\` ancestor would instead add its own specificity on
+       top and incorrectly make the stripe win regardless of source order.
+       \`:hover\`'s own background is more specific regardless, via
+       \`:host(:is(...))\`. */
+    :where(:host([stripes])) :nth-child(even of .body-row) {
       background: var(--ui-color-neutral-50);
     }
 

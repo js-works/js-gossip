@@ -277,6 +277,13 @@ export class DataGrid<T = unknown> extends LitElement {
   @property({ attribute: "row-actions-header" })
   accessor rowActionsHeader = "Actions";
 
+  // reflect: true — datagrid.styles.ts's zebra striping is a plain
+  // :host([stripes]) CSS rule, so the live property value needs mirroring
+  // onto the actual DOM attribute (same reason selectionAppearance reflects
+  // above).
+  @property({ type: Boolean, reflect: true })
+  accessor stripes = false;
+
   // --- internal state -------------------------------------------------------
 
   /** The current page's rows — computed locally (`data` mode) or resolved from `dataSource`. */
