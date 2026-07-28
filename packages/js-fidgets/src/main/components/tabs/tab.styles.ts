@@ -62,18 +62,21 @@ export const tabStyles = [
     :host([selected]) {
       color: var(--ui-color-primary-600);
       border-bottom-color: var(--ui-color-primary-500);
-      font-weight: var(--ui-font-weight-semibold);
+      /* Faux-semibold via stacked zero-offset text-shadow rather than an
+         actual font-weight bump: real bold glyphs are wider than regular
+         ones, so a font-weight increase here would resize the tab (and, in
+         vertical mode, every tab sharing the tablist's stretched width —
+         see tabs.styles.ts) and shift surrounding content the moment a tab
+         is selected. A blurred shadow thickens the glyph strokes without
+         touching layout metrics, so it's safe to gate on [selected]. */
+      text-shadow:
+        0 0 0.5px currentColor,
+        0 0 0.5px currentColor;
     }
 
     :host([orientation="vertical"][selected]) {
       border-inline-end-color: var(--ui-color-primary-500);
       background: var(--ui-color-neutral-100);
-      /* Cancels the :host([selected]) font-weight bump above — vertical
-         tabs share one stretched width across the whole tablist (see
-         tabs.styles.ts), so a selected tab getting wider text would grow
-         every tab's shared width along with it. The accent border and
-         background already carry the selected state here without it. */
-      font-weight: var(--ui-font-weight-normal);
     }
 
     :host([disabled]) {

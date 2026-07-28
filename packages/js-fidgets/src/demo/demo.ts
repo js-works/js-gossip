@@ -1134,7 +1134,6 @@ function dataGridFlatTab() {
         page-size="50"
         selection-mode="multi"
         selection-appearance="primary"
-        stripes
         @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
           console.log(
             "Selected:",
@@ -1161,6 +1160,7 @@ function dataGridGroupedTab() {
         page-size="50"
         selection-mode="multi"
         selection-appearance="primary"
+        stripes
         @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
           console.log(
             "Selected:",
