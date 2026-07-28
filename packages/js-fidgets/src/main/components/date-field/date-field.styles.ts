@@ -30,7 +30,7 @@ export const dateFieldStyles = [
       display: flex;
       align-items: center;
       border: 1px solid var(--ui-field-border-color);
-      border-radius: var(--ui-radius-sm);
+      border-radius: var(--ui-field-radius);
       box-sizing: border-box;
     }
 
@@ -119,7 +119,12 @@ export const dateFieldStyles = [
       background: var(--ui-bg);
       color: var(--ui-text);
       font-family: var(--ui-font-sans);
-      font-size: 1em;
+      /* A tiny bit larger than the field's own 1em — every other size in
+         this picker (.datepicker-controls button, .dow, .datepicker-cell,
+         etc.) is defined relative to this one, so bumping it here scales
+         the whole picker's text (and, via the width/height above being in
+         em too, the picker's own box) proportionally in one place. */
+      font-size: 1.08em;
       border: 1px solid var(--ui-color-neutral-300);
       border-radius: var(--ui-radius-sm);
       box-shadow:

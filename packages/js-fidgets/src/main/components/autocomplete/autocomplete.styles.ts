@@ -68,7 +68,7 @@ export const autocompleteStyles = [
       padding-block: var(--autocomplete-padding-block);
       box-sizing: border-box;
       border: 1px solid var(--ui-field-border-color);
-      border-radius: var(--ui-radius-sm);
+      border-radius: var(--ui-field-radius);
       background: var(--ui-bg);
       color: var(--ui-text);
     }

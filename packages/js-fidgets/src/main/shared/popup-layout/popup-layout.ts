@@ -56,6 +56,16 @@ interface TrackPopupLayoutConfig {
   // — unnecessary work for the common case where the default scheme already
   // works fine.
   usePopover?: boolean;
+  // Whether the popup is forced to exactly the host's own width (the
+  // default, `true`) — right for a form field's dropdown (ui-select,
+  // ui-combobox, ui-autocomplete), where the popup is conceptually an
+  // extension of the field itself. A menu (ui-menu-button/ui-split-button)
+  // wants the opposite: its trigger's width has nothing to do with how wide
+  // its labels need — set `false` to leave the popup's own width/left edge
+  // alone (still left-aligned to the host, still governed by whatever
+  // min/max-width the popup's own stylesheet sets) rather than stretching
+  // or squeezing it to match.
+  matchWidth?: boolean;
 }
 
 interface PopupLayoutHandle {
@@ -89,6 +99,7 @@ const MANAGED_PROPERTIES = [
 function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
   const maxHeightCap = config.maxHeightPx ?? 288;
   const gapPx = config.gapPx ?? 2;
+  const matchWidth = config.matchWidth ?? true;
 
   let placement: "top" | "bottom" = "bottom";
   let maxHeightPx = maxHeightCap;
@@ -144,7 +155,11 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
       // can't just be "100%" the way the non-popover branch below gets away
       // with).
       popup.style.setProperty("left", `${hostRect.left}px`);
-      popup.style.setProperty("width", `${hostRect.width}px`);
+      if (matchWidth) {
+        popup.style.setProperty("width", `${hostRect.width}px`);
+      } else {
+        popup.style.removeProperty("width");
+      }
       if (placement === "bottom") {
         popup.style.setProperty("top", `${hostRect.bottom + gapPx}px`);
         popup.style.removeProperty("bottom");
@@ -200,7 +215,12 @@ function trackPopupLayout(config: TrackPopupLayoutConfig): PopupLayoutHandle {
       return;
     }
     popup.style.setProperty("position", "absolute");
-    popup.style.setProperty("inset-inline", "0");
+    if (matchWidth) {
+      popup.style.setProperty("inset-inline", "0");
+    } else {
+      popup.style.removeProperty("inset-inline");
+      popup.style.setProperty("left", "0");
+    }
     popup.style.setProperty("z-index", "1");
     popup.style.setProperty("box-sizing", "border-box");
   }

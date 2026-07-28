@@ -92,14 +92,20 @@ export const defaultTheme = css`
     --ui-radius-lg: 12px;
 
     --ui-button-radius: var(--ui-radius-sm);
+    /* Same per-component-family indirection as --ui-button-radius, for
+       every input-like field (text/number/password/email/date fields,
+       select, combobox, autocomplete) — lets a consumer round (or square
+       off) every field control's corners at once without touching
+       --ui-radius-sm itself, which other, unrelated things also read. */
+    --ui-field-radius: var(--ui-radius-xs);
 
     /* The border color shared by every input-like field (text/number/
        password/email/date fields, select, combobox, autocomplete — and,
        matching it, their chevron icon where they have one). Deliberately its
        own token rather than a --ui-color-neutral-* ramp step — history:
        #545454 → lightened to #6b6b6b → lightened too far to #999999 →
-       darkened back a bit to this. */
-    --ui-field-border-color: #808080;
+       darkened back to #808080 → lightened again, in two steps, to this. */
+    --ui-field-border-color: #949494;
 
     --ui-focus-ring-width: 2px;
     --ui-focus-ring-offset: 1px;

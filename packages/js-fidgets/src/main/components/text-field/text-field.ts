@@ -140,7 +140,7 @@ export class TextField extends LitElement {
           --field-border-block-end,
           1px solid var(--ui-field-border-color)
         );
-        border-radius: var(--field-border-radius, var(--ui-radius-sm));
+        border-radius: var(--field-border-radius, var(--ui-field-radius));
         background: var(--ui-bg);
       }
 

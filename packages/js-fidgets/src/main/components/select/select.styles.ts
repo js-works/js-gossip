@@ -91,7 +91,7 @@ export const selectStyles = [
       padding-block: var(--select-padding-block);
       padding-inline-start: var(--select-padding-inline);
       border: 1px solid var(--ui-field-border-color);
-      border-radius: var(--ui-radius-sm);
+      border-radius: var(--ui-field-radius);
       background: var(--ui-bg);
       color: var(--ui-text);
       font: inherit;
