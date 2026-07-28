@@ -25,11 +25,9 @@ export const menuPopupStyles = [
       max-width: 22rem;
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-color-neutral-300);
+      border: 1px solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
-      box-shadow:
-        0 10px 25px -5px rgba(0, 0, 0, 0.2),
-        0 4px 8px -4px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--ui-popup-shadow);
       transform-origin: top left;
       /* Plays once whenever this stops matching [hidden] — a CSS animation
          restarts any time its own applicability flips from "not matching"
@@ -132,7 +130,13 @@ export const menuPopupStyles = [
       transform: translateX(100%);
     }
 
+    /* A real <button> now (see menu-popup.ts) — the whole row goes back a
+       level, not just the chevron, so the click target isn't a small icon
+       lost in the corner. */
     .menu-header {
+      all: unset;
+      box-sizing: border-box;
+      width: 100%;
       display: flex;
       align-items: center;
       gap: var(--ui-spacing-sm);
@@ -140,24 +144,19 @@ export const menuPopupStyles = [
       padding-inline: var(--ui-spacing-sm);
       border-bottom: 1px solid var(--ui-color-neutral-200);
       flex: none;
-    }
-
-    .menu-back {
-      all: unset;
-      box-sizing: border-box;
-      flex: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.75em;
-      height: 1.75em;
-      border-radius: var(--ui-radius-sm);
       cursor: pointer;
       color: var(--ui-text);
+      font: inherit;
+      text-align: start;
     }
 
-    .menu-back:hover {
+    .menu-header:hover {
       background: var(--ui-color-neutral-100);
+    }
+
+    .menu-back-icon {
+      display: flex;
+      flex: none;
     }
 
     .menu-title {

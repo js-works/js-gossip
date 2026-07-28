@@ -29,13 +29,29 @@ export const dateFieldStyles = [
     .wrapper {
       display: flex;
       align-items: center;
+      /* The trigger buttons are <ui-button variant="link"> (see render()),
+         which strips ui-button's own padding entirely — .wrapper no longer
+         gives them any spacing itself (see the two ui-button rules below,
+         which do instead: a wider gap after the input, a narrower one
+         between the two buttons than a single flex gap value could give
+         both at once). */
+      padding-inline-end: 0.5rem;
       border: 1px solid var(--ui-field-border-color);
       border-radius: var(--ui-field-radius);
       box-sizing: border-box;
+      /* Anchor for both picker popovers below (.datepicker and .time-popup) —
+         on the wrapper itself, not an inner element, so both popups'
+         left: anchor(left) lines up with this field's own visible left
+         edge exactly. Anchoring to an inner element instead would leave a
+         gap the width of this border (its own left edge sits 1px inside
+         the wrapper's). Every instance lives in its own shadow root, so
+         reusing one literal anchor name across all of them is safe — no
+         cross-instance name collision to worry about. */
+      anchor-name: --ui-date-field-anchor;
     }
 
     input {
-      flex-grow: 1;
+      flex: 1 1 auto;
       min-width: 0;
       padding: 0.5rem;
       font-family: var(--ui-font-sans);
@@ -43,46 +59,76 @@ export const dateFieldStyles = [
       border: none;
       background: transparent;
       color: inherit;
-      /* Anchor for the picker popover below. Every instance lives in its own
-         shadow root, so reusing one literal anchor name across all of them is
-         safe — there's no cross-instance name collision to worry about. */
-      anchor-name: --ui-date-field-anchor;
     }
 
     input:focus {
       outline: none;
     }
 
-    .trigger {
+    /* The calendar/clock trigger buttons are <ui-button variant="link">
+       (see render(), which also passes this field's own size attribute
+       through so they scale with it). Spacing after the input. */
+    ui-button {
       flex: none;
-      display: flex;
-      align-items: center;
-      padding-inline: 0.5rem;
-      border: none;
-      background: transparent;
-      color: inherit;
-      font-size: 1em;
-      cursor: pointer;
+      margin-inline-start: 0.4em;
     }
 
-    /* SVG's default display is inline, which leaves it sitting on the text
-       baseline with line-height-driven space around it — throwing off flex
-       centering by a few px even though align-items: center is set above.
-       display: block (plus pinning the size, redundant with the width/height
-       attributes already on the SVG itself) makes it a plain centered box. */
-    .trigger svg {
-      display: block;
-      width: 1em;
-      height: 1em;
-    }
-
-    .trigger:disabled {
-      cursor: default;
-      opacity: 0.5;
+    /* Spacing between the two buttons themselves, distinct from the spacing
+       after the input above — overrides that rule for whichever one isn't
+       first. */
+    ui-button + ui-button {
+      margin-inline-start: 0.5em;
     }
 
     :host([invalid]) .wrapper {
       border-color: var(--ui-color-danger-500);
+    }
+
+    /* ---- Time trigger + popup (type: "datetime") ---- */
+
+    .time-popup {
+      position: fixed;
+      /* Same anchor (the field's own .wrapper) and same top/left formula as
+         .datepicker below, so this popup's top-left lands at exactly the
+         same spot the calendar popup would — whichever of the two is open,
+         it opens from the same corner of the field. */
+      position-anchor: --ui-date-field-anchor;
+      top: calc(anchor(bottom) + 0.25rem);
+      left: anchor(left);
+      position-try-fallbacks: flip-block;
+      margin: 0;
+      /* Reset the UA's default popover chrome — same reasoning as
+         .datepicker above; the visible card here is .time-select's own
+         inline listbox (see select.styles.ts's :host([inline]) rules). */
+      border: none;
+      padding: 0;
+      background: transparent;
+      /* The UA default is overflow: auto, which — combined with this
+         element's own fit-content sizing hugging .time-select exactly —
+         clips .time-select's box-shadow at this element's edge instead of
+         letting it bleed outward as intended. Same fix as .datepicker
+         below. */
+      overflow: visible;
+    }
+
+    .time-select {
+      /* Same fixed width as .datepicker-picker below, so the two picker
+         popups this field opens read as the same kind of control rather
+         than one being a full-size card and the other a narrow sliver. */
+      width: 17em;
+      margin: 0;
+      /* Same height as .datepicker-picker below (17.5em) too — this select
+         has no header/footer chrome of its own to eat into that budget the
+         way the calendar's month nav and Today/Clear footer do, so the
+         whole 17.5em goes to the listbox itself; the full 96-entry list
+         always overflows it and scrolls regardless. */
+      --select-inline-height: 17.5em;
+      /* Same popup border/shadow as .datepicker-picker below too, instead of
+         ui-select's own plain field-style default (see select.styles.ts's
+         :host([inline]) .listbox for the override points this feeds). */
+      --select-inline-border-color: var(--ui-popup-border-color);
+      --select-inline-shadow: var(--ui-popup-shadow);
+      font-size: 1.08em;
     }
 
     /* ---- Picker popup, themed entirely from our own --ui-* tokens ---- */
@@ -104,6 +150,11 @@ export const dateFieldStyles = [
       border: none;
       padding: 0;
       background: transparent;
+      /* The UA default is overflow: auto, which — combined with this
+         element's own fit-content sizing hugging .datepicker-picker exactly
+         — clips its box-shadow at this element's edge instead of letting it
+         bleed outward as intended. */
+      overflow: visible;
     }
 
     .datepicker-picker {
@@ -125,11 +176,9 @@ export const dateFieldStyles = [
          the whole picker's text (and, via the width/height above being in
          em too, the picker's own box) proportionally in one place. */
       font-size: 1.08em;
-      border: 1px solid var(--ui-color-neutral-300);
+      border: 1px solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
-      box-shadow:
-        0 10px 25px -5px rgba(0, 0, 0, 0.2),
-        0 4px 8px -4px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--ui-popup-shadow);
       padding: 2px;
     }
 

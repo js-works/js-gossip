@@ -1,4 +1,4 @@
-import { LitElement, html } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 import Datepicker from "vanillajs-datepicker/Datepicker";
@@ -6,9 +6,22 @@ import type { DatepickerLocale } from "vanillajs-datepicker/Datepicker";
 
 import { dateFieldStyles } from "./date-field.styles.js";
 import { calendarIcon } from "./icons/calendar.icon.js";
+import { clockIcon } from "./icons/clock.icon.js";
 import { chevronLeftIcon } from "./icons/chevron-left.icon.js";
 import { chevronRightIcon } from "./icons/chevron-right.icon.js";
 import { renderFieldLabel } from "../../shared/field-label/field-label.js";
+import "../select/select.js";
+import type { Select } from "../select/select.js";
+import "../button/button.js";
+
+// One option per quarter hour, "00:00".."23:45" — the fixed set ui-date-field
+// offers in its time popup (see `type: "datetime"` below). Generated once at
+// module load rather than duplicated as a 96-entry literal.
+const TIME_OPTIONS: string[] = Array.from({ length: 24 * 4 }, (_, i) => {
+  const hours = String(Math.floor(i / 4)).padStart(2, "0");
+  const minutes = String((i % 4) * 15).padStart(2, "0");
+  return `${hours}:${minutes}`;
+});
 
 // ---- Locale, built from the platform's Intl data (see buildIntlLocale below) ----
 
@@ -159,10 +172,23 @@ export class DateField extends LitElement {
   @property()
   accessor label = "";
 
-  // ISO format (yyyy-mm-dd), or "" for no selection — matches native
-  // `<input type="date">`, and keeps the value unambiguous regardless of locale.
+  // ISO format — `yyyy-mm-dd` for `type: "date"`, or `yyyy-mm-ddTHH:mm` (same
+  // convention as native `<input type="datetime-local">`) once a time has
+  // also been picked for `type: "datetime"` — or "" for no selection. Always
+  // unambiguous regardless of locale.
   @property()
   accessor value = "";
+
+  // "datetime" adds a second trigger button (clock icon) next to the
+  // calendar one, opening a popup with a fixed list of times (00:00..23:45,
+  // 15-minute steps) to pick from — see #timePart/#onTimeChange. There's
+  // still exactly one text input either way; once a time is picked, its
+  // displayed text combines both (#displayValue) — vanillajs-datepicker
+  // itself only ever knows about the date part (format "yyyy-mm-dd"), so
+  // #onChangeDate re-appends the time part after every write the library
+  // makes to the input.
+  @property()
+  accessor type: "date" | "datetime" = "date";
 
   @property()
   accessor min: string | undefined = undefined;
@@ -241,7 +267,17 @@ export class DateField extends LitElement {
       // ancestor's `overflow: auto`, e.g. a js-gossip dialog's own scroll
       // container) and the CSS anchor positioning above.
       this.#input.addEventListener("show", () => pickerEl.showPopover());
-      this.#input.addEventListener("hide", () => pickerEl.hidePopover());
+      // Also resyncs the combined display text (not just "changeDate"
+      // below) — re-picking the date that's *already* selected (e.g. the
+      // footer's Today button, clicked twice) still closes the picker and
+      // still ends with the library rewriting the input to its own
+      // bare-date text, but doesn't consider the date "changed" and so never
+      // fires changeDate at all, leaving nothing else to restore the time
+      // suffix.
+      this.#input.addEventListener("hide", () => {
+        pickerEl.hidePopover();
+        this.#syncInputDisplay();
+      });
     }
 
     this.#input.addEventListener("changeDate", this.#onChangeDate);
@@ -264,9 +300,18 @@ export class DateField extends LitElement {
     }
 
     if (changed.has("value") && !this.#syncingFromPicker) {
-      this.#datepicker?.setDate({ clear: true });
-      if (this.value) {
-        this.#datepicker?.setDate(this.value);
+      // Only re-drive the datepicker when the *date* part actually changed —
+      // #onTimeChange also goes through `value` (to combine the existing
+      // date with the newly picked time), and calling setDate() here in that
+      // case would make the datepicker re-fire its own `changeDate` event
+      // re-entrantly (even for a date it's already showing), which then runs
+      // #onChangeDate while `value` is only half-updated and corrupts it.
+      const previousDatePart = String(changed.get("value") ?? "").slice(0, 10);
+      if (previousDatePart !== this.#datePart) {
+        this.#datepicker?.setDate({ clear: true });
+        if (this.#datePart) {
+          this.#datepicker?.setDate(this.#datePart);
+        }
       }
     }
     this.#syncingFromPicker = false;
@@ -313,8 +358,44 @@ export class DateField extends LitElement {
     this.toggleAttribute("invalid", !this.#internals.validity.valid);
   }
 
+  // this.value.slice(...) rather than parsing — both parts are fixed-width
+  // and fixed-position within the "yyyy-mm-ddTHH:mm" convention, and
+  // .slice() past either end of a shorter string (a date-only value, or "")
+  // just yields "", no bounds-checking needed.
+  get #datePart(): string {
+    return this.value.slice(0, 10);
+  }
+
+  get #timePart(): string {
+    return this.type === "datetime" ? this.value.slice(11, 16) : "";
+  }
+
+  // What the single input should actually show — vanillajs-datepicker only
+  // ever writes the bare date part to it (see #onChangeDate), so once a time
+  // is also picked, this is what puts both back together into one value.
+  get #displayValue(): string {
+    const date = this.#datePart;
+    const time = this.#timePart;
+    return date && time ? `${date} ${time}` : date;
+  }
+
+  // The library just wrote its own bare-date text into the input as part of
+  // firing "changeDate"/"hide" — restore the combined display on top of it.
+  // Called unconditionally by both, even where #onChangeDate's own
+  // `next === this.value` check below short-circuits before `value` itself
+  // changes, since the library's overwrite already happened regardless.
+  #syncInputDisplay() {
+    const date = String(this.#datepicker?.getDate("yyyy-mm-dd") ?? "");
+    const time = this.type === "datetime" ? this.#timePart : "";
+    this.#input.value = date && time ? `${date} ${time}` : date;
+  }
+
   #onChangeDate = () => {
-    const next = String(this.#datepicker?.getDate("yyyy-mm-dd") ?? "");
+    this.#syncInputDisplay();
+
+    const nextDate = String(this.#datepicker?.getDate("yyyy-mm-dd") ?? "");
+    const time = this.type === "datetime" ? this.#timePart : "";
+    const next = time ? `${nextDate}T${time}` : nextDate;
     if (next === this.value) {
       return;
     }
@@ -328,6 +409,31 @@ export class DateField extends LitElement {
   #onTriggerClick = () => {
     if (this.disabled) return;
     this.#datepicker?.toggle();
+  };
+
+  // ui-button (see render()) isn't itself a real <button>/<input>, so a
+  // declarative popovertarget attribute on it wouldn't do anything — the
+  // browser's popover-invoker behavior only recognizes that attribute on
+  // the native form-associated elements it's defined for.
+  #onTimeTriggerClick = () => {
+    if (this.disabled || !this.#datePart) return;
+    this.renderRoot.querySelector<HTMLElement>("#time-popup")?.togglePopover();
+  };
+
+  // Fired by the time popup's ui-select (see render()). The time trigger
+  // button is disabled until a date is picked (#datePart empty), so
+  // #datePart is always non-empty by the time this can run.
+  #onTimeChange = (event: Event) => {
+    const time = (event.target as Select).value;
+    const next = `${this.#datePart}T${time}`;
+    if (next === this.value) {
+      return;
+    }
+    this.value = next;
+    this.renderRoot.querySelector<HTMLElement>("#time-popup")?.hidePopover();
+
+    this.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true }));
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   };
 
   formResetCallback() {
@@ -368,13 +474,14 @@ export class DateField extends LitElement {
   }
 
   render() {
+    const timePart = this.#timePart;
     return html`
       ${renderFieldLabel(this.label, "input")}
       <div class="wrapper">
         <input
           id="input"
           type="text"
-          .value=${this.value}
+          .value=${this.#displayValue}
           name=${this.name}
           placeholder=${this.placeholder}
           autocomplete=${this.autocomplete}
@@ -383,16 +490,46 @@ export class DateField extends LitElement {
           ?required=${this.required}
           ?readonly=${this.readonly}
         />
-        <button
-          type="button"
-          class="trigger"
+        <ui-button
+          variant="link"
+          size=${this.size}
           aria-label="Open date picker"
           ?disabled=${this.disabled}
           @click=${this.#onTriggerClick}
         >
           ${calendarIcon}
-        </button>
+        </ui-button>
+        ${this.type === "datetime"
+          ? html`
+              <ui-button
+                variant="link"
+                size=${this.size}
+                aria-label="Open time picker"
+                ?disabled=${this.disabled || !this.#datePart}
+                @click=${this.#onTimeTriggerClick}
+              >
+                ${clockIcon}
+              </ui-button>
+            `
+          : nothing}
       </div>
+      ${this.type === "datetime"
+        ? html`
+            <div id="time-popup" class="time-popup" popover="auto">
+              <ui-select
+                class="time-select"
+                inline
+                .value=${timePart}
+                aria-label="Select time"
+                @change=${this.#onTimeChange}
+              >
+                ${TIME_OPTIONS.map(
+                  (time) => html`<ui-option value=${time}>${time}</ui-option>`,
+                )}
+              </ui-select>
+            </div>
+          `
+        : nothing}
     `;
   }
 }

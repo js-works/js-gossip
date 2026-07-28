@@ -109,6 +109,17 @@ export class Select extends LitElement {
   @property({ type: Boolean, attribute: "popup-portal" })
   accessor popupPortal = false;
 
+  // Renders as an always-expanded, always-visible listbox instead of the
+  // default closed trigger + popup — the custom-element analogue of a native
+  // `<select size="N">`/`<select multiple>` rather than a plain `<select>`.
+  // No trigger button, no chevron, no popup layout tracking: the listbox
+  // itself is the focusable host, real DOM focus lands there directly (there
+  // being no separate trigger to hold virtual focus while a popup floats
+  // over the page). Meant for embedding a plain pick-a-value list somewhere a
+  // full combobox would be overkill (e.g. `ui-date-field`'s time popup).
+  @property({ type: Boolean, reflect: true })
+  accessor inline = false;
+
   @state()
   accessor open = false;
 
@@ -120,10 +131,13 @@ export class Select extends LitElement {
   static styles = selectStyles;
 
   protected firstUpdated() {
-    this.#trigger = this.renderRoot.querySelector<HTMLElement>(".trigger")!;
+    this.#trigger = this.renderRoot.querySelector<HTMLElement>(
+      this.inline ? "#listbox" : ".trigger",
+    )!;
     this.#syncFormValue();
     this.#syncSelected();
     this.#syncValidity();
+    if (this.inline) return;
     this.#popupLayout = trackPopupLayout({
       // .wrapper, not `this` — :host can be stretched taller than the
       // trigger by a consumer's own layout (see .wrapper's comment in
@@ -350,6 +364,55 @@ export class Select extends LitElement {
     this.#closeList();
   }
 
+  // Same key set as #onTriggerKeydown's open-branch, minus the open/close
+  // transitions themselves — the listbox is always visible in inline mode,
+  // so there's nothing to open on ArrowDown/Enter, only an active option to
+  // move or pick.
+  #onInlineKeydown(event: KeyboardEvent) {
+    if (this.disabled) return;
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        this.#moveActive(1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        this.#moveActive(-1);
+        break;
+      case "Home": {
+        event.preventDefault();
+        const options = this.#options().filter((option) => !option.disabled);
+        this.#setActive(options[0]);
+        break;
+      }
+      case "End": {
+        event.preventDefault();
+        const options = this.#options().filter((option) => !option.disabled);
+        this.#setActive(options.at(-1));
+        break;
+      }
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        this.#selectActive();
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Highlights a starting option the first time the listbox gains focus —
+  // native <select size> has no equivalent (it starts with nothing
+  // highlighted), but ui-option's active state is also what drives
+  // aria-activedescendant, so leaving it unset until an arrow key would mean
+  // an assistive-tech user gets no positional feedback at all until their
+  // first keypress.
+  #onInlineFocus() {
+    if (this.#activeOption) return;
+    const options = this.#options().filter((option) => !option.disabled);
+    this.#setActive(this.#selectedOption ?? options[0]);
+  }
+
   #onListboxClick(event: Event) {
     const option = (event.target as Element).closest(
       "ui-option",
@@ -412,6 +475,28 @@ export class Select extends LitElement {
   }
 
   render() {
+    if (this.inline) {
+      return html`
+        ${renderFieldLabel(this.label, "listbox")}
+        <div class="wrapper inline">
+          <div
+            id="listbox"
+            role="listbox"
+            class="listbox"
+            tabindex=${this.disabled ? -1 : 0}
+            aria-multiselectable=${this.multiple ? "true" : nothing}
+            aria-activedescendant=${this.#activeOption?.id ?? nothing}
+            aria-disabled=${this.disabled ? "true" : nothing}
+            @click=${this.#onListboxClick}
+            @keydown=${this.#onInlineKeydown}
+            @focus=${this.#onInlineFocus}
+          >
+            <slot @slotchange=${this.#onSlotChange}></slot>
+          </div>
+        </div>
+      `;
+    }
+
     // In multiple mode, the picks show either as pills (own branch below) or,
     // with multipleValueDisplay: "text", as a plain comma list rendered
     // through this same .value span the single-select case already uses —

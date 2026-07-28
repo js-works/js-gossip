@@ -107,6 +107,15 @@ export const defaultTheme = css`
        darkened back to #808080 → lightened again, in two steps, to this. */
     --ui-field-border-color: #949494;
 
+    /* Shared by every floating popup (ui-select/ui-combobox/ui-autocomplete's
+       dropdown, ui-menu-button/ui-split-button's menu, ui-date-field's
+       calendar) — these were identical copy-pasted literals across all of
+       them before being pulled out here, so a future restyle only needs to
+       change it in one place. */
+    --ui-popup-border-color: var(--ui-color-neutral-300);
+    --ui-popup-shadow:
+      0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 4px 8px -4px rgba(0, 0, 0, 0.15);
+
     --ui-focus-ring-width: 2px;
     --ui-focus-ring-offset: 1px;
 

@@ -771,6 +771,18 @@ function selectTab() {
           <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
         </ui-select>
       </div>
+      <div class="row">
+        <ui-select inline label="Fruit (inline)">
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
+        </ui-select>
+      </div>
     </section>
   `;
 }
@@ -956,6 +968,13 @@ function dateFieldTab() {
           min="2026-01-01"
           max="2026-12-31"
           label="Date of birth"
+        ></ui-date-field>
+      </div>
+      <div class="row">
+        <ui-date-field
+          type="datetime"
+          placeholder="yyyy-mm-dd hh:mm"
+          label="Date & time"
         ></ui-date-field>
       </div>
     </section>

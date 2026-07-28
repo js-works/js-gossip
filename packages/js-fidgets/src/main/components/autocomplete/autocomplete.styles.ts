@@ -181,11 +181,9 @@ export const autocompleteStyles = [
     .popup {
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-color-neutral-300);
+      border: 1px solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
-      box-shadow:
-        0 10px 25px -5px rgba(0, 0, 0, 0.2),
-        0 4px 8px -4px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--ui-popup-shadow);
     }
 
     .listbox {

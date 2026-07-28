@@ -113,18 +113,16 @@ function renderPage(
     <div class="${classes}" ?inert=${outgoing} aria-hidden=${outgoing ? "true" : nothing}>
       ${group
         ? html`
-            <div class="menu-header">
-              <button
-                type="button"
-                class="menu-back"
-                tabindex="-1"
-                aria-label="Back"
-                @click=${() => controller.back()}
-              >
-                ${chevronLeftIcon}
-              </button>
+            <button
+              type="button"
+              class="menu-header"
+              tabindex="-1"
+              aria-label="Back"
+              @click=${() => controller.back()}
+            >
+              <span class="menu-back-icon">${chevronLeftIcon}</span>
               <span class="menu-title">${group.label}</span>
-            </div>
+            </button>
           `
         : nothing}
       <div class="menu-list" role="menu" aria-label=${group?.label ?? "Menu"}>

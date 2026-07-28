@@ -196,11 +196,9 @@ export const selectStyles = [
     .popup {
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-color-neutral-300);
+      border: 1px solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
-      box-shadow:
-        0 10px 25px -5px rgba(0, 0, 0, 0.2),
-        0 4px 8px -4px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--ui-popup-shadow);
     }
 
     /* Neutralizes the UA stylesheet's own popover defaults (margin: auto,
@@ -226,6 +224,41 @@ export const selectStyles = [
       padding-inline: var(--ui-spacing-sm);
       overflow-y: auto;
       box-sizing: border-box;
+    }
+
+    /* ---- inline mode: always-visible listbox, no trigger/popup ---- */
+
+    :host([inline]) .wrapper {
+      display: block;
+    }
+
+    :host([inline]) .listbox {
+      display: block;
+      min-width: var(--select-min-width);
+      /* Overridable per use (e.g. ui-date-field's time popup wants a
+         shorter list than this component's own default, and its own
+         popup-style border/shadow instead of this plain field-style
+         default). */
+      max-height: var(--select-inline-height, 12em);
+      border: 1px solid var(--select-inline-border-color, var(--ui-field-border-color));
+      border-radius: var(--ui-field-radius);
+      background: var(--ui-bg);
+      color: var(--ui-text);
+      box-shadow: var(--select-inline-shadow, none);
+    }
+
+    :host([inline]) .listbox:focus-visible {
+      outline: var(--ui-focus-ring-width) solid var(--ui-color-primary-500);
+      outline-offset: var(--ui-focus-ring-offset);
+    }
+
+    :host([inline][disabled]) .listbox {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    :host([inline][invalid]) .listbox {
+      border-color: var(--ui-color-danger-500);
     }
   `,
 ];
