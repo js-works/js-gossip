@@ -127,6 +127,15 @@ export const autocompleteStyles = [
       outline: none;
     }
 
+    /* Once pills are crowding the row, input's own min-width: 0 above (needed
+       so it can shrink small enough for .content's wrap to kick in at all)
+       would otherwise let it get squeezed down to an unusable sliver — this
+       floors it at a still-comfortable typing width instead, wrapping to its
+       own line if there isn't room rather than shrinking further. */
+    .content:has(.pill) input {
+      min-width: 4em;
+    }
+
     .spinner {
       flex: none;
       width: 1em;
@@ -179,6 +188,10 @@ export const autocompleteStyles = [
        still technically fits) proved unreliable in real-world testing) —
        this rule only adds the visual theming. */
     .popup {
+      /* Same reasoning as ui-select's own .popup: a floor independent of
+         trackPopupLayout's default trigger-width match, so a deliberately
+         narrow trigger doesn't also cramp the listbox itself. */
+      min-width: 7em;
       background: var(--ui-bg);
       color: var(--ui-text);
       border: 1px solid var(--ui-popup-border-color);
@@ -223,21 +236,24 @@ export const autocompleteStyles = [
       background: var(--ui-color-neutral-100);
     }
 
+    /* Focus-ring-like outline rather than a filled background, so it reads
+       as "the cursor is here" without competing with [aria-selected]'s own
+       visual weight. Same treatment as ui-select/ui-combobox's own
+       ui-option active state (option.styles.ts). */
     li[role="option"].active {
       border-color: var(--ui-color-primary-500);
-      background: var(--ui-color-primary-500);
-      color: white;
+      background: transparent;
     }
 
-    li[role="option"].active .check {
-      color: inherit;
-    }
-
-    /* Fixed-width slot, always reserved (even when empty) so option labels line up
-       whether or not that row is the selected one. */
+    /* Fixed-width slot, always reserved (even when empty) so option labels line
+       up whether or not that row is the selected one — sized to fit the
+       1.1em multi-select checked icon (check-square.icon.ts) plus a bit of
+       breathing room on each side. */
     .check {
       flex: none;
-      width: 1em;
+      width: 1.1em;
+      padding-inline: 0.15em;
+      box-sizing: content-box;
       display: flex;
       color: var(--ui-color-primary-500);
     }

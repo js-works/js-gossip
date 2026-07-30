@@ -216,6 +216,7 @@ export class Combobox extends LitElement {
 
   #syncSelected() {
     for (const option of this.#options()) {
+      option.multiple = this.multiple;
       option.selected = this.multiple
         ? this.values.includes(option.value)
         : option.value === this.value;
@@ -323,8 +324,16 @@ export class Combobox extends LitElement {
     this.#input.value = "";
     this.query = "";
     this.#applyFilter("");
+    // Re-finds `option` itself in the now-unfiltered list, rather than always
+    // snapping to index 0 — clearing the filter can reshuffle where things
+    // land, so activeIndex still needs re-resolving against the new list,
+    // but keeping it on the option just toggled (already on-screen, since
+    // that's what was just clicked/activated) is what keeps
+    // scrollIntoListboxView below a no-op instead of yanking the listbox's
+    // scroll position back to wherever index 0 happens to be.
     const options = this.#visibleOptions();
-    this.#setActiveIndex(options.length === 0 ? -1 : 0);
+    const index = options.indexOf(option);
+    this.#setActiveIndex(index === -1 ? (options.length === 0 ? -1 : 0) : index);
     this.#input.focus();
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }

@@ -51,16 +51,13 @@ export const optionStyles = [
 
     /* Keyboard-highlighted (see ui-select's #setActive) — distinct from
        [selected], which marks the actual current value regardless of whether
-       it's the one currently highlighted. Same primary-fill treatment as
+       it's the one currently highlighted. A focus-ring-like outline rather
+       than a filled background, so it reads as "the cursor is here" without
+       competing with [selected]'s own visual weight. Same treatment as
        ui-autocomplete's own active option. */
     :host([active]) .option {
       border-color: var(--ui-color-primary-500);
-      background: var(--ui-color-primary-500);
-      color: white;
-    }
-
-    :host([active]) .check {
-      color: inherit;
+      background: transparent;
     }
 
     :host([selected]) .option {
@@ -68,10 +65,14 @@ export const optionStyles = [
     }
 
     /* Fixed-width slot, always reserved (even when empty) so option labels line
-       up whether or not that row is the selected one. */
+       up whether or not that row is the selected one — sized to fit the
+       1.1em multi-select checked icon (check-square.icon.ts) plus a bit of
+       breathing room on each side. */
     .check {
       flex: none;
-      width: 1em;
+      width: 1.1em;
+      padding-inline: 0.15em;
+      box-sizing: content-box;
       display: flex;
       color: var(--ui-color-primary-500);
     }

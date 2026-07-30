@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
@@ -7,6 +7,9 @@ import {
   renderFieldLabel,
   fieldLabelStyles,
 } from "../../shared/field-label/field-label.js";
+import "../button/button.js";
+import { plusIcon } from "./icons/plus.icon.js";
+import { minusIcon } from "./icons/minus.icon.js";
 
 /**
  * A themed `<input type="number">` — min/max/step/required validity comes
@@ -14,6 +17,13 @@ import {
  * rangeOverflow/stepMismatch/valueMissing), the same delegation approach
  * `ui-email-field` uses for its native email-format check, rather than
  * reimplementing numeric range/step logic by hand.
+ *
+ * The native spin buttons are always suppressed (they render wildly
+ * differently across browsers and can't be themed) in favor of two
+ * `ui-button` `variant="link"` steppers with their own plus/minus glyphs,
+ * driven by `#adjust()` rather than the native `stepUp()`/`stepDown()` —
+ * those throw when `step` is `"any"` (this field's own default, see `step`
+ * below), so a manual +/-1 (or +/- the configured `step`) is used instead.
  */
 @customElement("ui-number-field")
 export class NumberField extends LitElement {
@@ -61,9 +71,9 @@ export class NumberField extends LitElement {
   @property()
   accessor placeholder = "";
 
-  // Hides the native up/down spin buttons — e.g. a compact "go to page"
-  // field, where the stepper has no room and clamping is handled by the
-  // consumer instead. Off by default, so the native stepper still shows.
+  // Hides the +/- stepper buttons entirely — e.g. a compact "go to page"
+  // field, where they have no room and clamping is handled by the consumer
+  // instead. Off by default, so the stepper buttons show.
   @property({ type: Boolean, reflect: true, attribute: "hide-stepper" })
   accessor hideStepper = false;
 
@@ -121,6 +131,11 @@ export class NumberField extends LitElement {
         outline-offset: var(--ui-focus-ring-offset);
       }
 
+      /* appearance: textfield (plus the ::-webkit-*-spin-button rule below)
+         suppresses the native spin buttons unconditionally — they're
+         replaced by .stepper's own ui-button pair below (see class doc)
+         regardless of hide-stepper, since a themed replacement exists now
+         either way. */
       input {
         flex-grow: 1;
         min-width: 0;
@@ -130,6 +145,7 @@ export class NumberField extends LitElement {
         border: none;
         background: transparent;
         color: inherit;
+        appearance: textfield;
       }
 
       :host([centered]) input {
@@ -142,21 +158,28 @@ export class NumberField extends LitElement {
         font-size: var(--field-font-size);
       }
 
-      /* hide-stepper: no stepper UI at all (native or custom) — the native
-         spin buttons would otherwise overlap long placeholder/value text,
-         since nothing reserves room for them. */
-      :host([hide-stepper]) input {
-        appearance: textfield;
-      }
-
-      :host([hide-stepper]) input::-webkit-outer-spin-button,
-      :host([hide-stepper]) input::-webkit-inner-spin-button {
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
         appearance: none;
         margin: 0;
       }
 
       input:focus {
         outline: none;
+      }
+
+      /* The two steppers sit right after the input, inside the same bordered
+         wrapper — sized down from the field's own font-size (ui-button's
+         default padding/font-size would otherwise dwarf a "small" field) and
+         packed edge-to-edge with no gap, reading as one horizontal pair
+         rather than two separate buttons. */
+      .stepper {
+        display: flex;
+        flex: none;
+        padding-inline-end: calc(var(--field-padding) / 2);
+        --btn-font-size: calc(var(--field-font-size) * 0.85);
+        --btn-padding-block: 0.15em;
+        --btn-padding-inline: 0.3em;
       }
 
       :host([invalid]) .wrapper {
@@ -230,6 +253,72 @@ export class NumberField extends LitElement {
     );
   }
 
+  // 1 when `step` is unset/"any" (this field's own default) — matches what a
+  // consumer typing decimals expects the buttons to do with nothing
+  // configured, same as the native stepper's own fallback.
+  #stepAmount(): number {
+    const parsed = parseFloat(this.step);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  }
+
+  // How many decimals the result is rounded to — derived from `step` (falling
+  // back to the same "1" #stepAmount() defaults to) so e.g. step="0.1" keeps
+  // landing on exact tenths instead of drifting via binary-float rounding
+  // (0.1 + 0.2 territory).
+  #decimalPlaces(): number {
+    const source = this.step || "1";
+    const dot = source.indexOf(".");
+    return dot === -1 ? 0 : source.length - dot - 1;
+  }
+
+  #numericValue(): number | undefined {
+    const parsed = parseFloat(this.value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  #isDecrementDisabled(): boolean {
+    if (this.disabled || this.readonly) return true;
+    const min = parseFloat(this.min);
+    const current = this.#numericValue();
+    return Number.isFinite(min) && current !== undefined && current <= min;
+  }
+
+  #isIncrementDisabled(): boolean {
+    if (this.disabled || this.readonly) return true;
+    const max = parseFloat(this.max);
+    const current = this.#numericValue();
+    return Number.isFinite(max) && current !== undefined && current >= max;
+  }
+
+  // Reimplements native stepUp()/stepDown() clamping by hand rather than
+  // calling them directly — both throw an InvalidStateError when `step` is
+  // "any", which is this field's own default (see the `step` doc above).
+  #adjust(direction: 1 | -1) {
+    if (this.disabled || this.readonly) return;
+
+    let next = (this.#numericValue() ?? 0) + direction * this.#stepAmount();
+
+    const min = parseFloat(this.min);
+    if (Number.isFinite(min)) next = Math.max(next, min);
+
+    const max = parseFloat(this.max);
+    if (Number.isFinite(max)) next = Math.min(next, max);
+
+    this.value = next.toFixed(this.#decimalPlaces());
+
+    if (this.#input) {
+      this.#input.value = this.value;
+    }
+
+    this.#syncFormValue();
+    this.#syncValidity();
+
+    this.dispatchEvent(
+      new InputEvent("input", { bubbles: true, composed: true }),
+    );
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+
   formResetCallback() {
     this.value = "";
 
@@ -300,6 +389,28 @@ export class NumberField extends LitElement {
           @input=${this.#onInput}
           @change=${this.#onChange}
         />
+        ${this.hideStepper
+          ? nothing
+          : html`
+              <div class="stepper">
+                <ui-button
+                  variant="link"
+                  aria-label="Decrement"
+                  ?disabled=${this.#isDecrementDisabled()}
+                  @click=${() => this.#adjust(-1)}
+                >
+                  ${minusIcon}
+                </ui-button>
+                <ui-button
+                  variant="link"
+                  aria-label="Increment"
+                  ?disabled=${this.#isIncrementDisabled()}
+                  @click=${() => this.#adjust(1)}
+                >
+                  ${plusIcon}
+                </ui-button>
+              </div>
+            `}
       </div>
     `;
   }

@@ -194,6 +194,13 @@ export const selectStyles = [
        element by shared/popup-layout/popup-layout.ts's trackPopupLayout (see
        select.ts's firstUpdated()) — this rule only adds the visual theming. */
     .popup {
+      /* trackPopupLayout matches this to the trigger's own width by default
+         (matchWidth, see select.ts's firstUpdated()) — a floor independent
+         of that so a deliberately narrow trigger (e.g. a page-size picker's
+         --select-min-width override) doesn't also cramp the listbox itself,
+         where option labels are usually longer than the closed value shown
+         on the trigger. */
+      min-width: 7em;
       background: var(--ui-bg);
       color: var(--ui-text);
       border: 1px solid var(--ui-popup-border-color);

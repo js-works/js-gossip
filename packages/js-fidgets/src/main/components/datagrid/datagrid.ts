@@ -10,7 +10,7 @@ import { chevronRightIcon } from "./icons/chevron-right.icon.js";
 import { chevronsLeftIcon } from "./icons/chevrons-left.icon.js";
 import { chevronsRightIcon } from "./icons/chevrons-right.icon.js";
 import { checkSquareIcon } from "./icons/check-square.icon.js";
-import { plusIcon } from "./icons/plus.icon.js";
+import { expanderChevronIcon } from "./icons/expander-chevron.icon.js";
 import type { DataGridFilterType } from "./filters.js";
 import "../button/button.js";
 import "../checkbox/checkbox.js";
@@ -329,6 +329,14 @@ export class DataGrid<T = unknown> extends LitElement {
   // regardless.
   #displayPage = 0;
 
+  // Same lagging as #displayPage above, and for the same reason — a
+  // page-size change is itself a new request (see updated()'s resetsPage),
+  // so without this the "A to B of C" text would briefly do its range math
+  // with the *new* page size against rows that still belong to the old one,
+  // showing a range that matches neither. Committed alongside #displayPage
+  // in the exact same two places.
+  #displayPageSize = 20;
+
   #activeRequest?: AbortController;
   #loadingSpinnerTimer?: ReturnType<typeof setTimeout>;
   #ready = false;
@@ -411,6 +419,7 @@ export class DataGrid<T = unknown> extends LitElement {
     this.rows = sorted.slice(start, start + pageSize);
     this.rowCount = sorted.length;
     this.#displayPage = this.page;
+    this.#displayPageSize = pageSize;
   }
 
   #refreshAsync(): void {
@@ -444,6 +453,7 @@ export class DataGrid<T = unknown> extends LitElement {
         this.rows = result.rows;
         this.rowCount = result.rowCount;
         this.#displayPage = this.page;
+        this.#displayPageSize = pageSize;
       },
       () => {
         if (request.signal.aborted) return;
@@ -736,15 +746,28 @@ export class DataGrid<T = unknown> extends LitElement {
     const pageSize = this.#effectivePageSize();
     const pageCount = Math.max(1, Math.ceil(this.rowCount / pageSize));
     // Drives the nav buttons' own enabled/disabled state and +/-1 arithmetic
-    // — based on `page` itself, so it's immediately consistent with clicks
-    // (including rapid repeated ones) rather than lagging behind a request.
+    // — based on `page`/`pageSize` themselves, so it's immediately consistent
+    // with clicks (including rapid repeated ones) rather than lagging behind
+    // a request.
     const currentPage = Math.min(this.page, pageCount - 1);
     // Drives the pagination bar's own displayed text (see `#displayPage`'s
-    // own doc) — lags behind `currentPage` until the rows it describes have
-    // actually loaded.
-    const displayPage = Math.min(this.#displayPage, pageCount - 1);
-    const rangeStart = this.rowCount === 0 ? 0 : displayPage * pageSize + 1;
-    const rangeEnd = Math.min(rangeStart + pageSize - 1, this.rowCount);
+    // own doc) — lags behind `currentPage`/`pageSize` until the rows it
+    // describes have actually loaded. Its own page *count* is derived from
+    // `#displayPageSize`, not the (possibly just-changed, not-yet-applied)
+    // `pageSize` above — otherwise clamping `displayPage` against a page
+    // count built from the new size would still leak that size's effect into
+    // the display one render early.
+    const displayPageCount = Math.max(
+      1,
+      Math.ceil(this.rowCount / this.#displayPageSize),
+    );
+    const displayPage = Math.min(this.#displayPage, displayPageCount - 1);
+    const rangeStart =
+      this.rowCount === 0 ? 0 : displayPage * this.#displayPageSize + 1;
+    const rangeEnd = Math.min(
+      rangeStart + this.#displayPageSize - 1,
+      this.rowCount,
+    );
 
     return html`
       ${this.title || this.subtitle || visibleActions.length > 0
@@ -813,8 +836,8 @@ export class DataGrid<T = unknown> extends LitElement {
                       style="grid-column: ${expanderCol}; grid-row: 2"
                     >
                       ${expandableRows.length > 0
-                        ? html`<button
-                            type="button"
+                        ? html`<ui-button
+                            variant="link"
                             class="expander-toggle ${anyRowDetailsExpanded
                               ? "expanded"
                               : ""}"
@@ -828,8 +851,8 @@ export class DataGrid<T = unknown> extends LitElement {
                                 anyRowDetailsExpanded,
                               )}
                           >
-                            ${plusIcon}
-                          </button>`
+                            ${expanderChevronIcon}
+                          </ui-button>`
                         : nothing}
                     </div>`
                   : nothing}
@@ -945,7 +968,8 @@ export class DataGrid<T = unknown> extends LitElement {
                 : nothing}
             </div>
 
-            <div class="body" role="rowgroup" ?inert=${this.showLoadingSpinner}>
+            <div class="body-viewport">
+              <div class="body" role="rowgroup" ?inert=${this.showLoadingSpinner}>
               ${this.rows.length === 0
                 ? html`<div class="empty-message">
                     ${this.showLoadingSpinner ? "" : "No rows"}
@@ -979,8 +1003,8 @@ export class DataGrid<T = unknown> extends LitElement {
                         ${hasRowDetails
                           ? html`<div class="cell expander-cell">
                               ${details !== undefined
-                                ? html`<button
-                                    type="button"
+                                ? html`<ui-button
+                                    variant="link"
                                     class="expander-toggle ${isExpanded
                                       ? "expanded"
                                       : ""}"
@@ -993,8 +1017,8 @@ export class DataGrid<T = unknown> extends LitElement {
                                       this.#toggleRowDetails(row);
                                     }}
                                   >
-                                    ${plusIcon}
-                                  </button>`
+                                    ${expanderChevronIcon}
+                                  </ui-button>`
                                 : nothing}
                             </div>`
                           : nothing}
@@ -1056,6 +1080,7 @@ export class DataGrid<T = unknown> extends LitElement {
                         : nothing}
                     `;
                   })}
+            </div>
               ${this.showLoadingSpinner
                 ? html`<div class="loading-overlay">
                     <span class="spinner"></span>

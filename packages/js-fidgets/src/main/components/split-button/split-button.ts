@@ -4,9 +4,10 @@ import { customElement, property } from "lit/decorators.js";
 import { splitButtonStyles } from "./split-button.styles.js";
 import { chevronDownIcon } from "./icons/chevron-down.icon.js";
 import { trackPopupLayout } from "../../shared/popup-layout/popup-layout.js";
-import { MenuController } from "../../shared/menu/menu-core.js";
+import { MenuController, MENU_TRANSITION_MS } from "../../shared/menu/menu-core.js";
 import { menuEntryId, renderMenuPopup } from "../../shared/menu/menu-popup.js";
 import { doubleRaf } from "../../shared/menu/double-raf.js";
+import { trackMenuHeightTransition } from "../../shared/menu/menu-height-transition.js";
 import type { MenuEntry, MenuSelectDetail } from "../../shared/menu/menu.types.js";
 
 export type { MenuEntry, MenuAction, MenuSubmenu, MenuSeparator, MenuSelectDetail } from "../../shared/menu/menu.types.js";
@@ -34,6 +35,16 @@ export class SplitButton extends LitElement {
   #primaryButton!: HTMLButtonElement;
   #popupLayout?: ReturnType<typeof trackPopupLayout>;
   #menu: MenuController;
+  // Animates the popup's box height smoothly across a page transition
+  // (drilling in/backing out) instead of it snapping instantly to whatever
+  // height the new page happens to need — see that module's own doc
+  // comment for the prepare()/apply() split this drives from willUpdate()/
+  // updated() below.
+  #heightTransition = trackMenuHeightTransition({
+    getViewportElement: () =>
+      this.renderRoot.querySelector<HTMLElement>(".viewport"),
+    durationMs: MENU_TRANSITION_MS,
+  });
 
   @property({ type: Array })
   accessor items: MenuEntry[] = [];
@@ -96,12 +107,20 @@ export class SplitButton extends LitElement {
     });
   }
 
+  // Captures the viewport's pre-update height while the outgoing page is
+  // still the one in the DOM — see menu-height-transition.ts's own doc
+  // comment for why this has to happen before Lit's patch, not after.
+  protected willUpdate() {
+    this.#heightTransition.prepare(this.#menu.transition);
+  }
+
   protected updated() {
     // See double-raf.ts's own doc comment for why this needs two frames,
     // not one, to reliably animate rather than snap.
     if (this.#menu.transition?.phase === "start") {
       doubleRaf(() => this.#menu.runTransition());
     }
+    this.#heightTransition.apply(this.#menu.transition);
     // Unconditional, not gated on the menu being open — mirrors
     // ui-select's own updated(), whose comment explains why: visibility can
     // flip without a narrower gate necessarily catching every transition.

@@ -221,6 +221,7 @@ export class Select extends LitElement {
 
   #syncSelected() {
     for (const option of this.#options()) {
+      option.multiple = this.multiple;
       option.selected = this.multiple
         ? this.values.includes(option.value)
         : option.value === this.value;

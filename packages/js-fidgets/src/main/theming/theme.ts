@@ -113,8 +113,13 @@ export const defaultTheme = css`
        them before being pulled out here, so a future restyle only needs to
        change it in one place. */
     --ui-popup-border-color: var(--ui-color-neutral-300);
+    /* Three layers, each a bit larger/fainter than the last (rather than the
+       previous two-layer version's tight negative spreads, which read as a
+       harder-edged cutoff) — a softer, more gradual falloff. */
     --ui-popup-shadow:
-      0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 4px 8px -4px rgba(0, 0, 0, 0.15);
+      0 2px 4px rgba(0, 0, 0, 0.06),
+      0 8px 16px rgba(0, 0, 0, 0.08),
+      0 20px 32px rgba(0, 0, 0, 0.1);
 
     --ui-focus-ring-width: 2px;
     --ui-focus-ring-offset: 1px;

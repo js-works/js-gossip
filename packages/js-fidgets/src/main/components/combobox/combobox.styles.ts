@@ -134,6 +134,15 @@ export const comboboxStyles = [
       outline: none;
     }
 
+    /* Once pills are crowding the row, input's own min-width: 0 above (needed
+       so it can shrink small enough for .content's wrap to kick in at all)
+       would otherwise let it get squeezed down to an unusable sliver — this
+       floors it at a still-comfortable typing width instead, wrapping to its
+       own line if there isn't room rather than shrinking further. */
+    .content:has(.pill) input {
+      min-width: 4em;
+    }
+
     input:disabled {
       cursor: not-allowed;
     }
@@ -172,6 +181,10 @@ export const comboboxStyles = [
        combobox.ts's firstUpdated()) — this rule only adds the visual
        theming. */
     .popup {
+      /* Same reasoning as ui-select's own .popup: a floor independent of
+         trackPopupLayout's default trigger-width match, so a deliberately
+         narrow trigger doesn't also cramp the listbox itself. */
+      min-width: 7em;
       background: var(--ui-bg);
       color: var(--ui-text);
       border: 1px solid var(--ui-popup-border-color);

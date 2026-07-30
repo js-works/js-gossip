@@ -33,12 +33,14 @@ import type {
 } from "../main/components/datagrid/datagrid.js";
 import { textFilter, selectFilter } from "../main/components/datagrid/filters.js";
 import "../main/components/text-field/text-field.js";
+import "../main/components/textarea/textarea.js";
 import "../main/components/number-field/number-field.js";
 import "../main/components/password-field/password-field.js";
 import "../main/components/email-field/email-field.js";
 import "../main/components/date-field/date-field.js";
 import "../main/components/native-date-field/native-date-field.js";
 import "../main/components/upload/upload.js";
+import "../main/components/editor/editor.js";
 import "../main/components/tabs/tabs.js";
 import type { Tabs } from "../main/components/tabs/tabs.js";
 import type {
@@ -556,6 +558,9 @@ const employeeDataGridDataSource: DataGridDataSource<Employee> = ({
   });
 
 function buttonsTab() {
+  const onSelect = (event: CustomEvent<MenuSelectDetail>) =>
+    console.log("Menu select:", event.detail.value, "path:", event.detail.path);
+
   return html`
     <section class="button-showcase">
       <h2>Buttons</h2>
@@ -612,14 +617,7 @@ function buttonsTab() {
         <ui-button full-width appearance="success">Full-width button</ui-button>
       </div>
     </section>
-  `;
-}
 
-function menuButtonTab() {
-  const onSelect = (event: CustomEvent<MenuSelectDetail>) =>
-    console.log("Menu select:", event.detail.value, "path:", event.detail.path);
-
-  return html`
     <section>
       <h2>Menu button</h2>
       <p>
@@ -655,14 +653,7 @@ function menuButtonTab() {
         </ui-menu-button>
       </div>
     </section>
-  `;
-}
 
-function splitButtonTab() {
-  const onSelect = (event: CustomEvent<MenuSelectDetail>) =>
-    console.log("Menu select:", event.detail.value, "path:", event.detail.path);
-
-  return html`
     <section>
       <h2>Split button</h2>
       <p>
@@ -706,88 +697,7 @@ function splitButtonTab() {
   `;
 }
 
-function selectTab() {
-  return html`
-    <section>
-      <h2>Select</h2>
-      <div class="row">
-        <ui-select label="Fruit">
-          <ui-option value="apple">Apple</ui-option>
-          <ui-option value="banana">Banana</ui-option>
-          <ui-option-group label="Citrus">
-            <ui-option value="orange">Orange</ui-option>
-            <ui-option value="lemon">Lemon</ui-option>
-            <ui-option value="lime">Lime</ui-option>
-          </ui-option-group>
-          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
-        </ui-select>
-      </div>
-      <div class="row">
-        <ui-select size="small" label="Small">
-          <ui-option value="a">Option A</ui-option>
-          <ui-option value="b">Option B</ui-option>
-        </ui-select>
-        <ui-select size="medium" label="Medium">
-          <ui-option value="a">Option A</ui-option>
-          <ui-option value="b">Option B</ui-option>
-        </ui-select>
-        <ui-select size="large" label="Large">
-          <ui-option value="a">Option A</ui-option>
-          <ui-option value="b">Option B</ui-option>
-        </ui-select>
-        <ui-select disabled label="Disabled">
-          <ui-option value="a">Option A</ui-option>
-        </ui-select>
-      </div>
-      <div class="row">
-        <ui-select
-          multiple
-          max-options-visible="2"
-          label="Fruits"
-        >
-          <ui-option value="apple">Apple</ui-option>
-          <ui-option value="banana">Banana</ui-option>
-          <ui-option-group label="Citrus">
-            <ui-option value="orange">Orange</ui-option>
-            <ui-option value="lemon">Lemon</ui-option>
-            <ui-option value="lime">Lime</ui-option>
-          </ui-option-group>
-          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
-        </ui-select>
-      </div>
-      <div class="row">
-        <ui-select
-          multiple
-          multiple-value-display="text"
-          label="Fruits (text display)"
-        >
-          <ui-option value="apple">Apple</ui-option>
-          <ui-option value="banana">Banana</ui-option>
-          <ui-option-group label="Citrus">
-            <ui-option value="orange">Orange</ui-option>
-            <ui-option value="lemon">Lemon</ui-option>
-            <ui-option value="lime">Lime</ui-option>
-          </ui-option-group>
-          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
-        </ui-select>
-      </div>
-      <div class="row">
-        <ui-select inline label="Fruit (inline)">
-          <ui-option value="apple">Apple</ui-option>
-          <ui-option value="banana">Banana</ui-option>
-          <ui-option-group label="Citrus">
-            <ui-option value="orange">Orange</ui-option>
-            <ui-option value="lemon">Lemon</ui-option>
-            <ui-option value="lime">Lime</ui-option>
-          </ui-option-group>
-          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
-        </ui-select>
-      </div>
-    </section>
-  `;
-}
-
-function radioTab() {
+function radiosAndCheckboxesTab() {
   return html`
     <section>
       <h2>Radio group</h2>
@@ -818,11 +728,7 @@ function radioTab() {
         </ui-radio-group>
       </div>
     </section>
-  `;
-}
 
-function checkboxTab() {
-  return html`
     <section>
       <h2>Checkbox group</h2>
       <div class="row">
@@ -850,7 +756,7 @@ function checkboxTab() {
   `;
 }
 
-function textFieldTab() {
+function inputFieldsTab() {
   return html`
     <section>
       <h2>Text field</h2>
@@ -873,11 +779,38 @@ function textFieldTab() {
         ></ui-text-field>
       </div>
     </section>
-  `;
-}
 
-function numberFieldTab() {
-  return html`
+    <section>
+      <h2>Textarea</h2>
+      <div class="row">
+        <ui-textarea label="Comments"></ui-textarea>
+      </div>
+      <div class="row">
+        <ui-textarea size="small" label="Small"></ui-textarea>
+        <ui-textarea size="medium" label="Medium"></ui-textarea>
+        <ui-textarea size="large" label="Large"></ui-textarea>
+        <ui-textarea disabled label="Disabled"></ui-textarea>
+      </div>
+      <div class="row">
+        <ui-textarea
+          required
+          minlength="10"
+          maxlength="200"
+          label="Feedback"
+          placeholder="10-200 characters"
+        ></ui-textarea>
+      </div>
+      <div class="row">
+        <ui-textarea
+          autosize
+          rows="2"
+          resize="none"
+          label="Autosize (grows as you type)"
+          placeholder="Starts at 2 rows, grows to fit..."
+        ></ui-textarea>
+      </div>
+    </section>
+
     <section>
       <h2>Number field</h2>
       <div class="row">
@@ -900,11 +833,7 @@ function numberFieldTab() {
         ></ui-number-field>
       </div>
     </section>
-  `;
-}
 
-function passwordFieldTab() {
-  return html`
     <section>
       <h2>Password field</h2>
       <div class="row">
@@ -925,11 +854,7 @@ function passwordFieldTab() {
         ></ui-password-field>
       </div>
     </section>
-  `;
-}
 
-function emailFieldTab() {
-  return html`
     <section>
       <h2>Email field</h2>
       <div class="row">
@@ -945,11 +870,7 @@ function emailFieldTab() {
         <ui-email-field required label="Email address"></ui-email-field>
       </div>
     </section>
-  `;
-}
 
-function dateFieldTab() {
-  return html`
     <section>
       <h2>Date field</h2>
       <p>Custom calendar popup, built on vanillajs-datepicker.</p>
@@ -978,11 +899,7 @@ function dateFieldTab() {
         ></ui-date-field>
       </div>
     </section>
-  `;
-}
 
-function nativeDateFieldTab() {
-  return html`
     <section>
       <h2>Native date field</h2>
       <p>Thin themed wrapper around the browser's own native date picker.</p>
@@ -1190,6 +1107,104 @@ function uploadTab() {
   `;
 }
 
+// A small inline placeholder — lets the "Article body" example below seed an
+// actual image block without needing a real upload backend (ui-editor's
+// default imageUploader just reads the picked file as a data URL; this is
+// the same shape a real upload would resolve with, just precomputed).
+const sampleEditorImage =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160">' +
+      '<rect width="320" height="160" fill="#cbd5e1"/>' +
+      '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#334155">Sample image</text>' +
+      "</svg>",
+  );
+
+function editorTab() {
+  return html`
+    <section>
+      <h2>Editor</h2>
+      <p>
+        Wraps <a href="https://editorjs.io" target="_blank">editor.js</a> —
+        <code>value</code> is a JSON-serialized <code>OutputData</code> (the
+        same block list <code>editor.save()</code> resolves), form-associated
+        like every other field here. Headings, lists, quotes, tables and
+        images (via the "+" toolbox button, or drag/paste) are bundled in
+        alongside the default paragraph and bold/italic/link formatting;
+        content is left-aligned rather than editor.js's own default centered
+        column. Images read the picked file locally as a data URL unless a
+        caller overrides <code>imageUploader</code> with its own upload
+        endpoint.
+      </p>
+      <div class="row">
+        <ui-editor
+          style="width: 100%"
+          label="Article body"
+          placeholder="Start writing..."
+          value=${JSON.stringify({
+            time: 0,
+            blocks: [
+              { type: "header", data: { text: "Getting started", level: 2 } },
+              {
+                type: "paragraph",
+                data: {
+                  text: "Try the toolbox <b>+</b> button on an empty line, or select this text to see bold/italic/link/mark.",
+                },
+              },
+              {
+                type: "list",
+                data: {
+                  style: "unordered",
+                  items: ["Headings", "Lists", "Quotes", "Tables", "Images"],
+                },
+              },
+              {
+                type: "image",
+                data: {
+                  file: { url: sampleEditorImage },
+                  caption: "Seeded from the demo, not an upload",
+                },
+              },
+              {
+                type: "table",
+                data: {
+                  withHeadings: true,
+                  content: [
+                    ["Tool", "Package"],
+                    ["Table", "@editorjs/table"],
+                    ["Image", "@editorjs/image"],
+                  ],
+                },
+              },
+            ],
+          })}
+        ></ui-editor>
+      </div>
+      <div class="row">
+        <ui-editor
+          style="width: 100%"
+          label="Required"
+          required
+          placeholder="This field can't be empty"
+        ></ui-editor>
+      </div>
+      <div class="row">
+        <ui-editor
+          style="width: 100%"
+          label="Disabled"
+          disabled
+          value=${JSON.stringify({
+            time: 0,
+            blocks: [
+              { type: "paragraph", data: { text: "Can't edit this one." } },
+            ],
+          })}
+        ></ui-editor>
+      </div>
+    </section>
+  `;
+}
+
 // Renders FRUITS as real <ui-option>/<ui-option-group> children — each call
 // produces a fresh set of elements, so it's safe to use once per <ui-combobox>
 // below rather than sharing a single set of slotted nodes across two hosts.
@@ -1205,8 +1220,85 @@ const fruitOptions = () =>
     `,
   );
 
-function comboboxTab() {
+function selectionTab() {
   return html`
+    <section>
+      <h2>Select</h2>
+      <div class="row">
+        <ui-select label="Fruit">
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
+        </ui-select>
+      </div>
+      <div class="row">
+        <ui-select size="small" label="Small">
+          <ui-option value="a">Option A</ui-option>
+          <ui-option value="b">Option B</ui-option>
+        </ui-select>
+        <ui-select size="medium" label="Medium">
+          <ui-option value="a">Option A</ui-option>
+          <ui-option value="b">Option B</ui-option>
+        </ui-select>
+        <ui-select size="large" label="Large">
+          <ui-option value="a">Option A</ui-option>
+          <ui-option value="b">Option B</ui-option>
+        </ui-select>
+        <ui-select disabled label="Disabled">
+          <ui-option value="a">Option A</ui-option>
+        </ui-select>
+      </div>
+      <div class="row">
+        <ui-select
+          multiple
+          max-options-visible="2"
+          label="Fruits"
+        >
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
+        </ui-select>
+      </div>
+      <div class="row">
+        <ui-select
+          multiple
+          multiple-value-display="text"
+          label="Fruits (text display)"
+        >
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
+        </ui-select>
+      </div>
+      <div class="row">
+        <ui-select inline label="Fruit (inline)">
+          <ui-option value="apple">Apple</ui-option>
+          <ui-option value="banana">Banana</ui-option>
+          <ui-option-group label="Citrus">
+            <ui-option value="orange">Orange</ui-option>
+            <ui-option value="lemon">Lemon</ui-option>
+            <ui-option value="lime">Lime</ui-option>
+          </ui-option-group>
+          <ui-option value="grape" disabled>Grape (out of stock)</ui-option>
+        </ui-select>
+      </div>
+    </section>
+
     <section>
       <h2>Combobox</h2>
       <div class="row">
@@ -1231,11 +1323,7 @@ function comboboxTab() {
         </ui-combobox>
       </div>
     </section>
-  `;
-}
 
-function autocompleteTab() {
-  return html`
     <section>
       <h2>Autocomplete</h2>
       <div class="row">
@@ -1371,24 +1459,15 @@ interface DemoPage {
 
 const demoPages: DemoPage[] = [
   { id: "buttons", label: "Buttons", content: buttonsTab },
-  { id: "menu-button", label: "Menu button", content: menuButtonTab },
-  { id: "split-button", label: "Split button", content: splitButtonTab },
-  { id: "select", label: "Select", content: selectTab },
-  { id: "combobox", label: "Combobox", content: comboboxTab },
-  { id: "autocomplete", label: "Autocomplete", content: autocompleteTab },
-  { id: "radio", label: "Radio group", content: radioTab },
-  { id: "checkbox", label: "Checkbox group", content: checkboxTab },
-  { id: "text-field", label: "Text field", content: textFieldTab },
-  { id: "number-field", label: "Number field", content: numberFieldTab },
-  { id: "password-field", label: "Password field", content: passwordFieldTab },
-  { id: "email-field", label: "Email field", content: emailFieldTab },
-  { id: "date-field", label: "Date field", content: dateFieldTab },
+  { id: "selection", label: "Selection", content: selectionTab },
   {
-    id: "native-date-field",
-    label: "Native date field",
-    content: nativeDateFieldTab,
+    id: "radios-and-checkboxes",
+    label: "Radio/Checkboxes",
+    content: radiosAndCheckboxesTab,
   },
+  { id: "input-fields", label: "Input Fields", content: inputFieldsTab },
   { id: "upload", label: "Upload", content: uploadTab },
+  { id: "editor", label: "Editor", content: editorTab },
   { id: "tabs", label: "Tabs", content: tabsTab },
   { id: "ag-grid", label: "AG Grid", content: agGridTab },
   {

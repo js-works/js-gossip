@@ -11,6 +11,24 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
+    // @editorjs/editorjs's own real types pull in a couple of the package's
+    // *.ts sources (not *.d.ts) that use real `enum` declarations, tripping
+    // erasableSyntaxOnly below — skipLibCheck doesn't help since those
+    // aren't declaration files. @editorjs/header/list/quote/image's own
+    // (otherwise fine) types re-trigger the same thing by importing
+    // "@editorjs/editorjs" internally — @editorjs/table doesn't (its own
+    // reference to editor.js's PasteEvent type never actually resolves as a
+    // real import), so it needs no entry here. Redirecting the rest to this
+    // project's own narrow stubs (src/main/components/editor/editorjs*.d.ts)
+    // means the real, broken module graph is never opened at all. See those
+    // files for the full explanation.
+    "paths": {
+      "@editorjs/editorjs": ["./src/main/components/editor/editorjs.d.ts"],
+      "@editorjs/header": ["./src/main/components/editor/editorjs-header.d.ts"],
+      "@editorjs/list": ["./src/main/components/editor/editorjs-list.d.ts"],
+      "@editorjs/quote": ["./src/main/components/editor/editorjs-quote.d.ts"],
+      "@editorjs/image": ["./src/main/components/editor/editorjs-image.d.ts"]
+    },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",

@@ -4,6 +4,7 @@ import type { PropertyValues } from "lit";
 
 import { autocompleteStyles } from "./autocomplete.styles.js";
 import { checkIcon } from "./icons/check.icon.js";
+import { checkSquareIcon } from "./icons/check-square.icon.js";
 import { chevronDownIcon } from "./icons/chevron.icon.js";
 import { renderPills } from "../../shared/pills/pills.js";
 import { renderFieldLabel } from "../../shared/field-label/field-label.js";
@@ -365,7 +366,11 @@ export class Autocomplete extends LitElement {
                       this.#onOptionPointerDown(row.selectableIndex, event)}
                   >
                     <span class="check"
-                      >${this.#isSelected(row.item) ? checkIcon : nothing}</span
+                      >${this.#isSelected(row.item)
+                        ? this.multiple
+                          ? checkSquareIcon
+                          : checkIcon
+                        : nothing}</span
                     >
                     <span class="option-label">${row.item}</span>
                   </li>`,

@@ -65,11 +65,12 @@ export const datagridStyles = [
     /* \`.thead\` (header + filter row) deliberately isn't touched by any of
        this — it stays fully opaque and interactive throughout a
        \`dataSource\` request, so sorting/filtering the *next* request stays
-       available while the current one is still in flight. Only \`.body\`
-       (dimmed via its own children, so \`.loading-overlay\` inside it below
-       isn't included) and \`.pagination-bar\` go transparent and (via
-       \`?inert\` in datagrid.ts) non-interactive. */
-    .grid-panel.loading .body > *:not(.loading-overlay),
+       available while the current one is still in flight. Only \`.body\`'s
+       own rows (\`.loading-overlay\` is \`.body\`'s *sibling* now, not its
+       child — see \`.body-viewport\` below — so it's never matched here and
+       stays fully opaque regardless) and \`.pagination-bar\` go transparent
+       and (via \`?inert\` in datagrid.ts) non-interactive. */
+    .grid-panel.loading .body > *,
     .grid-panel.loading .pagination-bar {
       opacity: 0.25;
     }
@@ -193,13 +194,23 @@ export const datagridStyles = [
       width: 100%;
     }
 
-    /* position: relative — the anchor for \`.loading-overlay\`, now scoped to
-       just \`.body\` (not the whole \`.grid-panel\`) so it never covers
-       \`.thead\`. */
-    .body {
+    /* Wraps just \`.body\` (not the whole \`.grid-panel\`, so it never covers
+       \`.thead\`) — the positioning anchor for \`.loading-overlay\`, kept as
+       \`.body\`'s own *sibling* rather than its child specifically so the
+       overlay's \`position: absolute\` is relative to this non-scrolling
+       box, not to \`.body\` itself (which scrolls its own descendants,
+       \`.loading-overlay\` included, right along with the rows — leaving it
+       stuck wherever \`.body\` happened to be scrolled to when loading
+       started, rather than centered in the currently visible area). */
+    .body-viewport {
       position: relative;
       flex: 1;
       min-height: 0;
+    }
+
+    .body {
+      position: absolute;
+      inset: 0;
       overflow-y: auto;
       scrollbar-gutter: stable;
     }
@@ -314,7 +325,9 @@ export const datagridStyles = [
     }
 
     :host([selection-mode="single"]) .body-row:hover,
-    :host([selection-mode="multi"]) .body-row:hover {
+    :host([selection-mode="multi"]) .body-row:hover,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:has(+ .row-details.expanded:hover) {
       background: color-mix(in srgb, var(--datagrid-row-accent) 6%, var(--ui-bg));
     }
 
@@ -326,12 +339,22 @@ export const datagridStyles = [
        hovered row — including its own expanded \`row-details\` (no
        \`.selected\` class to key off here, since \`:hover\` has no
        template-time equivalent, so this reaches it via the adjacent-sibling
-       combinator instead). */
+       combinator instead). The last two selectors are the reverse direction
+       — hovering the expanded \`row-details\` panel itself (rather than the
+       \`.body-row\` above it) reads as hovering that same row, so it gets
+       the identical treatment: the panel colors its own edge directly, and
+       \`:has()\` reaches back to color the \`.body-row\` it belongs to (again,
+       no template-time link from the details panel back to its row, so
+       \`:has()\` stands in for it, same as the forward direction does). */
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover,
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover
-      + .row-details.expanded {
+      + .row-details.expanded,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .row-details.expanded:hover,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:has(+ .row-details.expanded:hover) {
       border-inline-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
@@ -340,7 +363,12 @@ export const datagridStyles = [
        \`rowDetails\` above, expanded \`rowDetails\` above, and the hovered
        row's own expanded panel below it), just keyed off \`:hover\` instead
        and gated by \`selection-mode\` the same way the hover background
-       above already is (rows aren't hover-interactive at all otherwise). */
+       above already is (rows aren't hover-interactive at all otherwise).
+       The last two selectors add the reverse direction, same rationale as
+       the border-inline rule above: hovering the expanded \`row-details\`
+       panel directly colors its own bottom edge, and reaches back via
+       \`:has()\` to color the \`.body-row\` it belongs to, so the pair reads
+       as one hovered unit regardless of which half the pointer is over. */
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover,
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
@@ -351,7 +379,11 @@ export const datagridStyles = [
       .row-details.expanded:has(+ .body-row:hover),
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover
-      + .row-details.expanded {
+      + .row-details.expanded,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .row-details.expanded:hover,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:has(+ .row-details.expanded:hover) {
       border-bottom-color: color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
@@ -428,7 +460,10 @@ export const datagridStyles = [
     /* A selected/hovered row reads as one solid tinted block — its own
        internal column dividers (the select/expander gutter's own divider
        above, and the row-actions gutter's left border above) would cut
-       across that and are hidden for the duration. */
+       across that and are hidden for the duration. The last three
+       selectors cover the reverse-hover case above: the row's own trailing
+       expanded \`row-details\` being hovered tints this row's background
+       too, so its internal dividers hide right along with it. */
     .body-row.selected .select-cell,
     .body-row.selected .expander-cell,
     .body-row.selected .row-actions-cell,
@@ -440,34 +475,30 @@ export const datagridStyles = [
       .expander-cell,
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover
+      .row-actions-cell,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:has(+ .row-details.expanded:hover)
+      .select-cell,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:has(+ .row-details.expanded:hover)
+      .expander-cell,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:has(+ .row-details.expanded:hover)
       .row-actions-cell {
       border-inline-color: transparent;
     }
 
-    /* The plus glyph itself never changes — only this button's own rotation
-       animates, turning it into a cross when expanded. */
+    /* A plain, unstyled <ui-button variant="link"> (see datagrid.ts) — no
+       overrides of its own look here, only the rotation animation: the
+       chevron glyph itself never changes, only this button's own rotation
+       animates, turning it from pointing right to pointing down (the
+       standard disclosure-triangle convention) when expanded. */
     .expander-toggle {
-      all: unset;
-      box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.5em;
-      height: 1.5em;
-      border-radius: var(--ui-radius-sm);
-      color: var(--ui-color-neutral-600);
-      cursor: pointer;
-      transition:
-        transform 200ms ease,
-        background-color 120ms ease;
-    }
-
-    .expander-toggle:hover {
-      background: var(--ui-color-neutral-100);
+      transition: transform 200ms ease;
     }
 
     .expander-toggle.expanded {
-      transform: rotate(45deg);
+      transform: rotate(90deg);
     }
 
     /* A CSS-only expand/collapse animation for content of unknown height:
@@ -552,6 +583,13 @@ export const datagridStyles = [
       border-top-color: var(--ui-color-neutral-500);
       border-radius: 50%;
       animation: datagrid-spin 0.75s linear infinite;
+      /* margin, not a static transform — .spinner's own animation already
+         owns the transform property for the rotation, and a static
+         transform set here would just get replaced by each animation
+         frame's own rotation value, never actually shifting anything. This
+         nudges it a bit above dead-center of .loading-overlay's
+         align-items: center instead. */
+      margin-bottom: 3em;
     }
 
     @keyframes datagrid-spin {

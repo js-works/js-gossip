@@ -1,20 +1,25 @@
 import type { MenuEntry, MenuSelectDetail, MenuSubmenu } from "./menu.types.js";
 
-export { MenuController, MENU_TRANSITION_MS, MENU_CLOSE_MS, resolvePage, resolveGroup };
+export {
+  MenuController,
+  MENU_TRANSITION_MS,
+  MENU_CLOSE_MS,
+  resolvePage,
+  resolveGroup,
+};
+export type { TransitionState };
 
 // Shared by both the TS timer below and menu-popup.styles.ts's CSS
 // transition-duration (interpolated there via Lit's css tag, which allows
 // bare numbers through) — one constant so the "settle" timer and the actual
 // CSS animation can never drift apart. Governs the horizontal page-slide
 // (drilling in/backing out) only — see MENU_CLOSE_MS for the whole-popup
-// open/close fade, a separate and shorter animation.
-const MENU_TRANSITION_MS = 250;
+// open/close fade, a separate animation.
+const MENU_TRANSITION_MS = 150;
 
 // The whole-popup open/close fade's duration, and how long #closeMenu waits
-// before actually unmounting (see #closing above) — deliberately shorter
-// than MENU_TRANSITION_MS since fading the entire popup is a smaller visual
-// change than sliding between two pages.
-const MENU_CLOSE_MS = 180;
+// before actually unmounting (see #closing above).
+const MENU_CLOSE_MS = 270;
 
 type Selectable = Exclude<MenuEntry, { type: "separator" }>;
 

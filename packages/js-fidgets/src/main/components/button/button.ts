@@ -71,6 +71,12 @@ export class Button extends LitElement {
   @property({ attribute: "aria-label" })
   accessor ariaLabel: string | null = null;
 
+  // Same shadowing as ariaLabel above — for a disclosure-style button (e.g. a
+  // datagrid row's expand/collapse toggle) whose expanded/collapsed state
+  // needs to reach the real focusable element inside the shadow root.
+  @property({ attribute: "aria-expanded" })
+  accessor ariaExpanded: string | null = null;
+
   static styles = buttonStyles;
 
   protected firstUpdated() {
@@ -102,6 +108,7 @@ export class Button extends LitElement {
         type="button"
         class="button${this.loading ? " is-loading" : ""}"
         aria-label=${this.ariaLabel ?? nothing}
+        aria-expanded=${this.ariaExpanded ?? nothing}
         aria-busy=${this.loading ? "true" : nothing}
         ?disabled=${this.disabled || this.loading}
         @click=${this.#onClick}

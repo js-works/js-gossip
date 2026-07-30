@@ -100,9 +100,9 @@ export function selectFilter<T = unknown>(config?: {
         <ui-select
           size="small"
           multiple
+          multiple-value-display="text"
           popup-portal
           placeholder=${config?.placeholder ?? "(All)"}
-          max-options-visible="1"
           .values=${values}
           @change=${(event: Event) => {
             const next = (event.target as Select).values;

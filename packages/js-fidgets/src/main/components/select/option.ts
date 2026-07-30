@@ -3,6 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 
 import { optionStyles } from "./option.styles.js";
 import { checkIcon } from "./icons/check.icon.js";
+import { checkSquareIcon } from "./icons/check-square.icon.js";
 
 /**
  * A single choice inside `<ui-select>` (optionally grouped under
@@ -30,6 +31,15 @@ export class Option extends LitElement {
   @property({ type: Boolean, reflect: true })
   accessor active = false;
 
+  // Mirrors the owning ui-select/ui-combobox's own `multiple` — also set by
+  // the owner (see its #syncSelected), never by a consumer directly. Swaps
+  // the single-select checkmark for a checkbox-style checked-square glyph
+  // when selected, so a multi-select listbox reads as one at a glance
+  // instead of looking identical to a single-select. Unselected rows show
+  // nothing in either mode — same as single-select's own checkmark-or-nothing.
+  @property({ type: Boolean, reflect: true })
+  accessor multiple = false;
+
   static styles = optionStyles;
 
   // Plain-text label for ui-select's closed trigger. An option's row can hold
@@ -48,7 +58,7 @@ export class Option extends LitElement {
         aria-disabled=${this.disabled}
       >
         <span class="check" aria-hidden="true">
-          ${this.selected ? checkIcon : nothing}
+          ${this.selected ? (this.multiple ? checkSquareIcon : checkIcon) : nothing}
         </span>
         <span class="label"><slot></slot></span>
       </div>
