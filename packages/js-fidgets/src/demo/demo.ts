@@ -42,6 +42,14 @@ import "../main/components/date-field/date-field.js";
 import "../main/components/native-date-field/native-date-field.js";
 import "../main/components/upload/upload.js";
 import "../main/components/editor/editor.js";
+// BlockNote/Mantine's own stylesheets — required once by any BlockNote
+// integration (see ui-block-note's own class doc for why this can't be
+// bundled into the library itself: the library build (tsc) doesn't process
+// CSS, and the shadow-DOM-avoiding light-DOM mount means these just need to
+// reach the document normally, exactly like any other BlockNote consumer).
+import "@blocknote/core/fonts/inter.css";
+import "@blocknote/mantine/style.css";
+import "../main/components/block-note/block-note.js";
 import "../main/components/tabs/tabs.js";
 import type { Tabs } from "../main/components/tabs/tabs.js";
 import type {
@@ -1177,6 +1185,66 @@ function editorTab() {
   `;
 }
 
+function blockNoteTab() {
+  return html`
+    <section>
+      <h2>Block note</h2>
+      <p>
+        Wraps
+        <a href="https://www.blocknotejs.org" target="_blank">BlockNote</a>'s
+        React component (<code>@blocknote/react</code> plus the
+        <code>@blocknote/mantine</code> UI kit) — <code>value</code> is a
+        JSON-serialized array of BlockNote <code>Block</code>s (the same
+        shape <code>editor.document</code> exposes), form-associated like
+        every other field here. Type <code>/</code> on an empty line for the
+        slash menu, use the drag handle to reorder/convert a block, or select
+        text for the formatting toolbar.
+      </p>
+      <div class="row">
+        <ui-block-note
+          style="width: 100%"
+          label="Article body"
+          placeholder="Start writing..."
+          value=${JSON.stringify([
+            {
+              type: "heading",
+              props: { level: 2 },
+              content: "Getting started",
+            },
+            {
+              type: "paragraph",
+              content:
+                'Type "/" on an empty line to open the slash menu, or select this text to see the formatting toolbar.',
+            },
+            { type: "bulletListItem", content: "Headings" },
+            { type: "bulletListItem", content: "Lists" },
+            { type: "bulletListItem", content: "Tables" },
+            { type: "bulletListItem", content: "Code blocks" },
+          ])}
+        ></ui-block-note>
+      </div>
+      <div class="row">
+        <ui-block-note
+          style="width: 100%"
+          label="Required"
+          required
+          placeholder="This field can't be empty"
+        ></ui-block-note>
+      </div>
+      <div class="row">
+        <ui-block-note
+          style="width: 100%"
+          label="Disabled"
+          disabled
+          value=${JSON.stringify([
+            { type: "paragraph", content: "Can't edit this one." },
+          ])}
+        ></ui-block-note>
+      </div>
+    </section>
+  `;
+}
+
 // Renders FRUITS as real <ui-option>/<ui-option-group> children — each call
 // produces a fresh set of elements, so it's safe to use once per <ui-combobox>
 // below rather than sharing a single set of slotted nodes across two hosts.
@@ -1440,6 +1508,7 @@ const demoPages: DemoPage[] = [
   { id: "input-fields", label: "Input Fields", content: inputFieldsTab },
   { id: "upload", label: "Upload", content: uploadTab },
   { id: "editor", label: "Editor", content: editorTab },
+  { id: "block-note", label: "Block note", content: blockNoteTab },
   { id: "tabs", label: "Tabs", content: tabsTab },
   { id: "ag-grid", label: "AG Grid", content: agGridTab },
   {
