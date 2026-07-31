@@ -514,6 +514,12 @@ export const datagridStyles = [
     .row-details {
       display: grid;
       grid-template-rows: 0fr;
+      /* On the row itself (spanning every grid-column track), not just
+         .row-details-content — that cell only spans the middle columns
+         (see detailsColumnStart/detailsColumnEnd in datagrid.ts), leaving
+         the leading (checkbox/expander) and trailing (row-actions) tracks
+         as bare, differently-colored space either side of it otherwise. */
+      background: var(--ui-color-neutral-50);
       transition: grid-template-rows 200ms ease;
     }
 
@@ -554,7 +560,6 @@ export const datagridStyles = [
     .row-details-inner {
       padding-block: calc(var(--ui-spacing-md) - 1em);
       padding-inline: var(--ui-spacing-md);
-      background: var(--ui-color-neutral-50);
     }
 
     .empty-message {

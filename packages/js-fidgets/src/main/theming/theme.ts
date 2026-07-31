@@ -11,19 +11,6 @@ export const defaultTheme = css`
     --ui-bg: white;
     --ui-text: black;
 
-    /* The single density dial: a unitless multiplier every other sizing
-       token below (type scale, spacing, radius, border weight) is derived
-       from via calc(<px-or-rem> * var(--ui-scale)) — bumping this once
-       scales the whole library proportionally. Deliberately not a
-       transform: scale() (which would blur borders and desync hit-testing
-       from paint) — every affected token stays a real layout-participating
-       length. Kept separate from the type scale's own rem-relativity: rem
-       also tracks the document root's font-size, i.e. a user's own
-       browser/OS text-size preference — appropriate for type, not for
-       border/radius/spacing, which is why those use a fixed px base
-       multiplied by this token instead of rem. */
-    --ui-scale: 1;
-
     /* Color ramps below are the standard Tailwind CSS palette, used verbatim
        (no color-mix generation) — primary=blue, danger=red, warn=amber,
        success=emerald, neutral=neutral. */
@@ -160,5 +147,21 @@ export const defaultTheme = css`
     --ui-spacing-sm: calc(4px * var(--ui-scale));
     --ui-spacing-md: calc(16px * var(--ui-scale));
     --ui-spacing-lg: calc(24px * var(--ui-scale));
+  }
+
+  /* --ui-scale (the density dial every calc() above multiplies by) lives in
+     its own :root-only rule, deliberately *not* inside the shared :host,
+     :root block above — every other token there is redeclared on each
+     component's own :host, which (a direct declaration always beats
+     inheriting from an ancestor, regardless of specificity) would silently
+     pin --ui-scale back to its own default on every single component,
+     making it impossible for a consumer to actually override. Left
+     undeclared on :host, it's never redeclared inside any component's own
+     shadow tree, so it genuinely inherits through the shadow boundary from
+     wherever a consumer sets it on the real document (:root here only
+     matches the top-level <html> — see this file's own :host, :root doc
+     comment above for why the demo adopts this stylesheet there too). */
+  :root {
+    --ui-scale: 1;
   }
 `;

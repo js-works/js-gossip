@@ -8,6 +8,11 @@
   /* --ui-bg/--ui-text are fixed (light-only) values, not a light-dark() pair,
      so pin the scheme rather than letting it follow the OS preference. */
   color-scheme: light;
+  /* Reserves the scrollbar's width up front instead of only when a tab's
+     content is actually tall enough to scroll — without this, switching to
+     a shorter/taller tab makes the viewport's content area jump sideways as
+     the scrollbar appears/disappears. */
+  scrollbar-gutter: stable;
 }
 
 * {
@@ -36,9 +41,44 @@ body {
 }
 
 header {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--ui-color-neutral-200);
+}
+
+/* margin-inline-start: auto (not header's own justify-content:
+   space-between) flushes this against the flex line's own end edge —
+   which, since header has no horizontal padding of its own, lines up with
+   ui-tabs's right edge below (also a direct, unpadded .page child, so both
+   share the exact same right edge regardless of how many controls end up
+   in here). */
+.header-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-inline-start: auto;
+}
+
+/* ui-select.scale-control, not just .scale-control — select.styles.ts's own
+   :host rule sets --select-min-width: 12em unconditionally (its comment
+   there explicitly invites overriding it for exactly this "narrow trigger"
+   case), and a bare class selector ties that :host rule's own specificity,
+   which the component's own shadow-tree rule wins by default. Adding the
+   element type bumps this selector just past the tie. Plain `width` alone
+   (without this) does nothing useful here: the trigger's internal .wrapper
+   still enforces the 12em min-width from inside, so the host just overflows
+   its declared width instead of actually shrinking. */
+ui-select.scale-control {
+  flex: none;
+  --select-min-width: 4em;
+}
+
+ui-select.locale-control {
+  flex: none;
+  --select-min-width: 5em;
 }
 
 h1 {

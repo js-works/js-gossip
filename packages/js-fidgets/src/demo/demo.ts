@@ -11,6 +11,7 @@ import "../main/components/menu-button/menu-button.js";
 import type { MenuEntry, MenuSelectDetail } from "../main/components/menu-button/menu-button.js";
 import "../main/components/split-button/split-button.js";
 import "../main/components/select/select.js";
+import type { Select } from "../main/components/select/select.js";
 import "../main/components/combobox/combobox.js";
 import "../main/components/autocomplete/autocomplete.js";
 import { localFilter } from "../main/components/autocomplete/autocomplete.js";
@@ -1472,16 +1473,59 @@ window.addEventListener("hashchange", () => {
   renderApp();
 });
 
+// Not fed back through --ui-scale/lang themselves (reading a live CSS
+// custom property, or the attribute this demo itself just set, back out is
+// unnecessary indirection) — this is the demo's own record of what it last
+// set, so re-renders (e.g. on tab switch) keep both <ui-select>s showing
+// the chosen value instead of snapping back to their defaults.
+let uiScale = "1";
+let uiLocale = "en-US";
+
 function renderApp(): void {
   render(
     html`
       <main class="page">
         <header>
-          <h1>Component demo</h1>
-          <p class="tagline">
-            A living catalogue of every component in this library — buttons,
-            fields, menus, grids, and more.
-          </p>
+          <div>
+            <h1>Component demo</h1>
+            <p class="tagline">
+              A living catalogue of every component in this library — buttons,
+              fields, menus, grids, and more.
+            </p>
+          </div>
+          <div class="header-controls">
+            <ui-select
+              class="scale-control"
+              label="Scale"
+              size="small"
+              .value=${uiScale}
+              @change=${(event: Event) => {
+                uiScale = (event.currentTarget as Select).value;
+                document.documentElement.style.setProperty("--ui-scale", uiScale);
+              }}
+            >
+              <ui-option value="0.75">75%</ui-option>
+              <ui-option value="1">100%</ui-option>
+              <ui-option value="1.25">125%</ui-option>
+              <ui-option value="1.5">150%</ui-option>
+            </ui-select>
+            <ui-select
+              class="locale-control"
+              label="Locale"
+              size="small"
+              .value=${uiLocale}
+              @change=${(event: Event) => {
+                uiLocale = (event.currentTarget as Select).value;
+                // Only the html root's lang attribute, nothing else yet —
+                // no component in this library reads it today, this is
+                // just wiring the demo control ahead of that landing.
+                document.documentElement.lang = uiLocale;
+              }}
+            >
+              <ui-option value="en-US">en-US</ui-option>
+              <ui-option value="de-DE">de-DE</ui-option>
+            </ui-select>
+          </div>
         </header>
         <ui-tabs
           orientation="vertical"
