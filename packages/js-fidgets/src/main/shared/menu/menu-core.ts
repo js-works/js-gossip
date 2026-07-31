@@ -116,6 +116,12 @@ class MenuController {
   #closing = false;
   #stack: string[] = [];
   #activeValue: string | undefined;
+  // Which input moved #activeValue there last — keyboard nav renders a
+  // visible highlight (menu-popup.styles.ts's .active outline), pointer
+  // hover relies on the row's own :hover instead, so a mouse resting on one
+  // entry and a keyboard cursor left on another (see setActive below) read
+  // as distinct, matching ui-select's decoupled hover/[active] treatment.
+  #activeSource: "pointer" | "keyboard" = "keyboard";
   #transition: TransitionState | undefined;
 
   #closeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -148,6 +154,10 @@ class MenuController {
     return this.#activeValue;
   }
 
+  get activeSource(): "pointer" | "keyboard" {
+    return this.#activeSource;
+  }
+
   get transition(): TransitionState | undefined {
     return this.#transition;
   }
@@ -168,6 +178,7 @@ class MenuController {
     this.#stack = [];
     this.#transition = undefined;
     this.#activeValue = selectable(this.currentPage(entries))[0]?.value;
+    this.#activeSource = "keyboard";
     this.#onChange();
   }
 
@@ -199,6 +210,7 @@ class MenuController {
     const start = current === -1 ? (delta > 0 ? -1 : items.length) : current;
     const next = Math.min(Math.max(start + delta, 0), items.length - 1);
     this.#activeValue = items[next]?.value;
+    this.#activeSource = "keyboard";
     this.#onChange();
   }
 
@@ -206,15 +218,21 @@ class MenuController {
     const items = selectable(this.currentPage(entries));
     if (items.length === 0) return;
     this.#activeValue = edge === "first" ? items[0]!.value : items.at(-1)!.value;
+    this.#activeSource = "keyboard";
     this.#onChange();
   }
 
   // Mouse-driven equivalent of moveActive/setActiveEdge — a row's own
-  // pointerenter, so hovering highlights it the same way arrowing to it
-  // would, rather than the highlight only ever tracking the keyboard.
+  // pointerenter, so hovering still moves the logical "cursor" the same
+  // way arrowing to it would (so Enter right after a hover fires on the
+  // hovered row, and aria-activedescendant tracks it) — but tagged as
+  // "pointer" so the render layer leaves the keyboard's outline to
+  // moveActive/setActiveEdge/etc. and lets the row's own :hover carry the
+  // visual instead (see #activeSource above).
   setActive(value: string): void {
-    if (this.#activeValue === value) return;
+    if (this.#activeValue === value && this.#activeSource === "pointer") return;
     this.#activeValue = value;
+    this.#activeSource = "pointer";
     this.#onChange();
   }
 
@@ -230,6 +248,7 @@ class MenuController {
     const match = ordered.find((item) => item.label.toLowerCase().startsWith(lower));
     if (match) {
       this.#activeValue = match.value;
+      this.#activeSource = "keyboard";
       this.#onChange();
     }
   }
@@ -240,6 +259,7 @@ class MenuController {
     this.#beginTransition(toStack, "forward");
     this.#stack = toStack;
     this.#activeValue = selectable(resolvePage(entries, toStack))[0]?.value;
+    this.#activeSource = "keyboard";
     this.#onChange();
   }
 
@@ -255,6 +275,7 @@ class MenuController {
     // defaulting to the parent page's first entry — mirrors a native OS
     // menu returning focus to the item that opened the submenu you closed.
     this.#activeValue = leaving;
+    this.#activeSource = "keyboard";
     this.#onChange();
     return true;
   }

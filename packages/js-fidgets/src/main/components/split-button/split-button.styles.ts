@@ -33,7 +33,7 @@ export const splitButtonStyles = [
          for solid, --btn-600 for outlined/subtle/link, --btn-700 for
          filled), so this divider reads correctly against all of them
          without a per-variant override. */
-      border-inline-start: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+      border-inline-start: var(--ui-border-thin) solid color-mix(in srgb, currentColor 30%, transparent);
     }
   `,
 ];

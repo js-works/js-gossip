@@ -72,7 +72,7 @@ export const agGridStyles = [
       width: 2em;
       height: 2em;
       box-sizing: border-box;
-      border: 3px solid color-mix(in srgb, currentColor 20%, transparent);
+      border: calc(3px * var(--ui-scale)) solid color-mix(in srgb, currentColor 20%, transparent);
       border-top-color: var(--ui-color-neutral-500);
       border-radius: 50%;
       animation: ag-grid-spin 0.75s linear infinite;

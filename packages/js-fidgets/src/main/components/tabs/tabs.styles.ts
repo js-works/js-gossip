@@ -22,7 +22,7 @@ export const tabsStyles = [
       display: flex;
       flex: none;
       gap: var(--ui-spacing-sm);
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* Horizontal tabs are each sized to their own content rather than
@@ -50,7 +50,7 @@ export const tabsStyles = [
          edge, so a selected tab's accent (its own border-inline-end, see
          tab.styles.ts) lands right on top of this line, same as the
          horizontal case's border-bottom pairing. */
-      border-inline-end: 1px solid var(--ui-color-neutral-200);
+      border-inline-end: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* min-width/min-height: 0 — a flex item's default min-size is the size

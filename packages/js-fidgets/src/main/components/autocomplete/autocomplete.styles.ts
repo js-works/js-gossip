@@ -34,24 +34,24 @@ export const autocompleteStyles = [
       /* Was 0px (same as small below) at one point — collapsed medium and
          small to the same overall height, which read as broken rather than
          "compact". 2px keeps a real, visible step between the three sizes. */
-      --autocomplete-padding-block: 2px;
+      --autocomplete-padding-block: calc(2px * var(--ui-scale));
       /* Was a flat var(--ui-spacing-md) (16px) on the <input> directly,
          regardless of size — same ui-select's own padding-inline had before
          it got a small→large progression; matched to that same progression
          here instead. */
-      --autocomplete-padding-inline: 8px;
+      --autocomplete-padding-inline: calc(8px * var(--ui-scale));
     }
 
     :host([size="small"]) {
       font-size: var(--ui-font-size-sm);
       --autocomplete-padding-block: 0px;
-      --autocomplete-padding-inline: 4px;
+      --autocomplete-padding-inline: calc(4px * var(--ui-scale));
     }
 
     :host([size="large"]) {
       font-size: var(--ui-font-size-lg);
-      --autocomplete-padding-block: 5px;
-      --autocomplete-padding-inline: 12px;
+      --autocomplete-padding-block: calc(5px * var(--ui-scale));
+      --autocomplete-padding-inline: calc(12px * var(--ui-scale));
     }
 
     /* Two columns: .content (pills/input, flex-grow, wraps its own lines
@@ -67,7 +67,7 @@ export const autocompleteStyles = [
       gap: var(--ui-spacing-sm);
       padding-block: var(--autocomplete-padding-block);
       box-sizing: border-box;
-      border: 1px solid var(--ui-field-border-color);
+      border: var(--ui-border-thin) solid var(--ui-field-border-color);
       border-radius: var(--ui-field-radius);
       background: var(--ui-bg);
       color: var(--ui-text);
@@ -88,12 +88,12 @@ export const autocompleteStyles = [
          tallest child — same formula as ui-select's own .content, kept in
          sync by hand) so the empty and "has pills" states render the same
          height. */
-      min-height: calc(1.4 * var(--ui-font-size-sm) + 4px);
+      min-height: calc(1.4 * var(--ui-font-size-sm) + var(--ui-spacing-sm));
       /* Breathing room around the pills themselves — .wrapper's own
          padding-block (above) is intentionally near-zero to keep the plain
          (no pills) state compact, so this is the pills' own vertical margin
          from the border, not the whole control's. */
-      padding-block: 2px;
+      padding-block: calc(2px * var(--ui-scale));
     }
 
     .wrapper:has(.pill) {
@@ -141,8 +141,8 @@ export const autocompleteStyles = [
       width: 1em;
       height: 1em;
       box-sizing: border-box;
-      border: 2px solid color-mix(in srgb, currentColor 20%, transparent);
-      border-top: 2px solid var(--ui-color-neutral-500);
+      border: var(--ui-border-thick) solid color-mix(in srgb, currentColor 20%, transparent);
+      border-top: var(--ui-border-thick) solid var(--ui-color-neutral-500);
       border-radius: 50%;
       animation: autocomplete-spin 0.75s linear infinite;
     }
@@ -194,7 +194,7 @@ export const autocompleteStyles = [
       min-width: 7em;
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-popup-border-color);
+      border: var(--ui-border-thin) solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
       box-shadow: var(--ui-popup-shadow);
     }
@@ -219,11 +219,11 @@ export const autocompleteStyles = [
       align-items: center;
       gap: var(--ui-spacing-sm);
       box-sizing: border-box;
-      padding-block: 3px;
+      padding-block: calc(3px * var(--ui-scale));
       padding-inline: var(--ui-spacing-sm);
       /* Transparent by default (rather than only added on .active) so the border
          doesn't change the row's size and shift layout when it becomes active. */
-      border: 2px solid transparent;
+      border: var(--ui-border-thick) solid transparent;
       border-radius: var(--ui-radius-sm);
       cursor: pointer;
     }
@@ -273,17 +273,17 @@ export const autocompleteStyles = [
     }
 
     .header {
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     .footer {
-      border-top: 1px solid var(--ui-color-neutral-200);
+      border-top: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     .status {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: calc(8px * var(--ui-scale));
       padding-block: var(--ui-spacing-sm);
       padding-inline: var(--ui-spacing-md);
       font-size: 1em;

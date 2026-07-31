@@ -130,15 +130,15 @@ export class TextField extends LitElement {
            from outside, without reaching into the shadow root. */
         border-block-start: var(
           --field-border-block-start,
-          1px solid var(--ui-field-border-color)
+          var(--ui-border-thin) solid var(--ui-field-border-color)
         );
         border-inline: var(
           --field-border-inline,
-          1px solid var(--ui-field-border-color)
+          var(--ui-border-thin) solid var(--ui-field-border-color)
         );
         border-block-end: var(
           --field-border-block-end,
-          1px solid var(--ui-field-border-color)
+          var(--ui-border-thin) solid var(--ui-field-border-color)
         );
         border-radius: var(--field-border-radius, var(--ui-field-radius));
         background: var(--ui-bg);

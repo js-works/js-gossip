@@ -23,7 +23,7 @@ export const tabStyles = [
       padding-inline: var(--ui-spacing-md);
       /* Reserved transparent (not omitted) so becoming [selected] is a pure
          color change, never a layout shift from the border's own space. */
-      border-bottom: 2px solid transparent;
+      border-bottom: var(--ui-border-thick) solid transparent;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
@@ -40,7 +40,7 @@ export const tabStyles = [
          accent sits on the same side as that divider, same as the
          horizontal case where both the tablist's and the tab's own accent
          border are border-bottom. */
-      border-inline-end: 2px solid transparent;
+      border-inline-end: var(--ui-border-thick) solid transparent;
     }
 
     /* tab-align only affects vertical tabs — see ui-tabs's own "tabAlign"

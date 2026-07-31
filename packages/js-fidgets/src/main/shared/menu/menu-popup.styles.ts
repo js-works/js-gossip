@@ -25,7 +25,7 @@ export const menuPopupStyles = [
       max-width: 22rem;
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-popup-border-color);
+      border: var(--ui-border-thin) solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
       box-shadow: var(--ui-popup-shadow);
       transform-origin: top left;
@@ -142,7 +142,7 @@ export const menuPopupStyles = [
       gap: var(--ui-spacing-sm);
       padding-block: var(--ui-spacing-sm);
       padding-inline: var(--ui-spacing-sm);
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
       flex: none;
       cursor: pointer;
       color: var(--ui-text);
@@ -195,17 +195,33 @@ export const menuPopupStyles = [
       align-items: center;
       gap: var(--ui-spacing-sm);
       padding-block: 0.45em;
-      padding-inline: var(--ui-spacing-sm);
+      padding-inline-start: calc(var(--ui-spacing-sm) * 2);
+      padding-inline-end: var(--ui-spacing-sm);
+      /* Transparent by default (rather than only added on .active) so the
+         border doesn't change the row's size when it becomes active — same
+         reasoning as ui-select's own option rows (option.styles.ts). */
+      border: var(--ui-border-thick) solid transparent;
       border-radius: var(--ui-radius-sm);
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
-      transition: background-color 100ms ease, color 100ms ease;
+      transition: background-color 100ms ease, border-color 100ms ease;
     }
 
+    /* Hover is its own rule, decoupled from keyboard navigation — matches
+       ui-select, where a mouse resting on one row and a keyboard cursor
+       parked on another read as visibly distinct states. */
+    .menu-item:hover {
+      background: var(--ui-color-neutral-100);
+    }
+
+    /* Keyboard-highlighted (see MenuController#setActive/moveActive) — a
+       focus-ring-like outline rather than a filled background, so it reads
+       as "the cursor is here" without being confused for the hover state.
+       Same treatment as ui-select's [active] option. */
     .menu-item.active {
-      background: var(--ui-color-primary-50);
-      color: var(--ui-color-primary-700);
+      border-color: var(--ui-color-primary-500);
+      background: transparent;
     }
 
     .menu-item.danger {
@@ -213,8 +229,7 @@ export const menuPopupStyles = [
     }
 
     .menu-item.danger.active {
-      background: var(--ui-color-danger-50);
-      color: var(--ui-color-danger-700);
+      border-color: var(--ui-color-danger-600);
     }
 
     .menu-item.disabled {
@@ -241,7 +256,7 @@ export const menuPopupStyles = [
     }
 
     .menu-separator {
-      height: 1px;
+      height: calc(1px * var(--ui-scale));
       margin-block: var(--ui-spacing-sm);
       background: var(--ui-color-neutral-200);
     }

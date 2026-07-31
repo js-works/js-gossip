@@ -73,52 +73,24 @@ const BUTTON_VARIANTS = [
   "link",
 ] as const;
 
+// Attribute values (appearance/variant) stay lowercase to match the
+// component's own API — this only capitalizes what's shown as button text.
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 // Sample data for the ui-menu-button/ui-split-button demos below — two
 // levels of nested ui-submenu deep (Share > Export as) so drilling in/back
 // out actually has somewhere to go, plus a disabled leaf, a danger leaf,
 // and separators.
-const menuEditIcon = html`
-  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/>
-  </svg>
-`;
-const menuDuplicateIcon = html`
-  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M4 2a2 2 0 0 1 2-2h5.5a.5.5 0 0 1 .354.146l3.5 3.5A.5.5 0 0 1 15.5 4v7a2 2 0 0 1-2 2h-1v1a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1zm1 2h4.5a.5.5 0 0 1 .354.146l3.5 3.5A.5.5 0 0 1 13.5 8v5a1 1 0 0 0 1-1V4.207L11.293 1H6a1 1 0 0 0-1 1zM2 6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6.5a1 1 0 0 0 1-1V8.207L6.293 5H2z"/>
-  </svg>
-`;
-const menuShareIcon = html`
-  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
-  </svg>
-`;
-const menuDownloadIcon = html`
-  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
-    <path d="M7.646 11.354a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 9.793V1.5a.5.5 0 0 0-1 0v8.293L5.354 7.646a.5.5 0 1 0-.708.708z"/>
-  </svg>
-`;
-const menuArchiveIcon = html`
-  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1v7.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 12.5V5a1 1 0 0 1-1-1zm2 3v7.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V5zm13-3H1v2h14zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
-  </svg>
-`;
-const menuDeleteIcon = html`
-  <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-    <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-  </svg>
-`;
-
 const SAMPLE_MENU_ITEMS: MenuEntry[] = [
-  { value: "edit", label: "Edit", icon: menuEditIcon },
-  { value: "duplicate", label: "Duplicate", icon: menuDuplicateIcon },
+  { value: "edit", label: "Edit" },
+  { value: "duplicate", label: "Duplicate" },
   { type: "separator" },
   {
     type: "submenu",
     value: "share",
     label: "Share",
-    icon: menuShareIcon,
     items: [
       { value: "share-link", label: "Copy link" },
       { value: "share-email", label: "Email a copy" },
@@ -127,21 +99,20 @@ const SAMPLE_MENU_ITEMS: MenuEntry[] = [
         value: "export",
         label: "Export as",
         items: [
-          { value: "export-pdf", label: "PDF", icon: menuDownloadIcon },
-          { value: "export-csv", label: "CSV", icon: menuDownloadIcon },
+          { value: "export-pdf", label: "PDF" },
+          { value: "export-csv", label: "CSV" },
           {
             value: "export-json",
             label: "JSON",
-            icon: menuDownloadIcon,
             disabled: true,
           },
         ],
       },
     ],
   },
-  { value: "archive", label: "Archive", icon: menuArchiveIcon },
+  { value: "archive", label: "Archive" },
   { type: "separator" },
-  { value: "delete", label: "Delete", icon: menuDeleteIcon, danger: true },
+  { value: "delete", label: "Delete", danger: true },
 ];
 
 // Sample data for the ui-combobox/ui-autocomplete demos below — grouped to show
@@ -571,7 +542,7 @@ function buttonsTab() {
             ${BUTTON_VARIANTS.map(
               (variant) => html`
                 <ui-button appearance=${appearance} variant=${variant}>
-                  ${variant}
+                  ${capitalize(variant)}
                 </ui-button>
               `,
             )}
@@ -1505,6 +1476,13 @@ function renderApp(): void {
   render(
     html`
       <main class="page">
+        <header>
+          <h1>Component demo</h1>
+          <p class="tagline">
+            A living catalogue of every component in this library — buttons,
+            fields, menus, grids, and more.
+          </p>
+        </header>
         <ui-tabs
           orientation="vertical"
           .value=${activePageId}

@@ -36,7 +36,7 @@ export const dateFieldStyles = [
          between the two buttons than a single flex gap value could give
          both at once). */
       padding-inline-end: 0.5rem;
-      border: 1px solid var(--ui-field-border-color);
+      border: var(--ui-border-thin) solid var(--ui-field-border-color);
       border-radius: var(--ui-field-radius);
       box-sizing: border-box;
       /* Anchor for both picker popovers below (.datepicker and .time-popup) —
@@ -176,18 +176,18 @@ export const dateFieldStyles = [
          the whole picker's text (and, via the width/height above being in
          em too, the picker's own box) proportionally in one place. */
       font-size: 1.08em;
-      border: 1px solid var(--ui-popup-border-color);
+      border: var(--ui-border-thin) solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
       box-shadow: var(--ui-popup-shadow);
-      padding: 2px;
+      padding: calc(2px * var(--ui-scale));
     }
 
     .datepicker-header {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 2px;
-      padding: 2px;
+      gap: calc(2px * var(--ui-scale));
+      padding: calc(2px * var(--ui-scale));
       width: 100%;
       box-sizing: border-box;
     }
@@ -201,7 +201,7 @@ export const dateFieldStyles = [
     .datepicker-controls {
       display: flex;
       align-items: center;
-      gap: 2px;
+      gap: calc(2px * var(--ui-scale));
     }
 
     /* prev on the far left, next on the far right, the month/year switch
@@ -217,7 +217,7 @@ export const dateFieldStyles = [
       color: inherit;
       font: inherit;
       border-radius: var(--ui-radius-sm);
-      padding: 2px 8px;
+      padding: calc(2px * var(--ui-scale)) calc(8px * var(--ui-scale));
       font-size: 0.9em;
       cursor: pointer;
     }
@@ -227,7 +227,7 @@ export const dateFieldStyles = [
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2px;
+      padding: calc(2px * var(--ui-scale));
       font-size: 0.85em;
     }
 
@@ -244,7 +244,7 @@ export const dateFieldStyles = [
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 0 2px;
+      padding: 0 calc(2px * var(--ui-scale));
     }
 
     /* Grows to fill the fixed-height picker. For the days view this is a plain
@@ -270,14 +270,14 @@ export const dateFieldStyles = [
     .days-of-week {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      margin-bottom: 1px;
+      margin-bottom: calc(1px * var(--ui-scale));
     }
 
     .dow {
       text-align: center;
       font-size: 0.8em;
       color: var(--ui-color-neutral-700);
-      padding: 1px 0;
+      padding: calc(1px * var(--ui-scale)) 0;
     }
 
     .dow.disabled {
@@ -287,22 +287,22 @@ export const dateFieldStyles = [
     .datepicker-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 1px;
+      gap: calc(1px * var(--ui-scale));
     }
 
     .datepicker-grid.months,
     .datepicker-grid.years,
     .datepicker-grid.decades {
       grid-template-columns: repeat(4, 1fr);
-      gap: 2px;
-      padding: 2px 0;
+      gap: calc(2px * var(--ui-scale));
+      padding: calc(2px * var(--ui-scale)) 0;
     }
 
     .datepicker-cell {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2px;
+      padding: calc(2px * var(--ui-scale));
       font-size: 0.9em;
       border-radius: var(--ui-radius-sm);
       cursor: pointer;
@@ -348,8 +348,8 @@ export const dateFieldStyles = [
     .datepicker-footer .datepicker-controls {
       width: 100%;
       align-items: stretch;
-      padding-top: 2px;
-      border-top: 1px solid var(--ui-color-neutral-200);
+      padding-top: calc(2px * var(--ui-scale));
+      border-top: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* Today/Clear stretch to fill the footer's width equally, like the original

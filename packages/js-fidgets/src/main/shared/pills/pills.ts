@@ -82,14 +82,14 @@ const pillsStyles = css`
   .pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(6px * var(--ui-scale));
     flex: none;
     background: var(--ui-color-neutral-200);
     color: var(--ui-color-neutral-800);
-    border: 1px solid var(--ui-color-neutral-300);
-    border-radius: 3px;
-    padding-block: 1px;
-    padding-inline-start: 6px;
+    border: var(--ui-border-thin) solid var(--ui-color-neutral-300);
+    border-radius: calc(3px * var(--ui-scale));
+    padding-block: calc(1px * var(--ui-scale));
+    padding-inline-start: calc(6px * var(--ui-scale));
     padding-inline-end: var(--ui-spacing-sm);
     font-size: var(--ui-font-size-sm);
     line-height: 1;

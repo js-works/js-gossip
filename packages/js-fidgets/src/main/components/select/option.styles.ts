@@ -29,12 +29,12 @@ export const optionStyles = [
       align-items: center;
       gap: var(--ui-spacing-sm);
       box-sizing: border-box;
-      padding-block: 3px;
+      padding-block: calc(3px * var(--ui-scale));
       padding-inline: var(--ui-spacing-sm);
       /* Transparent by default (rather than only added on [active]) so the
          border doesn't change the row's size and shift layout when it becomes
          active — same reasoning as ui-combobox's own option rows. */
-      border: 2px solid transparent;
+      border: var(--ui-border-thick) solid transparent;
       border-radius: var(--ui-radius-sm);
       color: var(--ui-text);
       cursor: pointer;

@@ -120,7 +120,7 @@ export const buttonStyles = [
       line-height: 1;
       padding-block: var(--btn-padding-block);
       padding-inline: var(--btn-padding-inline);
-      border: 1px solid transparent;
+      border: var(--ui-border-thin) solid transparent;
       border-radius: var(--ui-button-radius);
       cursor: pointer;
       user-select: none;
@@ -248,7 +248,7 @@ export const buttonStyles = [
       width: 1.2em;
       height: 1.2em;
       box-sizing: border-box;
-      border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+      border: var(--ui-border-thick) solid color-mix(in srgb, currentColor 25%, transparent);
       border-top-color: currentColor;
       border-radius: 50%;
       animation: ui-button-spin 0.75s linear infinite;

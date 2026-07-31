@@ -113,7 +113,7 @@ export class PasswordField extends LitElement {
       .wrapper {
         display: flex;
         align-items: center;
-        border: 1px solid var(--ui-field-border-color);
+        border: var(--ui-border-thin) solid var(--ui-field-border-color);
         border-radius: var(--ui-field-radius);
         background: var(--ui-bg);
         box-sizing: border-box;

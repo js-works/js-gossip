@@ -11,6 +11,19 @@ export const defaultTheme = css`
     --ui-bg: white;
     --ui-text: black;
 
+    /* The single density dial: a unitless multiplier every other sizing
+       token below (type scale, spacing, radius, border weight) is derived
+       from via calc(<px-or-rem> * var(--ui-scale)) — bumping this once
+       scales the whole library proportionally. Deliberately not a
+       transform: scale() (which would blur borders and desync hit-testing
+       from paint) — every affected token stays a real layout-participating
+       length. Kept separate from the type scale's own rem-relativity: rem
+       also tracks the document root's font-size, i.e. a user's own
+       browser/OS text-size preference — appropriate for type, not for
+       border/radius/spacing, which is why those use a fixed px base
+       multiplied by this token instead of rem. */
+    --ui-scale: 1;
+
     /* Color ramps below are the standard Tailwind CSS palette, used verbatim
        (no color-mix generation) — primary=blue, danger=red, warn=amber,
        success=emerald, neutral=neutral. */
@@ -76,20 +89,28 @@ export const defaultTheme = css`
     --ui-color-neutral-950: #0a0a0a;
 
     --ui-font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    --ui-font-size-sm: 0.875rem;
-    --ui-font-size-md: 1rem;
-    --ui-font-size-lg: 1.125rem;
-    --ui-font-size-xl: 1.5rem;
+    /* rem, not px — these still track the document root's own font-size (a
+       user's browser/OS text-size preference) in addition to --ui-scale,
+       which is the one place that's actually wanted (see --ui-scale's own
+       comment above). */
+    --ui-font-size-sm: calc(0.875rem * var(--ui-scale));
+    --ui-font-size-md: calc(1rem * var(--ui-scale));
+    --ui-font-size-lg: calc(1.125rem * var(--ui-scale));
+    --ui-font-size-xl: calc(1.5rem * var(--ui-scale));
 
     --ui-font-weight-light: 300;
     --ui-font-weight-normal: 400;
     --ui-font-weight-semibold: 600;
     --ui-font-weight-bold: 700;
 
-    --ui-radius-xs: 2px;
-    --ui-radius-sm: 4px;
-    --ui-radius-md: 6px;
-    --ui-radius-lg: 12px;
+    /* px, not rem — border/radius/spacing are visual-design decisions the
+       library's own --ui-scale should control on its own, independent of a
+       user's separate text-size preference (see --ui-scale's own comment
+       above; the type scale above is the one place rem is right). */
+    --ui-radius-xs: calc(2px * var(--ui-scale));
+    --ui-radius-sm: calc(4px * var(--ui-scale));
+    --ui-radius-md: calc(6px * var(--ui-scale));
+    --ui-radius-lg: calc(12px * var(--ui-scale));
 
     --ui-button-radius: var(--ui-radius-sm);
     /* Same per-component-family indirection as --ui-button-radius, for
@@ -107,6 +128,18 @@ export const defaultTheme = css`
        darkened back to #808080 → lightened again, in two steps, to this. */
     --ui-field-border-color: #949494;
 
+    /* The two border weights used throughout: -thin for hairline dividers
+       and field/popup outlines, -thick for the reserved-space active/focus
+       outline border (ui-select's [active] option, ui-menu-button's
+       .menu-item.active — see option.styles.ts/menu-popup.styles.ts). Not a
+       larger sm/md/lg scale — audited every border-width literal in
+       src/main and only these two values are actually in use as a line
+       weight (a few one-off spinner/hit-target borders elsewhere scale
+       directly off --ui-scale without going through a shared token, since
+       they aren't this kind of border). */
+    --ui-border-thin: calc(1px * var(--ui-scale));
+    --ui-border-thick: calc(2px * var(--ui-scale));
+
     /* Shared by every floating popup (ui-select/ui-combobox/ui-autocomplete's
        dropdown, ui-menu-button/ui-split-button's menu, ui-date-field's
        calendar) — these were identical copy-pasted literals across all of
@@ -121,11 +154,11 @@ export const defaultTheme = css`
       0 8px 16px rgba(0, 0, 0, 0.08),
       0 20px 32px rgba(0, 0, 0, 0.1);
 
-    --ui-focus-ring-width: 2px;
-    --ui-focus-ring-offset: 1px;
+    --ui-focus-ring-width: var(--ui-border-thick);
+    --ui-focus-ring-offset: var(--ui-border-thin);
 
-    --ui-spacing-sm: 4px;
-    --ui-spacing-md: 16px;
-    --ui-spacing-lg: 24px;
+    --ui-spacing-sm: calc(4px * var(--ui-scale));
+    --ui-spacing-md: calc(16px * var(--ui-scale));
+    --ui-spacing-lg: calc(24px * var(--ui-scale));
   }
 `;

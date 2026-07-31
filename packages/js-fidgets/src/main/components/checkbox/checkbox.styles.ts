@@ -52,7 +52,7 @@ export const checkboxStyles = [
       justify-content: center;
       width: 1.1em;
       height: 1.1em;
-      border: 1px solid var(--ui-color-neutral-600);
+      border: var(--ui-border-thin) solid var(--ui-color-neutral-600);
       border-radius: var(--ui-radius-xs);
       background: var(--ui-bg);
       color: white;

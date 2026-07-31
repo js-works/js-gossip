@@ -32,12 +32,12 @@ export const selectStyles = [
       /* Was 0px (same as small below) at one point — collapsed medium and
          small to the same overall height, which read as broken rather than
          "compact". 2px keeps a real, visible step between the three sizes. */
-      --select-padding-block: 2px;
+      --select-padding-block: calc(2px * var(--ui-scale));
       /* var(--ui-spacing-md) (16px) here previously — a flat, static value
          that didn't scale with size at all (large ended up identical to
          medium) and read as way too wide once padding-block above shrank
          this far. A plain small→large progression instead. */
-      --select-padding-inline: 8px;
+      --select-padding-inline: calc(8px * var(--ui-scale));
       /* Overridable by a consumer that needs a narrower trigger (e.g. a
          page-size picker). */
       --select-min-width: 12em;
@@ -46,13 +46,13 @@ export const selectStyles = [
     :host([size="small"]) {
       font-size: var(--ui-font-size-sm);
       --select-padding-block: 0px;
-      --select-padding-inline: 4px;
+      --select-padding-inline: calc(4px * var(--ui-scale));
     }
 
     :host([size="large"]) {
       font-size: var(--ui-font-size-lg);
-      --select-padding-block: 5px;
-      --select-padding-inline: 12px;
+      --select-padding-block: calc(5px * var(--ui-scale));
+      --select-padding-inline: calc(12px * var(--ui-scale));
     }
 
     :host([disabled]) {
@@ -90,7 +90,7 @@ export const selectStyles = [
       min-width: var(--select-min-width);
       padding-block: var(--select-padding-block);
       padding-inline-start: var(--select-padding-inline);
-      border: 1px solid var(--ui-field-border-color);
+      border: var(--ui-border-thin) solid var(--ui-field-border-color);
       border-radius: var(--ui-field-radius);
       background: var(--ui-bg);
       color: var(--ui-text);
@@ -112,12 +112,12 @@ export const selectStyles = [
          + 1px border × 2, and .pill-remove's 1.4em/line-height:1 as the
          tallest child) so the empty and "has pills" states render the same
          height. */
-      min-height: calc(1.4 * var(--ui-font-size-sm) + 4px);
+      min-height: calc(1.4 * var(--ui-font-size-sm) + var(--ui-spacing-sm));
       /* Breathing room around the pills themselves — .trigger's own
          padding-block (above) is intentionally near-zero to keep the plain
          (no pills) state compact, so this is the pills' own vertical margin
          from the border, not the whole control's. */
-      padding-block: 2px;
+      padding-block: calc(2px * var(--ui-scale));
     }
 
     .trigger:has(.pill) {
@@ -203,7 +203,7 @@ export const selectStyles = [
       min-width: 7em;
       background: var(--ui-bg);
       color: var(--ui-text);
-      border: 1px solid var(--ui-popup-border-color);
+      border: var(--ui-border-thin) solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-sm);
       box-shadow: var(--ui-popup-shadow);
     }
@@ -247,7 +247,7 @@ export const selectStyles = [
          popup-style border/shadow instead of this plain field-style
          default). */
       max-height: var(--select-inline-height, 12em);
-      border: 1px solid var(--select-inline-border-color, var(--ui-field-border-color));
+      border: var(--ui-border-thin) solid var(--select-inline-border-color, var(--ui-field-border-color));
       border-radius: var(--ui-field-radius);
       background: var(--ui-bg);
       color: var(--ui-text);

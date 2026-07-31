@@ -147,7 +147,14 @@ function renderEntry(
   },
 ): TemplateResult {
   const { namespace, controller, entries, outgoing } = context;
-  const isActive = !outgoing && !entry.disabled && controller.activeValue === entry.value;
+  // Only rendered as the highlighted row for keyboard nav — a pointer-driven
+  // activeValue (see MenuController#setActive) relies on the row's own CSS
+  // :hover for its visual instead (menu-popup.styles.ts).
+  const isActive =
+    !outgoing &&
+    !entry.disabled &&
+    controller.activeValue === entry.value &&
+    controller.activeSource === "keyboard";
   const danger = !isSubmenu(entry) && entry.danger;
 
   return html`

@@ -88,7 +88,7 @@ export const datagridStyles = [
       min-height: 0;
     }
 
-    /* border-inline: 1px solid transparent (not omitted) on every row type
+    /* border-inline: var(--ui-border-thin) solid transparent (not omitted) on every row type
        — header, filter, and body alike — even though only a selected/
        hovered \`.body-row\`/\`.row-details\` ever colors it in (see below).
        Reserving it everywhere, rather than just there, keeps every row's
@@ -100,7 +100,7 @@ export const datagridStyles = [
     .row {
       display: grid;
       align-items: stretch;
-      border-inline: 1px solid transparent;
+      border-inline: var(--ui-border-thin) solid transparent;
     }
 
     /* The base cell rule — kept ahead of \`.header-cell\`/\`.filter-cell\`/
@@ -108,7 +108,7 @@ export const datagridStyles = [
        class-selector specificity) reliably win instead of silently losing
        to whichever one happens to sit later in the file. */
     .cell {
-      padding: 6px var(--ui-spacing-md);
+      padding: calc(6px * var(--ui-scale)) var(--ui-spacing-md);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -116,7 +116,7 @@ export const datagridStyles = [
 
     .header-row {
       flex: none;
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
       font-weight: var(--ui-font-weight-semibold);
     }
 
@@ -155,7 +155,7 @@ export const datagridStyles = [
       position: absolute;
       inset-inline: 0.5em;
       inset-block-end: 0;
-      height: 1px;
+      height: calc(1px * var(--ui-scale));
       background: var(--ui-color-neutral-200);
     }
 
@@ -182,7 +182,7 @@ export const datagridStyles = [
 
     .filter-row {
       flex: none;
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     .filter-cell {
@@ -229,7 +229,7 @@ export const datagridStyles = [
     }
 
     .body-row {
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* Zebra striping — opt-in via the \`stripes\` property, off by default.
@@ -308,7 +308,7 @@ export const datagridStyles = [
        plain gray \`.thead\`/\`.pagination-bar\` border directly next to this
        accent one — that's the intended look, not a bug. */
     .body-row:first-child {
-      border-top: 1px solid transparent;
+      border-top: var(--ui-border-thin) solid transparent;
     }
 
     .body-row:first-child.selected {
@@ -316,7 +316,7 @@ export const datagridStyles = [
     }
 
     .body-row.selected:last-child {
-      border-bottom: 1px solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+      border-bottom: var(--ui-border-thin) solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     :host([selection-mode="single"]) .body-row,
@@ -401,7 +401,7 @@ export const datagridStyles = [
 
     :host(:is([selection-mode="single"], [selection-mode="multi"]))
       .body-row:hover:last-child {
-      border-bottom: 1px solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+      border-bottom: var(--ui-border-thin) solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     .select-cell {
@@ -436,7 +436,7 @@ export const datagridStyles = [
        (both otherwise show doubled, immediately-adjacent borders). */
     .body-row .expander-cell,
     .body-row .select-cell:not(:has(+ .expander-cell)) {
-      border-inline-end: 1px solid var(--ui-color-neutral-200);
+      border-inline-end: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     .row-actions-cell {
@@ -454,7 +454,7 @@ export const datagridStyles = [
        to. */
     .body-row .row-actions-cell {
       background: transparent;
-      border-inline-start: 1px solid var(--ui-color-neutral-200);
+      border-inline-start: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* A selected/hovered row reads as one solid tinted block — its own
@@ -524,7 +524,7 @@ export const datagridStyles = [
        line rather than the usual 1px. */
     .row-details.expanded {
       grid-template-rows: 1fr;
-      border-bottom: 1px solid var(--ui-color-neutral-200);
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* Same specificity as .row-details.expanded above (two classes) — needs
@@ -543,7 +543,7 @@ export const datagridStyles = [
        the rule directly above: same (three-class) specificity, so this
        only reliably wins the tie by coming later in the file. */
     .row-details.selected:last-child {
-      border-bottom: 1px solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+      border-bottom: var(--ui-border-thin) solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
     }
 
     .row-details-content {
@@ -579,7 +579,7 @@ export const datagridStyles = [
       width: 4em;
       height: 4em;
       box-sizing: border-box;
-      border: 6px solid color-mix(in srgb, currentColor 20%, transparent);
+      border: calc(6px * var(--ui-scale)) solid color-mix(in srgb, currentColor 20%, transparent);
       border-top-color: var(--ui-color-neutral-500);
       border-radius: 50%;
       animation: datagrid-spin 0.75s linear infinite;
@@ -612,7 +612,7 @@ export const datagridStyles = [
       align-items: center;
       gap: var(--ui-spacing-md);
       padding: calc(var(--ui-spacing-sm) * 2.5) var(--ui-spacing-md);
-      border-top: 1px solid var(--ui-color-neutral-200);
+      border-top: var(--ui-border-thin) solid var(--ui-color-neutral-200);
       font-size: var(--ui-font-size-md);
     }
 
@@ -661,7 +661,7 @@ export const datagridStyles = [
       inset-block: 0;
       inset-inline-end: calc((var(--ui-spacing-md) + 1.75em) / -2);
       margin-block: auto;
-      width: 2px;
+      width: calc(2px * var(--ui-scale));
       height: 1.25em;
       background: var(--ui-color-neutral-200);
     }

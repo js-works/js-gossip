@@ -42,7 +42,7 @@ export const uploadStyles = [
       gap: var(--ui-spacing-sm);
       box-sizing: border-box;
       padding: var(--field-padding);
-      border: 1px dashed var(--ui-color-neutral-400);
+      border: var(--ui-border-thin) dashed var(--ui-color-neutral-400);
       border-radius: var(--ui-radius-md);
       background: var(--ui-color-neutral-50);
       color: var(--ui-color-neutral-700);
@@ -120,7 +120,7 @@ export const uploadStyles = [
       gap: var(--ui-spacing-sm);
       box-sizing: border-box;
       padding: var(--ui-spacing-sm) var(--ui-spacing-md);
-      border: 1px solid var(--ui-color-neutral-200);
+      border: var(--ui-border-thin) solid var(--ui-color-neutral-200);
       border-radius: var(--ui-radius-sm);
       background: var(--ui-bg);
     }
@@ -168,7 +168,7 @@ export const uploadStyles = [
     .file-progress {
       position: relative;
       width: 5em;
-      height: 6px;
+      height: calc(6px * var(--ui-scale));
       flex: none;
       border-radius: var(--ui-radius-xs);
       background: var(--ui-color-neutral-200);
@@ -194,13 +194,13 @@ export const uploadStyles = [
 
     .file-start {
       flex: none;
-      border: 1px solid var(--ui-color-primary-500);
+      border: var(--ui-border-thin) solid var(--ui-color-primary-500);
       background: transparent;
       color: var(--ui-color-primary-600);
       font: inherit;
       font-size: var(--ui-font-size-sm);
       border-radius: var(--ui-radius-xs);
-      padding: 2px var(--ui-spacing-sm);
+      padding: calc(2px * var(--ui-scale)) var(--ui-spacing-sm);
       cursor: pointer;
     }
 
