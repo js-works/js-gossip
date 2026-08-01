@@ -1,6 +1,9 @@
 import { html, nothing, render } from "lit";
 
 import { defaultTheme } from "../main/theming/theme.js";
+import "../main/components/heading/heading.js";
+import "../main/components/text/text.js";
+import "../main/components/link/link.js";
 import "../main/components/checkbox/checkbox.js";
 import "../main/components/checkbox/checkbox-group.js";
 import "../main/components/radio/radio-button.js";
@@ -67,7 +70,7 @@ document.adoptedStyleSheets = [
 ];
 
 // Sample data for the ui-button demo below.
-const BUTTON_APPEARANCES = [
+const BUTTON_TONES = [
   "neutral",
   "primary",
   "danger",
@@ -82,7 +85,7 @@ const BUTTON_VARIANTS = [
   "link",
 ] as const;
 
-// Attribute values (appearance/variant) stay lowercase to match the
+// Attribute values (tone/variant) stay lowercase to match the
 // component's own API — this only capitalizes what's shown as button text.
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -537,6 +540,130 @@ const employeeDataGridDataSource: DataGridDataSource<Employee> = ({
     });
   });
 
+function typographyTab() {
+  return html`
+    <section>
+      <h2>Heading</h2>
+      <p>
+        <code>level</code> (1–6) alone already picks a sensible default
+        size — the same way a bare <code>&lt;h1&gt;</code>…<code
+          >&lt;h6&gt;</code
+        >
+        would. <code>role="heading"</code>/<code>aria-level</code> reproduce
+        the document-outline semantics a real heading tag would give for
+        free.
+      </p>
+      <div class="row" style="flex-direction: column; align-items: stretch;">
+        <ui-heading level="1">Heading level 1</ui-heading>
+        <ui-heading level="2">Heading level 2</ui-heading>
+        <ui-heading level="3">Heading level 3</ui-heading>
+        <ui-heading level="4">Heading level 4</ui-heading>
+        <ui-heading level="5">Heading level 5</ui-heading>
+        <ui-heading level="6">Heading level 6</ui-heading>
+      </div>
+      <p>
+        <code>size</code> overrides the level-driven default — for an
+        <code>&lt;h2&gt;</code> that should read smaller than its own level
+        implies, without lying about the document outline.
+      </p>
+      <div class="row">
+        <ui-heading level="2" size="small">Small h2</ui-heading>
+      </div>
+      <p><code>tone</code> — same five values as <code>ui-button</code>.</p>
+      <div class="row" style="flex-direction: column; align-items: stretch;">
+        <ui-heading level="3" tone="primary">Primary heading</ui-heading>
+        <ui-heading level="3" tone="danger">Danger heading</ui-heading>
+        <ui-heading level="3" tone="warning">Warning heading</ui-heading>
+        <ui-heading level="3" tone="success">Success heading</ui-heading>
+      </div>
+      <p><code>truncate</code> — a single line, ellipsized rather than wrapping.</p>
+      <div class="row" style="width: 20em;">
+        <ui-heading level="3" truncate style="width: 100%">
+          A heading with far too much text to fit on one line at this width
+        </ui-heading>
+      </div>
+    </section>
+
+    <section>
+      <h2>Text</h2>
+      <p>
+        The plain-text counterpart to <code>ui-heading</code> — body copy,
+        captions, helper/error text. <code>as</code> controls block-vs-inline
+        flow rather than swapping the underlying element.
+      </p>
+      <div class="row" style="flex-direction: column; align-items: stretch;">
+        <ui-text as="p">
+          A paragraph of body copy, rendered block-level with its own
+          trailing spacing (<code>as="p"</code>) so a second paragraph right
+          after it doesn't run straight into it.
+        </ui-text>
+        <ui-text as="p">
+          A second paragraph, to show that spacing.
+        </ui-text>
+      </div>
+      <p>
+        <code>size</code>/<code>weight</code>/<code>tone</code> — same scales
+        as everywhere else in this library.
+      </p>
+      <div class="row" style="flex-direction: column; align-items: stretch;">
+        <ui-text size="small" tone="neutral">Small helper text under a field.</ui-text>
+        <ui-text weight="semibold">Semibold emphasis.</ui-text>
+        <ui-text tone="danger">Something went wrong.</ui-text>
+        <ui-text tone="success">Saved successfully.</ui-text>
+      </div>
+      <p>
+        <code>muted</code> — dimmed via opacity, tracking whatever
+        <code>tone</code> is set rather than a flat gray.
+      </p>
+      <div class="row">
+        <ui-text muted>Optional — leave blank to skip this step.</ui-text>
+      </div>
+      <p><code>truncate</code> (single line) and <code>clamp</code> (a fixed number of lines).</p>
+      <div class="row" style="width: 20em;">
+        <ui-text as="div" truncate style="width: 100%">
+          This line of text is far too long to fit in twenty characters of
+          width, so it gets cut off with an ellipsis.
+        </ui-text>
+      </div>
+      <div class="row" style="width: 20em;">
+        <ui-text as="div" clamp="2">
+          This description runs long enough to wrap past two lines, at which
+          point the third line and beyond are clipped with a trailing
+          ellipsis instead of pushing the layout around it taller and taller.
+        </ui-text>
+      </div>
+    </section>
+
+    <section>
+      <h2>Link</h2>
+      <p>
+        Wraps a real <code>&lt;a&gt;</code> — focus, keyboard activation, and
+        middle-click/ctrl-click-to-open-in-new-tab all come from the native
+        element. <code>tone</code> defaults to <code>"primary"</code>
+        (unlike <code>ui-heading</code>/<code>ui-text</code>, which default to
+        <code>"neutral"</code>) — a bare link should already read as a link.
+      </p>
+      <div class="row">
+        <ui-text as="p">
+          Read the <ui-link href="https://www.blocknotejs.org" target="_blank">
+            BlockNote docs
+          </ui-link>
+          for more, or
+          <ui-link href="#" tone="danger">delete your account</ui-link>
+          instead.
+        </ui-text>
+      </div>
+      <div class="row">
+        <ui-link href="#" tone="neutral">Neutral</ui-link>
+        <ui-link href="#" tone="primary">Primary</ui-link>
+        <ui-link href="#" tone="danger">Danger</ui-link>
+        <ui-link href="#" tone="warning">Warning</ui-link>
+        <ui-link href="#" tone="success">Success</ui-link>
+      </div>
+    </section>
+  `;
+}
+
 function buttonsTab() {
   const onSelect = (event: CustomEvent<MenuSelectDetail>) =>
     console.log("Menu select:", event.detail.value, "path:", event.detail.path);
@@ -545,12 +672,12 @@ function buttonsTab() {
     <section class="button-showcase">
       <h2>Buttons</h2>
       <div class="button-grid">
-        ${BUTTON_APPEARANCES.map(
-          (appearance) => html`
-            <span class="page-label">${appearance}</span>
+        ${BUTTON_TONES.map(
+          (tone) => html`
+            <span class="page-label">${tone}</span>
             ${BUTTON_VARIANTS.map(
               (variant) => html`
-                <ui-button appearance=${appearance} variant=${variant}>
+                <ui-button tone=${tone} variant=${variant}>
                   ${capitalize(variant)}
                 </ui-button>
               `,
@@ -564,7 +691,7 @@ function buttonsTab() {
         <ui-button size="large">Large</ui-button>
         <ui-button disabled>Disabled</ui-button>
         <ui-button
-          appearance="primary"
+          tone="primary"
           @click=${(event: Event) => {
             const btn = event.currentTarget as Button;
             setTimeout(() => {
@@ -577,7 +704,7 @@ function buttonsTab() {
         >
           Click to load
         </ui-button>
-        <ui-button appearance="primary" variant="outlined" type="submit">
+        <ui-button tone="primary" variant="outlined" type="submit">
           <svg
             slot="prefix"
             viewBox="0 0 16 16"
@@ -594,7 +721,7 @@ function buttonsTab() {
         </ui-button>
       </div>
       <div class="row">
-        <ui-button full-width appearance="success">Full-width button</ui-button>
+        <ui-button full-width tone="success">Full-width button</ui-button>
       </div>
     </section>
 
@@ -1412,8 +1539,8 @@ function agGridTab() {
     <section>
       <h2>AG Grid</h2>
       <ui-ag-grid
-        title="Employees"
-        subtitle="All employees across every department"
+        heading="Employees"
+        subheading="All employees across every department"
         .columns=${employeeGridColumns}
         .dataSource=${employeeGridDataSource}
         .actions=${employeeGridActions}
@@ -1435,8 +1562,8 @@ function dataGridFlatTab() {
     <section>
       <h2>Datagrid</h2>
       <ui-datagrid
-        title="Employees"
-        subtitle="All employees across every department"
+        heading="Employees"
+        subheading="All employees across every department"
         .columns=${employeeDataGridColumnsFlat}
         .dataSource=${employeeDataGridDataSource}
         .actions=${employeeDataGridActions}
@@ -1445,7 +1572,7 @@ function dataGridFlatTab() {
         .pageSizeOptions=${[50, 100, 150, 250, 500]}
         page-size="50"
         selection-mode="multi"
-        selection-appearance="primary"
+        selection-tone="primary"
         @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
           console.log(
             "Selected:",
@@ -1461,8 +1588,8 @@ function dataGridGroupedTab() {
     <section>
       <h2>Datagrid</h2>
       <ui-datagrid
-        title="Employees"
-        subtitle="All employees across every department"
+        heading="Employees"
+        subheading="All employees across every department"
         .columns=${employeeDataGridColumns}
         .dataSource=${employeeDataGridDataSource}
         .actions=${employeeDataGridActions}
@@ -1471,7 +1598,7 @@ function dataGridGroupedTab() {
         .pageSizeOptions=${[50, 100, 150, 250, 500]}
         page-size="50"
         selection-mode="multi"
-        selection-appearance="primary"
+        selection-tone="primary"
         stripes
         @row-selection-change=${(event: CustomEvent<{ selected: Employee[] }>) =>
           console.log(
@@ -1498,6 +1625,7 @@ interface DemoPage {
 }
 
 const demoPages: DemoPage[] = [
+  { id: "typography", label: "Typography", content: typographyTab },
   { id: "buttons", label: "Buttons", content: buttonsTab },
   { id: "selection", label: "Selection", content: selectionTab },
   {

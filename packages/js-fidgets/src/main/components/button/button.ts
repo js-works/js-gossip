@@ -27,12 +27,8 @@ export class Button extends LitElement {
   #button!: HTMLButtonElement;
 
   @property({ reflect: true })
-  accessor appearance:
-    | "neutral"
-    | "primary"
-    | "danger"
-    | "warning"
-    | "success" = "neutral";
+  accessor tone: "neutral" | "primary" | "danger" | "warning" | "success" =
+    "neutral";
 
   @property({ reflect: true })
   accessor variant: "solid" | "outlined" | "filled" | "subtle" | "link" =

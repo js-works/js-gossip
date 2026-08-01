@@ -87,12 +87,12 @@ export const agGridStyles = [
       }
     }
 
-    /* Title/subtitle (AG Grid has no header concept of its own beyond
+    /* Heading/subheading (AG Grid has no header concept of its own beyond
        column headers, so this component renders both) and the toolbar
        actions share one row: \`.toolbar\`'s
        \`margin-inline-start: auto\` pushes it to the far end regardless of
        whether \`.header-text\` is present, so actions still end up on the
-       right even with no title/subtitle set. */
+       right even with no heading/subheading set. */
     .header {
       display: flex;
       align-items: flex-end;
@@ -101,13 +101,13 @@ export const agGridStyles = [
       margin-bottom: var(--ui-spacing-md);
     }
 
-    .title {
+    .heading {
       font-size: var(--ui-font-size-lg);
       font-weight: 600;
       margin: 0;
     }
 
-    .subtitle {
+    .subheading {
       font-size: var(--ui-font-size-sm);
       opacity: 0.7;
       margin: 0.25em 0 0;

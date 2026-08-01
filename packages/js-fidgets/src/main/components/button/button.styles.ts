@@ -5,9 +5,9 @@ import { defaultTheme } from "../../theming/theme.js";
 export const buttonStyles = [
   defaultTheme,
   css`
-    /* Generic --btn-* tokens carry each appearance's color scale; every variant
+    /* Generic --btn-* tokens carry each tone's color scale; every variant
        rule below reads only these, so adding a variant never means touching the
-       per-appearance color mapping (and vice versa). appearance="neutral" (the
+       per-tone color mapping (and vice versa). tone="neutral" (the
        default) is set directly here rather than behind an attribute selector —
        "define the default, override the rest". */
     :host {
@@ -43,7 +43,7 @@ export const buttonStyles = [
       --btn-gap: var(--ui-spacing-sm);
     }
 
-    :host([appearance="primary"]) {
+    :host([tone="primary"]) {
       --btn-50: var(--ui-color-primary-50);
       --btn-100: var(--ui-color-primary-100);
       --btn-200: var(--ui-color-primary-200);
@@ -53,7 +53,7 @@ export const buttonStyles = [
       --btn-solid-text: white;
     }
 
-    :host([appearance="danger"]) {
+    :host([tone="danger"]) {
       --btn-50: var(--ui-color-danger-50);
       --btn-100: var(--ui-color-danger-100);
       --btn-200: var(--ui-color-danger-200);
@@ -63,7 +63,7 @@ export const buttonStyles = [
       --btn-solid-text: white;
     }
 
-    :host([appearance="warning"]) {
+    :host([tone="warning"]) {
       --btn-50: var(--ui-color-warn-50);
       --btn-100: var(--ui-color-warn-100);
       --btn-200: var(--ui-color-warn-200);
@@ -73,7 +73,7 @@ export const buttonStyles = [
       --btn-solid-text: white;
     }
 
-    :host([appearance="success"]) {
+    :host([tone="success"]) {
       --btn-50: var(--ui-color-success-50);
       --btn-100: var(--ui-color-success-100);
       --btn-200: var(--ui-color-success-200);
@@ -127,7 +127,7 @@ export const buttonStyles = [
       /* Suppresses the browser's own default (grayish) tap-highlight overlay on
          touch, which otherwise shows through a variant with a transparent base
          background (outlined, subtle, link) and reads as "always just gray"
-         regardless of appearance — our own :active rules below replace it. */
+         regardless of tone — our own :active rules below replace it. */
       -webkit-tap-highlight-color: transparent;
       transition:
         background-color 120ms ease,
@@ -235,7 +235,7 @@ export const buttonStyles = [
       align-self: center;
     }
 
-    /* currentColor tracks whatever text color the active variant/appearance
+    /* currentColor tracks whatever text color the active variant/tone
        resolved to, so the spinner never needs its own color token. Centered via
        inset + margin: auto rather than a translate transform — the spin
        animation below already owns the transform property (for its rotate

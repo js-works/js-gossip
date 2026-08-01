@@ -657,10 +657,10 @@ export interface AgGridAction<T> {
  * AG Grid needs an explicit height on its container — it does not auto-size
  * to its own row count — set via the `height` property (any CSS length).
  *
- * `title`/`subtitle` are an optional plain-text header above the toolbar —
- * same idea as `ui-datagrid`'s own `title`/`subtitle` (this component
- * renders both, not AG Grid, which has no header concept of its own beyond
- * column headers).
+ * `heading`/`subheading` are an optional plain-text header above the
+ * toolbar — same idea as `ui-datagrid`'s own `heading`/`subheading` (this
+ * component renders both, not AG Grid, which has no header concept of its
+ * own beyond column headers).
  */
 @customElement("ui-ag-grid")
 export class AgGrid<T = unknown> extends LitElement {
@@ -683,10 +683,10 @@ export class AgGrid<T = unknown> extends LitElement {
   accessor dataSource: AgGridDataSource<T> | undefined = undefined;
 
   @property()
-  accessor title = "";
+  accessor heading = "";
 
   @property()
-  accessor subtitle = "";
+  accessor subheading = "";
 
   @property({ type: Boolean })
   accessor pagination = true;
@@ -989,15 +989,15 @@ export class AgGrid<T = unknown> extends LitElement {
     });
 
     return html`
-      ${this.title || this.subtitle || visibleActions.length > 0
+      ${this.heading || this.subheading || visibleActions.length > 0
         ? html`<div class="header">
-            ${this.title || this.subtitle
+            ${this.heading || this.subheading
               ? html`<div class="header-text">
-                  ${this.title
-                    ? html`<h2 class="title">${this.title}</h2>`
+                  ${this.heading
+                    ? html`<h2 class="heading">${this.heading}</h2>`
                     : nothing}
-                  ${this.subtitle
-                    ? html`<p class="subtitle">${this.subtitle}</p>`
+                  ${this.subheading
+                    ? html`<p class="subheading">${this.subheading}</p>`
                     : nothing}
                 </div>`
               : nothing}
@@ -1006,7 +1006,7 @@ export class AgGrid<T = unknown> extends LitElement {
                   ${visibleActions.map(
                     (action) => html`
                       <ui-button
-                        appearance="neutral"
+                        tone="neutral"
                         variant="outlined"
                         size="medium"
                         ?disabled=${action.disabled}

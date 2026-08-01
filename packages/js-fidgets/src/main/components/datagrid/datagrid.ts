@@ -88,7 +88,7 @@ export type DataGridSelectionMode = "none" | "single" | "multi";
  * "primary". Same idea (and same two values) as `ui-ag-grid`'s own
  * `AgGridSelectionAppearance`.
  */
-export type DataGridSelectionAppearance = "neutral" | "primary";
+export type DataGridSelectionTone = "neutral" | "primary";
 
 /**
  * Per-row expandable detail content — return a `TemplateResult` to give
@@ -131,7 +131,7 @@ export interface DataGridRowAction<T> {
   label: string;
   icon?: TemplateResult;
   /**
-   * The action button's `ui-button` appearance — defaults to "neutral".
+   * The action button's `ui-button` tone — defaults to "neutral".
    * Set to "danger" for a destructive action (e.g. "Delete") to flag it as
    * such, the same convention `DataGridAction`'s own toolbar buttons use.
    */
@@ -216,7 +216,7 @@ export type DataGridDataSource<T> = (
  * "same" row; this matters most for `dataSource`, where each request
  * resolves independently — a `dataSource` backed by a stable in-memory store
  * naturally satisfies this by returning slices of the same row objects
- * every time. `selectionAppearance` (see `DataGridSelectionAppearance`) is
+ * every time. `selectionTone` (see `DataGridSelectionTone`) is
  * unrelated to any of the above — it only changes the color selected/
  * hovered rows are tinted, not selection behavior itself; same idea as
  * `ui-ag-grid`'s own `selectionAppearance`.
@@ -237,10 +237,10 @@ export class DataGrid<T = unknown> extends LitElement {
   accessor dataSource: DataGridDataSource<T> | undefined = undefined;
 
   @property()
-  accessor title = "";
+  accessor heading = "";
 
   @property()
-  accessor subtitle = "";
+  accessor subheading = "";
 
   @property({ type: Boolean })
   accessor pagination = true;
@@ -255,12 +255,12 @@ export class DataGrid<T = unknown> extends LitElement {
   accessor selectionMode: DataGridSelectionMode = "none";
 
   // reflect: true — datagrid.styles.ts's --datagrid-row-accent swap is a
-  // plain :host([selection-appearance="primary"]) CSS rule, which needs the
+  // plain :host([selection-tone="primary"]) CSS rule, which needs the
   // live property value mirrored onto the actual DOM attribute (Lit doesn't
   // do that by default; same reason ui-ag-grid's own selectionAppearance
   // reflects too).
-  @property({ attribute: "selection-appearance", reflect: true })
-  accessor selectionAppearance: DataGridSelectionAppearance = "neutral";
+  @property({ attribute: "selection-tone", reflect: true })
+  accessor selectionTone: DataGridSelectionTone = "neutral";
 
   @property({ attribute: false })
   accessor actions: DataGridAction<T>[] = [];
@@ -279,7 +279,7 @@ export class DataGrid<T = unknown> extends LitElement {
 
   // reflect: true — datagrid.styles.ts's zebra striping is a plain
   // :host([stripes]) CSS rule, so the live property value needs mirroring
-  // onto the actual DOM attribute (same reason selectionAppearance reflects
+  // onto the actual DOM attribute (same reason selectionTone reflects
   // above).
   @property({ type: Boolean, reflect: true })
   accessor stripes = false;
@@ -800,15 +800,15 @@ export class DataGrid<T = unknown> extends LitElement {
     );
 
     return html`
-      ${this.title || this.subtitle || visibleActions.length > 0
+      ${this.heading || this.subheading || visibleActions.length > 0
         ? html`<div class="header">
-            ${this.title || this.subtitle
+            ${this.heading || this.subheading
               ? html`<div class="header-text">
-                  ${this.title
-                    ? html`<h2 class="title">${this.title}</h2>`
+                  ${this.heading
+                    ? html`<h2 class="heading">${this.heading}</h2>`
                     : nothing}
-                  ${this.subtitle
-                    ? html`<p class="subtitle">${this.subtitle}</p>`
+                  ${this.subheading
+                    ? html`<p class="subheading">${this.subheading}</p>`
                     : nothing}
                 </div>`
               : nothing}
@@ -817,7 +817,7 @@ export class DataGrid<T = unknown> extends LitElement {
                   ${visibleActions.map(
                     (action) => html`
                       <ui-button
-                        appearance="neutral"
+                        tone="neutral"
                         variant="outlined"
                         size="medium"
                         ?disabled=${action.disabled}
@@ -849,7 +849,7 @@ export class DataGrid<T = unknown> extends LitElement {
                       class="cell select-cell"
                       style="grid-column: ${checkboxCol}; grid-row: 2"
                     >
-                      ${hasFilters ? nothing : selectAllCheckbox}
+                      ${selectAllCheckbox}
                     </div>`
                   : nothing}
                 ${expanderCol
@@ -857,7 +857,7 @@ export class DataGrid<T = unknown> extends LitElement {
                       class="cell expander-cell"
                       style="grid-column: ${expanderCol}; grid-row: 2"
                     >
-                      ${hasFilters ? nothing : expandAllToggle}
+                      ${expandAllToggle}
                     </div>`
                   : nothing}
                 ${headerEntries.map((entry) => {
@@ -945,14 +945,10 @@ export class DataGrid<T = unknown> extends LitElement {
                     style="grid-template-columns: ${gridTemplateColumns}"
                   >
                     ${this.selectionMode === "multi"
-                      ? html`<div class="cell select-cell">
-                          ${selectAllCheckbox}
-                        </div>`
+                      ? html`<div class="cell"></div>`
                       : nothing}
                     ${hasRowDetails
-                      ? html`<div class="cell expander-cell">
-                          ${expandAllToggle}
-                        </div>`
+                      ? html`<div class="cell"></div>`
                       : nothing}
                     ${leafColumns.map((column) => {
                       return html`
@@ -1046,8 +1042,7 @@ export class DataGrid<T = unknown> extends LitElement {
                               ${this.rowActions.map(
                                 (action) => html`
                                   <ui-button
-                                    appearance=${action.appearance ??
-                                    "neutral"}
+                                    tone=${action.appearance ?? "neutral"}
                                     variant="link"
                                     size="small"
                                     ?disabled=${action.disabled?.(row) ??
@@ -1129,7 +1124,7 @@ export class DataGrid<T = unknown> extends LitElement {
               </div>
               <div class="page-nav">
                 <ui-button
-                  appearance="neutral"
+                  tone="neutral"
                   variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="First page"
@@ -1141,7 +1136,7 @@ export class DataGrid<T = unknown> extends LitElement {
                   ${chevronsLeftIcon}
                 </ui-button>
                 <ui-button
-                  appearance="neutral"
+                  tone="neutral"
                   variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Previous page"
@@ -1172,7 +1167,7 @@ export class DataGrid<T = unknown> extends LitElement {
                 ></ui-number-field>
                 <span class="page-label">of ${pageCount}</span>
                 <ui-button
-                  appearance="neutral"
+                  tone="neutral"
                   variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Next page"
@@ -1184,7 +1179,7 @@ export class DataGrid<T = unknown> extends LitElement {
                   ${chevronRightIcon}
                 </ui-button>
                 <ui-button
-                  appearance="neutral"
+                  tone="neutral"
                   variant="subtle"
                   style="--btn-font-size: 1.1em; --btn-padding-block: 0.2em; --btn-padding-inline: 0.3em;"
                   aria-label="Last page"

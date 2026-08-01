@@ -11,20 +11,20 @@ export const datagridStyles = [
       font-size: var(--ui-font-size-sm);
       color: var(--ui-text);
       display: block;
-      /* "neutral" (DataGrid.selectionAppearance's default) — read by every
+      /* "neutral" (DataGrid.selectionTone's default) — read by every
          selected/hovered-row background rule below, so they all switch
          together. Same pattern as ui-ag-grid's own --ag-grid-row-accent. */
       --datagrid-row-accent: var(--ui-color-neutral-500);
     }
 
-    :host([selection-appearance="primary"]) {
+    :host([selection-tone="primary"]) {
       --datagrid-row-accent: var(--ui-color-primary-500);
     }
 
-    /* Title/subtitle and the toolbar actions share one row: \`.toolbar\`'s
+    /* Heading/subheading and the toolbar actions share one row: \`.toolbar\`'s
        \`margin-inline-start: auto\` pushes it to the far end regardless of
        whether \`.header-text\` is present, so actions still end up on the
-       right even with no title/subtitle set. Same convention as
+       right even with no heading/subheading set. Same convention as
        ui-ag-grid's own header. */
     .header {
       display: flex;
@@ -35,13 +35,13 @@ export const datagridStyles = [
       margin-bottom: var(--ui-spacing-md);
     }
 
-    .title {
+    .heading {
       font-size: var(--ui-font-size-lg);
       font-weight: var(--ui-font-weight-semibold);
       margin: 0;
     }
 
-    .subtitle {
+    .subheading {
       font-size: var(--ui-font-size-sm);
       opacity: 0.7;
       margin: 0.25em 0 0;
@@ -145,19 +145,6 @@ export const datagridStyles = [
     .header-row .expander-cell,
     .header-row .actions-header-cell {
       background: transparent;
-    }
-
-    /* Overrides \`.select-cell\`/\`.expander-cell\`'s own \`align-items: center\`
-       (further below) for the header only — bottom-aligned instead, flush
-       with the boundary just below (the filter row when shown, otherwise
-       the table body's own top edge), rather than centered in whatever
-       height the header happens to be (taller with a group header's own
-       row above, per \`grid-row: 2\` — see datagrid.ts). The body's own
-       per-row checkbox/chevron are unaffected, still centered in their own
-       single-line row. */
-    .header-row .select-cell,
-    .header-row .expander-cell {
-      align-items: flex-end;
     }
 
     .header-cell {
@@ -286,7 +273,7 @@ export const datagridStyles = [
     }
 
     /* Selected/hovered rows are tinted with --datagrid-row-accent (neutral
-       gray by default, primary when \`selectionAppearance="primary"\` —
+       gray by default, primary when \`selectionTone="primary"\` —
        see :host above). */
     .body-row.selected {
       background: color-mix(in srgb, var(--datagrid-row-accent) 12%, var(--ui-bg));
@@ -302,7 +289,7 @@ export const datagridStyles = [
 
     /* A selected row's top/bottom edge, a shade darker than its own
        background tint above — same variable, so it stays in step whether
-       \`selectionAppearance\` is "neutral" or "primary". \`.body-row.selected\`
+       \`selectionTone\` is "neutral" or "primary". \`.body-row.selected\`
        covers its own bottom edge; what reads as its *top* edge is really
        the border-bottom of whatever comes immediately before it, so that's
        recolored instead — which one that is depends on whether the row
