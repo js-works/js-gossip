@@ -154,3 +154,80 @@ h2 {
   margin-bottom: 0.5rem;
 }
 
+
+/* Date Picker page — the live picker beside its control panel. Wraps to one
+   column when there isn't room for both side by side. */
+.picker-demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--ui-spacing-lg);
+}
+
+.picker-demo-main {
+  flex: 0 1 24rem;
+}
+
+/* The picker sizes itself (the core's .cal-base carries its own min-width and
+   min-height), so this only gives it the card treatment. */
+.picker-demo-picker {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--ui-color-neutral-200);
+  border-radius: var(--ui-radius-md);
+  padding: var(--ui-spacing-md);
+}
+
+.picker-demo-selection {
+  margin: var(--ui-spacing-md) 0 0;
+  font-size: 0.85rem;
+  color: var(--ui-color-neutral-600);
+}
+
+.picker-demo-selection strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+/* Narrower than the pickers' own column but wide enough for the longest
+   calendar-size label. */
+.picker-demo-controls {
+  flex: 1 1 20rem;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Both fields on one line where they fit, since they're a matched pair. */
+.picker-demo-range {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--ui-spacing-md);
+  margin-top: var(--ui-spacing-sm);
+}
+
+/* Date Fields page — one field per selection mode, in a responsive grid with
+   the raw stored value under each. */
+.date-fields-locale {
+  margin-bottom: var(--ui-spacing-lg);
+}
+
+.date-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--ui-spacing-lg);
+}
+
+.date-fields-cell ui-date-field {
+  width: 100%;
+}
+
+/* The raw picker value behind the formatted display — deliberately shown, since
+   the point of the Locale selector above is that this half does *not* change. */
+.date-fields-raw {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ui-color-neutral-600);
+  overflow-wrap: anywhere;
+}

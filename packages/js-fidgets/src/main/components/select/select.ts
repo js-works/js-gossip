@@ -116,7 +116,7 @@ export class Select extends LitElement {
   // itself is the focusable host, real DOM focus lands there directly (there
   // being no separate trigger to hold virtual focus while a popup floats
   // over the page). Meant for embedding a plain pick-a-value list somewhere a
-  // full combobox would be overkill (e.g. `ui-date-field`'s time popup).
+  // full combobox would be overkill (e.g. `ui-date-field2`'s time popup).
   @property({ type: Boolean, reflect: true })
   accessor inline = false;
 

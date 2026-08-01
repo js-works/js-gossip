@@ -11,7 +11,7 @@ import {
 /**
  * A themed wrapper around the browser's own native date picker — `<input
  * type="date">` or, with `type="datetime-local"`, its date+time variant.
- * Unlike `ui-date-field` (a custom calendar built on vanillajs-datepicker),
+ * Unlike `ui-date-field2` (a custom calendar built on vanillajs-datepicker),
  * this one has no picker UI of its own: the browser's native picker affordance
  * (the small calendar icon Chromium/Firefox/Safari all render inside the
  * input) is what opens it, so there's nothing to theme beyond the input's own
@@ -262,7 +262,7 @@ export class NativeDateField extends LitElement {
   }
 
   // Native browser affordance (Chromium/Firefox/Safari all support this) to
-  // programmatically open the picker — mirrors `ui-date-field`'s own
+  // programmatically open the picker — mirrors `ui-date-field2`'s own
   // trigger button, without needing one here since the native input already
   // renders its own picker-icon affordance.
   showPicker() {

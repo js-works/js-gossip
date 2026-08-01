@@ -5,6 +5,7 @@ import "../main/components/heading/heading.js";
 import "../main/components/text/text.js";
 import "../main/components/link/link.js";
 import "../main/components/checkbox/checkbox.js";
+import type { Checkbox } from "../main/components/checkbox/checkbox.js";
 import "../main/components/checkbox/checkbox-group.js";
 import "../main/components/radio/radio-button.js";
 import "../main/components/radio/radio-group.js";
@@ -41,8 +42,18 @@ import "../main/components/textarea/textarea.js";
 import "../main/components/number-field/number-field.js";
 import "../main/components/password-field/password-field.js";
 import "../main/components/email-field/email-field.js";
+import "../main/components/date-field2/date-field2.js";
 import "../main/components/date-field/date-field.js";
+import type {
+  DateField,
+  DateFieldSelectionMode,
+} from "../main/components/date-field/date-field.js";
 import "../main/components/native-date-field/native-date-field.js";
+import "../main/components/date-picker/date-picker.js";
+import type {
+  DatePicker,
+  DatePickerSelectionMode,
+} from "../main/components/date-picker/date-picker.js";
 import "../main/components/upload/upload.js";
 import "../main/components/editor/editor.js";
 // BlockNote/Mantine's own stylesheets — required once by any BlockNote
@@ -977,33 +988,42 @@ function inputFieldsTab() {
         <ui-email-field required label="Email address"></ui-email-field>
       </div>
     </section>
+  `;
+}
 
+function dateFieldsOldTab() {
+  return html`
     <section>
-      <h2>Date field</h2>
-      <p>Custom calendar popup, built on vanillajs-datepicker.</p>
+      <h2>Date field 2</h2>
+      <p>
+        <code>ui-date-field2</code> — the older implementation, built on
+        vanillajs-datepicker. Still the one to use where a
+        <code>type="datetime"</code> is needed, until
+        <code>ui-date-field</code> grows a time mode of its own.
+      </p>
       <div class="row">
-        <ui-date-field label="Date"></ui-date-field>
+        <ui-date-field2 label="Date"></ui-date-field2>
       </div>
       <div class="row">
-        <ui-date-field size="small" label="Small"></ui-date-field>
-        <ui-date-field size="medium" label="Medium"></ui-date-field>
-        <ui-date-field size="large" label="Large"></ui-date-field>
-        <ui-date-field disabled label="Disabled"></ui-date-field>
+        <ui-date-field2 size="small" label="Small"></ui-date-field2>
+        <ui-date-field2 size="medium" label="Medium"></ui-date-field2>
+        <ui-date-field2 size="large" label="Large"></ui-date-field2>
+        <ui-date-field2 disabled label="Disabled"></ui-date-field2>
       </div>
       <div class="row">
-        <ui-date-field
+        <ui-date-field2
           required
           min="2026-01-01"
           max="2026-12-31"
           label="Date of birth"
-        ></ui-date-field>
+        ></ui-date-field2>
       </div>
       <div class="row">
-        <ui-date-field
+        <ui-date-field2
           type="datetime"
           placeholder="yyyy-mm-dd hh:mm"
-          label="Date & time"
-        ></ui-date-field>
+          label="Date &amp; time"
+        ></ui-date-field2>
       </div>
     </section>
 
@@ -1016,7 +1036,7 @@ function inputFieldsTab() {
       <div class="row">
         <ui-native-date-field
           type="datetime-local"
-          label="Date & time"
+          label="Date &amp; time"
         ></ui-native-date-field>
       </div>
       <div class="row">
@@ -1032,6 +1052,189 @@ function inputFieldsTab() {
           max="2026-12-31"
           label="Date of birth"
         ></ui-native-date-field>
+      </div>
+    </section>
+  `;
+}
+
+// -------------------------------------------------------------------
+// Date Fields page — one ui-date-field per selection mode, all sharing a
+// Locale selector so the same stored values can be seen reformatted. Adapted
+// from the field's own upstream demo, with Shoelace's sl-select/sl-option and
+// sx-fieldset swapped for this library's equivalents.
+// -------------------------------------------------------------------
+
+// Module-level, like uiScale/uiLocale above — this file re-renders the whole
+// page on change.
+let dateFieldsLocale = "en-US";
+
+// The raw (unformatted) value each field last reported, keyed by mode, so the
+// page can show what's actually stored next to the formatted display.
+const dateFieldValues: Record<string, string> = {};
+
+const DATE_FIELD_LOCALES = ["en-US", "en-GB", "es-ES", "fr-FR", "de-DE", "it-IT"];
+
+interface DateFieldDemo {
+  mode: DateFieldSelectionMode;
+  label: string;
+  placeholder: string;
+  weekNumbers?: boolean;
+  highlightWeekends?: boolean;
+  centuryView?: boolean;
+}
+
+const DATE_FIELD_DEMOS: DateFieldDemo[] = [
+  {
+    mode: "date",
+    label: "Date",
+    placeholder: "Pick a date",
+    weekNumbers: true,
+    highlightWeekends: true,
+  },
+  { mode: "dateTime", label: "Date and time", placeholder: "Pick a date and time" },
+  {
+    mode: "dateRange",
+    label: "Date range",
+    placeholder: "Pick a date range",
+    highlightWeekends: true,
+  },
+  {
+    mode: "dateTimeRange",
+    label: "Date time range",
+    placeholder: "Pick a range",
+  },
+  { mode: "time", label: "Time", placeholder: "Pick a time" },
+  { mode: "timeRange", label: "Time range", placeholder: "Pick a time range" },
+  { mode: "week", label: "Week", placeholder: "Pick a week", weekNumbers: true },
+  {
+    mode: "weekRange",
+    label: "Week range",
+    placeholder: "Pick a week range",
+    weekNumbers: true,
+  },
+  { mode: "month", label: "Month", placeholder: "Pick a month" },
+  { mode: "monthRange", label: "Month range", placeholder: "Pick a month range" },
+  { mode: "quarter", label: "Quarter", placeholder: "Pick a quarter" },
+  {
+    mode: "quarterRange",
+    label: "Quarter range",
+    placeholder: "Pick a quarter range",
+  },
+  {
+    mode: "year",
+    label: "Year",
+    placeholder: "Pick a year",
+    centuryView: true,
+  },
+  {
+    mode: "yearRange",
+    label: "Year range",
+    placeholder: "Pick a year range",
+    centuryView: true,
+  },
+];
+
+function dateFieldsTab() {
+  return html`
+    <section>
+      <h2>Date field</h2>
+      <p>
+        <code>ui-date-field</code> — a read-only formatted display plus a picker
+        popup, built on <code>ui-date-picker</code> and so on that component's
+        framework-free core. One field covers every single and range selection
+        mode the picker offers: day, date+time, week, month, quarter, year, and
+        a range of each.
+      </p>
+      <p>
+        <code>value</code> stays the picker's own raw, locale-independent string
+        (<code>2026-08-01</code>, <code>2026-W32</code>, <code>2026-Q3</code>,
+        <code>2026-08-01,2026-08-09</code>, …) — that's what a form submits. The
+        text you see is that value run through <code>Intl</code> for the field's
+        language, so switching Locale below reformats every field in place
+        without touching what's stored. The popup commits on <strong>OK</strong>,
+        so picking the second half of a range never churns the field through a
+        half-selected state.
+      </p>
+      <div class="date-fields-locale">
+        <ui-select
+          label="Locale"
+          size="small"
+          .value=${dateFieldsLocale}
+          @change=${(event: Event) => {
+            dateFieldsLocale = (event.currentTarget as Select).value;
+            renderApp();
+          }}
+        >
+          ${DATE_FIELD_LOCALES.map(
+            (locale) => html`<ui-option value=${locale}>${locale}</ui-option>`,
+          )}
+        </ui-select>
+      </div>
+      <div class="date-fields-grid" lang=${dateFieldsLocale}>
+        ${DATE_FIELD_DEMOS.map(
+          (demo) => html`
+            <div class="date-fields-cell">
+              <ui-date-field
+                label=${demo.label}
+                selection-mode=${demo.mode}
+                placeholder=${demo.placeholder}
+                highlight-current
+                ?show-week-numbers=${demo.weekNumbers ?? false}
+                ?highlight-weekends=${demo.highlightWeekends ?? false}
+                ?enable-century-view=${demo.centuryView ?? false}
+                @change=${(event: Event) => {
+                  dateFieldValues[demo.mode] = (
+                    event.currentTarget as DateField
+                  ).value;
+                  renderApp();
+                }}
+              ></ui-date-field>
+              <p class="date-fields-raw">
+                <code>${dateFieldValues[demo.mode] || "\u2014"}</code>
+              </p>
+            </div>
+          `,
+        )}
+      </div>
+    </section>
+
+    <section>
+      <h2>States</h2>
+      <p>
+        Sizes, and the usual field states. <code>required</code> reports
+        <code>valueMissing</code> through <code>ElementInternals</code> like
+        every other field here; <code>min</code>/<code>max</code> additionally
+        report range under/overflow, but only in <code>date</code> mode — for a
+        week or a quarter there is no meaningful string comparison against a
+        <code>yyyy-mm-dd</code> bound (the picker still greys out the
+        out-of-range cells in every mode).
+      </p>
+      <div class="row">
+        <ui-date-field size="small" label="Small"></ui-date-field>
+        <ui-date-field size="medium" label="Medium"></ui-date-field>
+        <ui-date-field size="large" label="Large"></ui-date-field>
+      </div>
+      <div class="row">
+        <ui-date-field disabled label="Disabled"></ui-date-field>
+        <ui-date-field
+          readonly
+          value="2026-08-01"
+          label="Read-only"
+        ></ui-date-field>
+        <ui-date-field required label="Required"></ui-date-field>
+      </div>
+      <div class="row">
+        <ui-date-field
+          label="Bounded to 2026"
+          min="2026-01-01"
+          max="2026-12-31"
+          value="2026-08-01"
+        ></ui-date-field>
+        <ui-date-field
+          label="Weekends disabled"
+          disable-weekends
+          highlight-weekends
+        ></ui-date-field>
       </div>
     </section>
   `;
@@ -1611,6 +1814,251 @@ function dataGridGroupedTab() {
 }
 
 // -------------------------------------------------------------------
+// Date Picker page — one live picker driven by a panel of controls, so every
+// selection mode and option can be exercised against the same instance
+// (rather than a grid of fixed configurations). Adapted from the picker's own
+// upstream demo, with Shoelace's sl-select/sl-option/sl-checkbox swapped for
+// this library's equivalents and its --sl-* tokens for --ui-*.
+// -------------------------------------------------------------------
+
+// Module-level, like uiScale/uiLocale above — this file re-renders the whole
+// page on change, so there's nowhere per-component to keep it.
+const pickerDemo = {
+  locale: "en-US",
+  // What the picker last reported through `value`.
+  selection: "",
+  selectionMode: "date" as DatePickerSelectionMode,
+  calendarSize: "default" as "default" | "minimal" | "maximal",
+  accentuateHeader: true,
+  highlightCurrent: true,
+  highlightWeekends: true,
+  disableWeekends: false,
+  showWeekNumbers: true,
+  enableCenturyView: false,
+  // ISO yyyy-mm-dd, straight from the two ui-date-fields below.
+  minDate: "",
+  maxDate: "",
+};
+
+// Local midnight, not `new Date(iso)` — the date-only form is parsed as UTC,
+// which in a negative-offset zone lands on the previous local day and would
+// shift the bound the picker is given by one. Same reasoning as
+// ui-date-field's own parseIsoDate.
+function isoToLocalDate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// The four day-grid options only mean anything in a mode whose sheet is
+// actually made of days — a month/quarter/year sheet has no weekends to
+// highlight and no week numbers to show. ("weekRange" is included here; the
+// upstream demo's own list omitted it, which looks like an oversight given
+// "week"/"weeks" are both in.)
+const DAY_BASED_MODES: DatePickerSelectionMode[] = [
+  "date",
+  "dates",
+  "dateTime",
+  "dateRange",
+  "dateTimeRange",
+  "week",
+  "weeks",
+  "weekRange",
+];
+
+const PICKER_SELECTION_MODES: DatePickerSelectionMode[] = [
+  "date",
+  "dates",
+  "dateTime",
+  "dateRange",
+  "dateTimeRange",
+  "time",
+  "timeRange",
+  "week",
+  "weeks",
+  "weekRange",
+  "month",
+  "months",
+  "monthRange",
+  "quarter",
+  "quarters",
+  "quarterRange",
+  "year",
+  "years",
+  "yearRange",
+];
+
+const PICKER_LOCALES = [
+  "en-US",
+  "en-GB",
+  "en-GB-u-hc-h12",
+  "es-ES",
+  "fr-FR",
+  "de-DE",
+  "de-AT",
+  "de-CH",
+  "it-IT",
+  "ar-SA",
+];
+
+const PICKER_CALENDAR_SIZES: {
+  value: "default" | "minimal" | "maximal";
+  label: string;
+}[] = [
+  { value: "default", label: "default — show adjacent days/years/decades" },
+  { value: "minimal", label: "minimal — hide adjacent days/years/decades" },
+  { value: "maximal", label: "maximal — always show 42 days in month view" },
+];
+
+// Each toggle writes one field and re-renders the page. Typed per control
+// rather than the upstream demo's `data-subject` string dispatch, which wrote
+// through a computed `Object.assign` key and so type-checked nothing.
+type PickerToggle =
+  | "accentuateHeader"
+  | "highlightCurrent"
+  | "highlightWeekends"
+  | "disableWeekends"
+  | "showWeekNumbers"
+  | "enableCenturyView";
+
+function renderPickerToggle(field: PickerToggle, label: string) {
+  return html`
+    <ui-checkbox
+      ?checked=${pickerDemo[field]}
+      @change=${(event: Event) => {
+        pickerDemo[field] = (event.currentTarget as Checkbox).checked;
+        renderApp();
+      }}
+    >
+      ${label}
+    </ui-checkbox>
+  `;
+}
+
+function datePickerTab() {
+  return html`
+    <section>
+      <h2>Date Picker</h2>
+      <p>
+        <code>ui-date-picker</code> is built on a
+        <strong>framework-free core</strong> (<code>vanilla/</code>): its own
+        small virtual DOM, a <code>Calendar</code> interface with a Gregorian
+        implementation behind it, and a plain CSS string. The Lit wrapper only
+        owns the custom element and maps the core's <code>--cal-*</code> tokens
+        onto this library's theme — which is why the picker follows the Theme
+        switcher above without a single dark-specific rule of its own.
+      </p>
+      <p>
+        Drill into the header to move month → year → decade (→ century, if
+        enabled). The two date fields at the bottom of the panel are
+        <code>ui-date-field</code>, itself built on this same picker.
+      </p>
+      <div class="picker-demo">
+        <div class="picker-demo-main">
+          <ui-date-picker
+            class="picker-demo-picker"
+            lang=${pickerDemo.locale}
+            dir=${pickerDemo.locale === "ar-SA" ? "rtl" : "ltr"}
+            selection-mode=${pickerDemo.selectionMode}
+            calendar-size=${pickerDemo.calendarSize}
+            ?accentuate-header=${pickerDemo.accentuateHeader}
+            ?highlight-current=${pickerDemo.highlightCurrent}
+            ?highlight-weekends=${pickerDemo.highlightWeekends}
+            ?disable-weekends=${pickerDemo.disableWeekends}
+            ?show-week-numbers=${pickerDemo.showWeekNumbers}
+            ?enable-century-view=${pickerDemo.enableCenturyView}
+            .minDate=${isoToLocalDate(pickerDemo.minDate)}
+            .maxDate=${isoToLocalDate(pickerDemo.maxDate)}
+            @change=${(event: Event) => {
+              pickerDemo.selection = (event.currentTarget as DatePicker).value;
+              renderApp();
+            }}
+          ></ui-date-picker>
+          <p class="picker-demo-selection">
+            <code>value</code>:
+            <strong>
+              ${pickerDemo.selection.replaceAll(",", ", ") ||
+              "(nothing selected)"}
+            </strong>
+          </p>
+        </div>
+        <div class="picker-demo-controls">
+          <ui-select
+            label="Locale"
+            .value=${pickerDemo.locale}
+            @change=${(event: Event) => {
+              pickerDemo.locale = (event.currentTarget as Select).value;
+              renderApp();
+            }}
+          >
+            ${PICKER_LOCALES.map(
+              (locale) => html`<ui-option value=${locale}>${locale}</ui-option>`,
+            )}
+          </ui-select>
+          <ui-select
+            label="Selection mode"
+            .value=${pickerDemo.selectionMode}
+            @change=${(event: Event) => {
+              pickerDemo.selectionMode = (event.currentTarget as Select)
+                .value as DatePickerSelectionMode;
+              renderApp();
+            }}
+          >
+            ${PICKER_SELECTION_MODES.map(
+              (mode) => html`<ui-option value=${mode}>${mode}</ui-option>`,
+            )}
+          </ui-select>
+          <ui-select
+            label="Calendar size"
+            .value=${pickerDemo.calendarSize}
+            @change=${(event: Event) => {
+              pickerDemo.calendarSize = (event.currentTarget as Select)
+                .value as "default" | "minimal" | "maximal";
+              renderApp();
+            }}
+          >
+            ${PICKER_CALENDAR_SIZES.map(
+              (size) =>
+                html`<ui-option value=${size.value}>${size.label}</ui-option>`,
+            )}
+          </ui-select>
+          ${renderPickerToggle("accentuateHeader", "accentuate header")}
+          ${DAY_BASED_MODES.includes(pickerDemo.selectionMode)
+            ? html`
+                ${renderPickerToggle("highlightCurrent", "highlight current")}
+                ${renderPickerToggle("highlightWeekends", "highlight weekends")}
+                ${renderPickerToggle("disableWeekends", "disable weekends")}
+                ${renderPickerToggle("showWeekNumbers", "show week numbers")}
+              `
+            : nothing}
+          ${renderPickerToggle("enableCenturyView", "enable century view")}
+          <div class="picker-demo-range">
+            <ui-date-field
+              size="small"
+              label="Min. date"
+              .value=${pickerDemo.minDate}
+              @change=${(event: Event) => {
+                pickerDemo.minDate = (event.currentTarget as DateField).value;
+                renderApp();
+              }}
+            ></ui-date-field>
+            <ui-date-field
+              size="small"
+              label="Max. date"
+              .value=${pickerDemo.maxDate}
+              @change=${(event: Event) => {
+                pickerDemo.maxDate = (event.currentTarget as DateField).value;
+                renderApp();
+              }}
+            ></ui-date-field>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+// -------------------------------------------------------------------
 // Tabs — each subdemo lives on its own page, switched via the vertical tab
 // list rendered alongside the content (see renderApp() below).
 // -------------------------------------------------------------------
@@ -1634,6 +2082,13 @@ const demoPages: DemoPage[] = [
     content: radiosAndCheckboxesTab,
   },
   { id: "input-fields", label: "Input Fields", content: inputFieldsTab },
+  { id: "date-picker", label: "Date Picker", content: datePickerTab },
+  { id: "date-fields", label: "Date Fields", content: dateFieldsTab },
+  {
+    id: "date-fields-old",
+    label: "Date Fields (old)",
+    content: dateFieldsOldTab,
+  },
   { id: "upload", label: "Upload", content: uploadTab },
   { id: "editor", label: "Editor.js", content: editorTab },
   { id: "block-note", label: "BlockNote", content: blockNoteTab },

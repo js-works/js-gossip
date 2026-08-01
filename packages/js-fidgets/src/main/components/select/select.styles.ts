@@ -242,7 +242,7 @@ export const selectStyles = [
     :host([inline]) .listbox {
       display: block;
       min-width: var(--select-min-width);
-      /* Overridable per use (e.g. ui-date-field's time popup wants a
+      /* Overridable per use (e.g. ui-date-field2's time popup wants a
          shorter list than this component's own default, and its own
          popup-style border/shadow instead of this plain field-style
          default). */

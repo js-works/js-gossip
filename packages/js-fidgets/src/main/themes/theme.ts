@@ -201,7 +201,7 @@ export const defaultTheme = css`
     --ui-border-thick: calc(2px * var(--ui-scale));
 
     /* Shared by every floating popup (ui-select/ui-combobox/ui-autocomplete's
-       dropdown, ui-menu-button/ui-split-button's menu, ui-date-field's
+       dropdown, ui-menu-button/ui-split-button's menu, ui-date-field/ui-date-field2's
        calendar) — these were identical copy-pasted literals across all of
        them before being pulled out here, so a future restyle only needs to
        change it in one place. */
