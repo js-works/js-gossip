@@ -45,6 +45,13 @@ export const tabsStyles = [
       flex-direction: column;
       align-items: stretch;
       border-bottom: none;
+      /* Tighter than the horizontal row's --ui-spacing-sm (4px): stacked
+         full-width strips with their own hover/selected backgrounds read as
+         one list, so they want a hairline between them rather than the
+         visible separation that reads correctly between content-width tabs
+         sitting side by side. Still multiplied by --ui-scale, so it tracks
+         the density dial like every other metric. */
+      gap: calc(2px * var(--ui-scale));
       /* No padding-inline-end here (unlike the gap-to-content on .panels
          below) — the divider must sit flush against each tab's own right
          edge, so a selected tab's accent (its own border-inline-end, see

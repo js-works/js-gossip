@@ -35,6 +35,14 @@ export const tabStyles = [
 
     :host([orientation="vertical"]) {
       border-bottom: none;
+      /* A little taller than the horizontal case's --ui-spacing-sm. A
+         vertical tab is a full-width strip whose hover/selected background
+         spans the whole tablist, so the same 4px that looks right on a
+         content-width horizontal tab reads as cramped here. No shared token
+         for it — the scale jumps straight from -sm (4px) to -md (16px), and
+         16px is far too much — so this scales off --ui-scale directly, the
+         same way the one-off border widths elsewhere do. */
+      padding-block: calc(6px * var(--ui-scale));
       /* inline-end, not -start: matches the tablist's own border-inline-end
          (tabs.styles.ts) that separates it from the panel content — the
          accent sits on the same side as that divider, same as the
