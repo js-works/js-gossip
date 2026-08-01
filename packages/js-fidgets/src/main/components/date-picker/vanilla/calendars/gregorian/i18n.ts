@@ -102,8 +102,44 @@ class I18n {
     return info!;
   }
 
+  // Constructing an Intl formatter is expensive — far more so than using one —
+  // and these are called per grid cell: a month sheet formats 42 day names plus
+  // a week number per row, so building a formatter each time cost ~3.5ms per
+  // sheet, paid again on every click, month change and re-render. Cached by
+  // locale + options instead, which takes that to well under a millisecond.
+  //
+  // Static, so the cache is shared across every I18n instance (and therefore
+  // every picker on the page) rather than per-instance. Formatters are immutable
+  // and keyed by everything that affects them, so sharing is safe.
+  static readonly #dateFormatters = new Map<string, Intl.DateTimeFormat>();
+  static readonly #numberFormatters = new Map<string, Intl.NumberFormat>();
+
+  #dateFormatter(options?: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+    const key = this.#locale + '|' + JSON.stringify(options ?? null);
+    let formatter = I18n.#dateFormatters.get(key);
+
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat(this.#locale, options);
+      I18n.#dateFormatters.set(key, formatter);
+    }
+
+    return formatter;
+  }
+
+  #numberFormatter(options?: Intl.NumberFormatOptions): Intl.NumberFormat {
+    const key = this.#locale + '|' + JSON.stringify(options ?? null);
+    let formatter = I18n.#numberFormatters.get(key);
+
+    if (!formatter) {
+      formatter = new Intl.NumberFormat(this.#locale, options);
+      I18n.#numberFormatters.set(key, formatter);
+    }
+
+    return formatter;
+  }
+
   formatDate(date: Date, options?: Intl.DateTimeFormatOptions) {
-    return new Intl.DateTimeFormat(this.#locale, options).format(date);
+    return this.#dateFormatter(options).format(date);
   }
 
   formatDateRange(
@@ -111,14 +147,11 @@ class I18n {
     date2: Date,
     options?: Intl.DateTimeFormatOptions
   ) {
-    return new Intl.DateTimeFormat(this.#locale, options).formatRange(
-      date1,
-      date2
-    );
+    return this.#dateFormatter(options).formatRange(date1, date2);
   }
 
   formatNumber(num: number, options?: Intl.NumberFormatOptions) {
-    return new Intl.NumberFormat(this.#locale, options).format(num);
+    return this.#numberFormatter(options).format(num);
   }
 
   getFirstDayOfWeek(): number {

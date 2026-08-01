@@ -4,11 +4,7 @@ import type { PropertyValues } from "lit";
 
 import { dateFieldStyles } from "./date-field.styles.js";
 import { FIELD_ICONS } from "./icons.js";
-import {
-  formatFieldValue,
-  isRangeMode,
-  type DateFieldSelectionMode,
-} from "./format.js";
+import { formatFieldValue, type DateFieldSelectionMode } from "./format.js";
 import { renderFieldLabel } from "../../shared/field-label/field-label.js";
 import { closestLang, observeLocale } from "../../shared/locale.js";
 import "../date-picker/date-picker.js";
@@ -59,7 +55,9 @@ function parseIsoDay(value: string): Date | null {
  *
  * The popup commits on **OK** rather than on click, so a range can be picked
  * without the field churning through half-selected states — **Cancel** discards
- * and **Clear** empties.
+ * and **Clear** empties. It has no header of its own: the picker already shows
+ * the selection (a highlighted cell, or the time view's own readout), so a
+ * restatement above it was only taking up height.
  */
 @customElement("ui-date-field")
 export class DateField extends LitElement {
@@ -136,6 +134,15 @@ export class DateField extends LitElement {
 
   @property({ type: Boolean, attribute: "enable-century-view" })
   accessor enableCenturyView = false;
+
+  /**
+   * The increment, in minutes, between the picker's minute options — `15` for
+   * quarter hours, `60` to pin minutes to the hour. Only affects the
+   * time-bearing modes. See `ui-date-picker`'s own `minuteStep` for the exact
+   * handling of out-of-range values and of a value that isn't on the grid.
+   */
+  @property({ type: Number, attribute: "minute-step" })
+  accessor minuteStep = 1;
 
   constructor() {
     super();
@@ -217,14 +224,6 @@ export class DateField extends LitElement {
 
   get #displayValue(): string {
     return formatFieldValue(this.value, this.selectionMode, closestLang(this));
-  }
-
-  /** The formatted draft, shown in the popup header while picking. */
-  get #draftLabel(): string {
-    return (
-      formatFieldValue(this.#draft, this.selectionMode, closestLang(this)) ||
-      (isRangeMode(this.selectionMode) ? "Select a range" : "Select a value")
-    );
   }
 
   get #popup(): HTMLElement | null {
@@ -330,10 +329,6 @@ export class DateField extends LitElement {
         @toggle=${this.#onPopupToggle}
       >
         <div class="popup-card">
-          <div class="popup-header">
-            ${this.#icon}
-            <span class="popup-title">${this.#draftLabel}</span>
-          </div>
           <ui-date-picker
             .value=${this.#draft}
             selection-mode=${this.selectionMode}
@@ -344,16 +339,17 @@ export class DateField extends LitElement {
             ?highlight-weekends=${this.highlightWeekends}
             ?disable-weekends=${this.disableWeekends}
             ?enable-century-view=${this.enableCenturyView}
+            minute-step=${this.minuteStep}
             .minDate=${parseIsoDay(this.min ?? "")}
             .maxDate=${parseIsoDay(this.max ?? "")}
             @change=${this.#onPickerChange}
           ></ui-date-picker>
           <div class="popup-footer">
-            <ui-button variant="subtle" size="small" @click=${this.#onClearClick}>
+            <ui-button variant="link" size="small" @click=${this.#onClearClick}>
               Clear
             </ui-button>
             <span class="popup-footer-spacer"></span>
-            <ui-button variant="subtle" size="small" @click=${this.#onCancelClick}>
+            <ui-button variant="link" size="small" @click=${this.#onCancelClick}>
               Cancel
             </ui-button>
             <ui-button

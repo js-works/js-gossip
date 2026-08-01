@@ -77,6 +77,23 @@ export class DatePicker extends LitElement {
   @property({ type: Boolean, attribute: "enable-century-view" })
   accessor enableCenturyView = false;
 
+  /**
+   * The increment, in minutes, between the options the time view's minute
+   * column offers: `15` for quarter hours, `60` to pin minutes to the hour.
+   * Defaults to `1` — every minute.
+   *
+   * Only divisors of 60 give an even grid across the hour; a non-divisor is
+   * accepted but leaves a shorter gap where it wraps. Anything outside 1–60
+   * (including a value like `120`, which cannot mean "every two hours" — a
+   * minute step has no way to filter the hour column) falls back to showing
+   * `00` alone.
+   *
+   * A current value that isn't on the grid is kept and offered as an extra
+   * option rather than being rounded.
+   */
+  @property({ type: Number, attribute: "minute-step" })
+  accessor minuteStep = 1;
+
   @property({ converter: dateAttributeConverter, attribute: "min-date" })
   accessor minDate: Date | null = null;
 

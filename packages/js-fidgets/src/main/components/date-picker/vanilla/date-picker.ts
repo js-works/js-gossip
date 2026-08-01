@@ -34,6 +34,12 @@ namespace DatePicker {
     highlightWeekends: boolean;
     disableWeekends: boolean;
     enableCenturyView: boolean;
+    /**
+     * The increment, in minutes, between the options the minute column offers
+     * — 15 for quarter hours, 60 to pin minutes to the hour. See
+     * normalizeMinuteStep for how out-of-range values are handled.
+     */
+    minuteStep: number;
     minDate: Date | Calendar.Date | null;
     maxDate: Date | Calendar.Date | null;
   };
@@ -42,6 +48,18 @@ namespace DatePicker {
 // === local types ===================================================
 
 type Time = Readonly<{ hours: number; minutes: number }>;
+
+// Everything the cell fills are derived from, worked out once per sheet — see
+// #selectionBounds.
+type SelectionBounds = Readonly<{
+  hasRange: boolean;
+  start: string;
+  end: string;
+  // Null unless the pointer is proposing a range: one endpoint chosen, pointer
+  // over another selectable cell.
+  pendingStart: string | null;
+  pendingEnd: string | null;
+}>;
 
 // === local VDOM factories ==========================================
 
@@ -68,7 +86,13 @@ class DatePicker {
   #selectionMode: SelectionMode = 'date';
   #view: View = 'month';
   #sheet: Calendar.Sheet | null = null;
-  #lastTimeScrollKey = '';
+  // Which cell the pointer is over, as an index into the current sheet's items.
+  // Tracked because a hovered cell paints a fill like a selected one does, so it
+  // has to take part in the joined-edge adjacency (see #isFilledCell) — and
+  // "the cell one row up is hovered" is not something CSS can express.
+  #hoveredIndex: number | null = null;
+  #lastTimeValueKey = '';
+  #lastTimeLayoutKey = '';
   #renderTarget?: HTMLElement;
   #timeColumnResizeObserver?: ResizeObserver;
   #observedTimeColumn?: Element;
@@ -239,6 +263,10 @@ class DatePicker {
   }
 
   #onParentClick = () => {
+    // The sheet changes under the pointer; a stale index would mark the
+    // wrong cell as filled, and mouseleave may not fire across a patch.
+    this.#hoveredIndex = null;
+
     const idx = calendarViewOrder.indexOf(this.#view as CalendarView);
 
     const nextView =
@@ -253,6 +281,10 @@ class DatePicker {
   };
 
   #onNextClick = () => {
+    // The sheet changes under the pointer; a stale index would mark the
+    // wrong cell as filled, and mouseleave may not fire across a patch.
+    this.#hoveredIndex = null;
+
     if (this.#sheet?.next) {
       this.#year = this.#sheet.next.year;
       this.#month = this.#sheet.next.month ?? this.#month;
@@ -261,6 +293,10 @@ class DatePicker {
   };
 
   #onPreviousClick = () => {
+    // The sheet changes under the pointer; a stale index would mark the
+    // wrong cell as filled, and mouseleave may not fire across a patch.
+    this.#hoveredIndex = null;
+
     if (this.#sheet?.previous) {
       this.#year = this.#sheet.previous.year;
       this.#month = this.#sheet.previous.month ?? this.#month;
@@ -319,6 +355,10 @@ class DatePicker {
   };
 
   #onBackToMonthClick = () => {
+    // The sheet changes under the pointer; a stale index would mark the
+    // wrong cell as filled, and mouseleave may not fire across a patch.
+    this.#hoveredIndex = null;
+
     this.#view = 'month';
     this.#requestUpdate();
   };
@@ -419,7 +459,7 @@ class DatePicker {
         class: 'cal-base cal-view--' + this.#view
       },
       this.#renderTimeTabs(this.#view === 'time2' ? 'time2' : 'time1', props),
-      this.#renderTimeSelector(this.#view == 'time2' ? 'time2' : 'time1'),
+      this.#renderTimeSelector(this.#view == 'time2' ? 'time2' : 'time1', props),
 
       kind !== 'calendar+time'
         ? null
@@ -428,7 +468,12 @@ class DatePicker {
               class: 'cal-back-to-month-link',
               onclick: this.#onBackToMonthClick
             },
-            '\u{1f860} Back to month'
+            // The same arrow SVG the sheet header's prev control uses, rather
+            // than the U+1F860 character this had: that codepoint is in none of
+            // the fonts this library specifies, so it rendered as a tofu box.
+            // It was also a *rightwards* arrow on a "back" link.
+            arrowLeftIcon,
+            'Back to month'
           )
     );
   }
@@ -522,6 +567,17 @@ class DatePicker {
     const hasRowNames = !!sheet.rowNames?.length;
     const cells: VNode[] = [];
 
+    // Which cells carry a selection fill — the selected ones plus anything
+    // inside a selection range. Computed once for the whole sheet because each
+    // cell needs to know about its neighbours, not just itself: where two
+    // filled cells touch, the shared edge is squared off so a run of them reads
+    // as one region rather than a row of rounded tiles.
+    const bounds = this.#selectionBounds(sheet);
+
+    const filled = sheet.items.map((_, idx) =>
+      this.#isFilledCell(sheet, props, idx, bounds)
+    );
+
     sheet.items.forEach((item, idx) => {
       if (hasRowNames && idx % 7 === 0) {
         cells.push(
@@ -529,17 +585,96 @@ class DatePicker {
         );
       }
 
-      cells.push(this.#renderTableCell(item, sheet, props, idx));
+      cells.push(
+        this.#renderTableCell(item, sheet, props, idx, filled, bounds)
+      );
     });
 
     return cells;
+  }
+
+  // Every boundary the fills depend on, worked out once per sheet rather than
+  // per cell (it used to sort the selection inside each cell's render).
+  //
+  // `pending` is the range the pointer is currently *proposing*: with one
+  // endpoint chosen, hovering another cell previews the range those two would
+  // make. That preview used to be done entirely in CSS, with two !important
+  // rules keyed off `~` sibling chains — which meant the core had no idea which
+  // cells were in it, so they couldn't take part in the corner joining.
+  #selectionBounds(sheet: Calendar.Sheet): SelectionBounds {
+    const { selectType } = selectionModeMeta[this.#selectionMode];
+    const sorted = [...this.#selection].sort();
+    const hasRange = selectType === 'range' && sorted.length > 0;
+    const start = sorted[0];
+    const end = sorted.length < 2 ? sorted[0] : sorted[1];
+
+    let pendingStart: string | null = null;
+    let pendingEnd: string | null = null;
+
+    if (hasRange && sorted.length === 1 && this.#hoveredIndex !== null) {
+      const hovered = sheet.items[this.#hoveredIndex];
+
+      // A minimal-size placeholder can't be hovered (it has no handlers), so
+      // only `disabled` needs excluding here.
+      if (hovered && !hovered.disabled) {
+        const hoveredKey = getSelectionKey(hovered, this.#selectionMode);
+        const before = hoveredKey < start;
+
+        pendingStart = before ? hoveredKey : start;
+        pendingEnd = before ? start : hoveredKey;
+      }
+    }
+
+    return { hasRange, start, end, pendingStart, pendingEnd };
+  }
+
+  // Whether the cell at `index` paints a selection fill. Anything that doesn't
+  // render as a real cell counts as not filled — in calendarSize "minimal" an
+  // adjacent day is an empty placeholder (see #renderTableCell), and a gap
+  // should break a run rather than be bridged across.
+  #isFilledCell(
+    sheet: Calendar.Sheet,
+    props: DatePicker.Props,
+    index: number,
+    bounds: SelectionBounds
+  ): boolean {
+    const item = sheet.items[index];
+
+    if (!item || (props.calendarSize === 'minimal' && item.adjacent)) {
+      return false;
+    }
+
+    // A hovered cell paints the same fill the selection range does, so it joins
+    // its neighbours exactly like one. Disabled cells have no hover fill.
+    if (index === this.#hoveredIndex && !item.disabled) {
+      return true;
+    }
+
+    const key = getSelectionKey(item, this.#selectionMode);
+
+    if (this.#selection.has(key)) {
+      return true;
+    }
+
+    if (bounds.hasRange && key >= bounds.start && key <= bounds.end) {
+      return true;
+    }
+
+    // The range being proposed reads as one region too, so it joins as one.
+    return (
+      bounds.pendingStart !== null &&
+      key >= bounds.pendingStart &&
+      key <= bounds.pendingEnd!
+    );
   }
 
   #renderTableCell(
     item: Calendar.Item,
     sheet: Calendar.Sheet,
     props: DatePicker.Props,
-    columnIndex: number
+    columnIndex: number,
+    filled: boolean[],
+    bounds: SelectionBounds
   ) {
     if (props.calendarSize === 'minimal' && item.adjacent) {
       const highlighted = !!sheet.highlightedColumns?.includes(
@@ -555,12 +690,6 @@ class DatePicker {
 
     const selectionKey = getSelectionKey(item, this.#selectionMode);
     const selected = this.#selection.has(selectionKey);
-    const { selectType } = selectionModeMeta[this.#selectionMode];
-    const hasSelectedRange = this.#selection.size > 0 && selectType === 'range';
-    const selectedItems = [...this.#selection].sort();
-    const startSelectionKey = selectedItems[0];
-    const endSelectionKey =
-      selectedItems.length < 2 ? selectedItems[0] : selectedItems[1];
 
     return a(
       {
@@ -573,34 +702,38 @@ class DatePicker {
           'cal-cell--selected': selected,
 
           'cal-cell--in-selection-range':
-            hasSelectedRange &&
-            selectionKey >= startSelectionKey &&
-            selectionKey <= endSelectionKey,
+            bounds.hasRange &&
+            selectionKey >= bounds.start &&
+            selectionKey <= bounds.end,
 
-          'cal-cell--first-in-selection-range':
-            hasSelectedRange &&
-            selectionKey === startSelectionKey &&
-            this.#selectionMode !== 'weekRange',
+          // The range the pointer is proposing. Replaces the pair of
+          // before-/after-singleton-selection-range classes, which existed only
+          // so CSS could infer the preview from `~` sibling chains — the core
+          // knows the actual bounds now, so the preview rounds and joins like
+          // any other fill.
+          'cal-cell--in-pending-range':
+            bounds.pendingStart !== null &&
+            selectionKey >= bounds.pendingStart &&
+            selectionKey <= bounds.pendingEnd!,
 
-          'cal-cell--last-in-selection-range':
-            hasSelectedRange &&
-            selectionKey === endSelectionKey &&
-            this.#selectionMode !== 'weekRange',
-
-          'cal-cell--before-singleton-selection-range':
-            hasSelectedRange &&
-            selectedItems.length === 1 &&
-            selectionKey < startSelectionKey,
-
-          'cal-cell--after-singleton-selection-range':
-            hasSelectedRange &&
-            selectedItems.length === 1 &&
-            selectionKey > endSelectionKey
+          // Edges shared with another filled cell, so the corners there can be
+          // squared off (see the .cal-cell--joined-* rules). Named for the
+          // logical axes rather than left/right/top/bottom: the sheet is a grid
+          // that flips in an RTL locale, so the previous item in reading order
+          // is the one to the visual *right* there — and the CSS uses logical
+          // corner properties to match.
+          ...this.#joinedEdgeClasses(sheet, columnIndex, filled)
         }),
 
         onclick: item.disabled
           ? null
-          : (ev: Event) => this.#onItemClick(ev, props, item)
+          : (ev: Event) => this.#onItemClick(ev, props, item),
+
+        // mouseenter/mouseleave rather than mouseover/mouseout: these don't
+        // bubble, so each cell's handler fires once on entry and once on exit
+        // instead of again for the inner .cal-cell-text.
+        onmouseenter: item.disabled ? null : () => this.#setHovered(columnIndex),
+        onmouseleave: item.disabled ? null : () => this.#setHovered(null)
       },
       div({ class: 'cal-cell-text' }, item.name)
     );
@@ -683,7 +816,7 @@ class DatePicker {
     if (formattedDate) {
       const fromOrToLabel =
         selectType === 'range' && this.#selection.size > 1
-          ? (type === 'time1' ? 'from:' : 'to:') + '\u00a0\u00a0'
+          ? (type === 'time1' ? 'From:' : 'To:') + '\u00a0\u00a0'
           : '';
 
       timeHeader = div(
@@ -697,7 +830,7 @@ class DatePicker {
     ) {
       timeHeader = div(
         { class: 'cal-time-header' },
-        (type === 'time1' ? 'from:' : 'to:') + '\u00a0\u00a0'
+        (type === 'time1' ? 'From:' : 'To:') + '\u00a0\u00a0'
       );
     }
 
@@ -734,6 +867,41 @@ class DatePicker {
     );
   }
 
+  #setHovered(index: number | null) {
+    if (this.#hoveredIndex === index) {
+      return;
+    }
+
+    this.#hoveredIndex = index;
+    this.#requestUpdate();
+  }
+
+  // The joined-edge classes for the cell at `index`. Only a filled cell can be
+  // joined to anything; an unfilled one has no fill whose corners could need
+  // squaring.
+  #joinedEdgeClasses(
+    sheet: Calendar.Sheet,
+    index: number,
+    filled: boolean[]
+  ): Record<string, boolean> {
+    if (!filled[index]) {
+      return {};
+    }
+
+    const column = index % sheet.columnCount;
+
+    return {
+      // Guarded by column, or the last cell of a row would be treated as
+      // touching the first cell of the next one: adjacent in the DOM, nowhere
+      // near each other on screen.
+      'cal-cell--joined-inline-start': column > 0 && !!filled[index - 1],
+      'cal-cell--joined-inline-end':
+        column < sheet.columnCount - 1 && !!filled[index + 1],
+      'cal-cell--joined-block-start': !!filled[index - sheet.columnCount],
+      'cal-cell--joined-block-end': !!filled[index + sheet.columnCount]
+    };
+  }
+
   // --- time selector -----------------------------------------------
 
   // Two scrollable option columns (hour, minute) plus an AM/PM control where
@@ -745,11 +913,13 @@ class DatePicker {
   // selectable here, and the current value is a highlighted option you can
   // see in place.
   //
-  // Positionally diffed like everything else in this vdom (no keys), so the
-  // option counts must stay constant for a given mode — they do: 12 or 24
-  // hours, always 60 minutes. Patching a click therefore only rewrites the two
-  // affected class attributes.
-  #renderTimeSelector(type: 'time1' | 'time2') {
+  // Positionally diffed like everything else in this vdom (no keys). The hour
+  // and AM/PM counts are fixed, so patching a click there only rewrites the two
+  // affected class attributes. The minute count can change — with minuteStep,
+  // and again when an off-grid value adds or drops its extra option — which the
+  // diff handles by appending or removing at the tail; it just re-patches more
+  // of the column when it happens.
+  #renderTimeSelector(type: 'time1' | 'time2', props: DatePicker.Props) {
     const time = this.#getTime(type);
     const twelveHour = uses12HourClock(this.#getLocale());
 
@@ -776,7 +946,25 @@ class DatePicker {
           onSelect: () => setHours(hours)
         }));
 
-    const minuteOptions = Array.from({ length: 60 }, (_, minutes) => ({
+    const minuteStep = normalizeMinuteStep(props.minuteStep);
+    const minuteValues: number[] = [];
+
+    for (let minutes = 0; minutes < 60; minutes += minuteStep) {
+      minuteValues.push(minutes);
+    }
+
+    // A minute that isn't on the step's grid is added to the list rather than
+    // rounded away. The value can easily be off-grid — restored from a form, an
+    // API, or picked while the step was finer — and silently rewriting it on
+    // render would mean this component quietly changed data it was only asked
+    // to display. The extra option disappears as soon as an on-grid minute is
+    // picked.
+    if (!minuteValues.includes(time.minutes)) {
+      minuteValues.push(time.minutes);
+      minuteValues.sort((a, b) => a - b);
+    }
+
+    const minuteOptions = minuteValues.map((minutes) => ({
       label: twoDigits(minutes),
       selected: time.minutes === minutes,
       onSelect: () => {
@@ -786,41 +974,52 @@ class DatePicker {
       }
     }));
 
+    const meridiemOptions = (['AM', 'PM'] as const).map((label, index) => ({
+      label,
+      selected: (time.hours >= 12 ? 1 : 0) === index,
+      // Keeps the hour-of-day within its half and swaps which half it's in, so
+      // picking PM at 9am gives 21:00 rather than resetting the hour.
+      onSelect: () => setHours((time.hours % 12) + index * 12)
+    }));
+
+    // Whether the from:/to: tabs above are both showing — the same condition
+    // #renderTimeTabs uses to decide whether to render the second one.
+    const { kind, selectType } = selectionModeMeta[props.selectionMode];
+    const twoTabs =
+      (kind === 'time' && selectType === 'range') || this.#selection.size > 1;
+
     return div(
-      { class: 'cal-time-selector' },
-      this.#renderTimeColumn('Hour', hourOptions),
-      // The colon and the AM/PM control are wrapped in the same
-      // group-plus-caption shape as a column, with the caption left empty. It
-      // isn't decoration: it is what makes them line up with the *selected*
-      // option rather than with the top of the columns, structurally, with no
-      // offset arithmetic to get wrong. (An earlier version did compute the
-      // offset from a caption-height token — and got it wrong by exactly the
-      // caption's own font-size, since `em` inside the 0.8em caption resolves
-      // differently than it does beside it.)
+      {
+        // The outer box only positions the wheels; .cal-time-wheels below is
+        // the row itself. With both tabs showing, the wheels sit under whichever
+        // one is being edited so it's visually obvious which half of the range
+        // is changing; with a single tab there's nothing to disambiguate and
+        // they stay centred.
+        class: classMap({
+          'cal-time-selector': true,
+          [`cal-time-selector--${type}`]: twoTabs
+        })
+      },
+      div(
+      { class: 'cal-time-wheels' },
+      this.#renderTimeColumn('Hour', 'Hour', hourOptions),
+      // The colon is the one child that isn't a column, so it borrows the
+      // columns' group shape to line up with them — see #renderTimeAside.
       this.#renderTimeAside(div({ class: 'cal-time-separator' }, ':')),
-      this.#renderTimeColumn('Minute', minuteOptions),
+      this.#renderTimeColumn('Minute', 'Minute', minuteOptions),
+      // Deliberately a third column rather than the pair of buttons it started
+      // as: two options is few enough that buttons were tempting, but they put
+      // a second visual language (bordered chips) next to two borderless
+      // option lists, and needed their own alignment handling to sit level
+      // with the selected rows. As a column it matches the other two exactly,
+      // costs no extra styling, and is how native time pickers present it.
+      // Captionless — "AM/PM" above AM and PM would only restate them — but
+      // the empty caption is still rendered, since that is what holds all
+      // three columns level.
       !twelveHour
         ? null
-        : this.#renderTimeAside(
-            div(
-            { class: 'cal-time-meridiem' },
-            ...(['AM', 'PM'] as const).map((label, index) =>
-              a(
-                {
-                  class: classMap({
-                    'cal-time-meridiem-option': true,
-                    'cal-time-meridiem-option--selected':
-                      (time.hours >= 12 ? 1 : 0) === index
-                  }),
-                  role: 'option',
-                  'aria-selected': (time.hours >= 12 ? 1 : 0) === index,
-                  onclick: () => setHours((time.hours % 12) + index * 12)
-                },
-                label
-              )
-            )
-          )
-          )
+        : this.#renderTimeColumn('', 'AM/PM', meridiemOptions)
+      )
     );
   }
 
@@ -835,18 +1034,21 @@ class DatePicker {
   }
 
   #renderTimeColumn(
-    label: string,
+    caption: string,
+    ariaLabel: string,
     options: { label: string; selected: boolean; onSelect: () => void }[]
   ) {
     return div(
       { class: 'cal-time-column-group' },
-      div({ class: 'cal-time-column-label' }, label),
+      caption
+        ? div({ class: 'cal-time-column-label' }, caption)
+        : div({ class: 'cal-time-column-label', 'aria-hidden': 'true' }),
       div(
         // The scroll container. Kept scrollable rather than showing all 60
         // minutes at once so the time view stays roughly as tall as the month
         // sheet and the popup doesn't resize when switching between them;
         // #scrollSelectedTimeIntoView centres the current value in it.
-        { class: 'cal-time-column', role: 'listbox', 'aria-label': label },
+        { class: 'cal-time-column', role: 'listbox', 'aria-label': ariaLabel },
         ...options.map((option) =>
           a(
             {
@@ -896,10 +1098,19 @@ class DatePicker {
     }
 
     this.#timeColumnResizeObserver ??= new ResizeObserver(() => {
-      // Drop the cached key, or the re-centring below would decide the value
-      // hadn't moved and skip.
-      this.#lastTimeScrollKey = '';
-
+      // Just re-run the positioning: it reads the column's live clientHeight
+      // itself, so it detects a height change on its own and no-ops when only
+      // the width moved.
+      //
+      // It must NOT invalidate #lastTimeLayoutKey first. That looks harmless —
+      // the key is recomputed anyway — but a ResizeObserver fires for *width*
+      // too, and this observer's own columns change width whenever the selected
+      // option is re-bolded. Clearing the key there forced the follow-up
+      // re-centre into 'auto', which landed a microtask after the smooth scroll
+      // had started and snapped it straight to the end. The visible symptom was
+      // the AM/PM column jumping while the hour and minute columns glided: it's
+      // the one column narrow enough that re-bolding two-letter labels actually
+      // shifts its measured width.
       if (this.#renderTarget) {
         this.#scrollSelectedTimeIntoView(this.#renderTarget);
       }
@@ -914,37 +1125,55 @@ class DatePicker {
   // render() rather than from the click handlers so it also covers the value
   // being set from outside (setValue) and the view being switched to.
   //
-  // Guarded by what it last scrolled for, so a user free-scrolling a column
-  // without picking anything isn't yanked back to the selection on the next
-  // unrelated re-render. Skipped entirely while a column has no layout
-  // (clientHeight 0 — the picker sits inside a closed popover in
-  // ui-date-field), leaving #lastTimeScrollKey unset so the next render, once
-  // it is visible, does the scrolling.
+  // Animates only when the *value* moved: picking an option glides the columns
+  // to the new time, which is what makes three separate lists read as one
+  // control settling on a value. A first positioning or a relayout jumps
+  // instead — those should look already-settled, not animate in from whatever
+  // offset they happened to be sitting at.
+  //
+  // Skipped entirely while a column has no layout (clientHeight 0 — the picker
+  // sits inside a closed popover in ui-date-field), leaving the keys unset so
+  // the next render, once it is visible, does the positioning.
   #scrollSelectedTimeIntoView(target: HTMLElement) {
     if (this.#view !== 'time1' && this.#view !== 'time2') {
-      this.#lastTimeScrollKey = '';
+      this.#lastTimeValueKey = '';
+      this.#lastTimeLayoutKey = '';
       return;
     }
 
     const columns = target.querySelectorAll<HTMLElement>('.cal-time-column');
 
     if (!columns.length) {
-      this.#lastTimeScrollKey = '';
+      this.#lastTimeValueKey = '';
+      this.#lastTimeLayoutKey = '';
       return;
     }
 
-    // The column's own height is part of the key, not just the value: a
-    // relayout moves where the centre *is* without changing what's selected, so
-    // a value-only key would leave the selection stranded at its previous
-    // offset. That happens for a change of --ui-scale or inherited font-size,
-    // and for the popover in ui-date-field going from hidden (height 0) to
-    // shown.
     const time = this.#getTime(this.#view);
-    const key = `${this.#view}:${time.hours}:${time.minutes}:${columns[0].clientHeight}`;
+    const valueKey = `${this.#view}:${time.hours}:${time.minutes}`;
+    // The column's own height, tracked separately from the value: a relayout
+    // moves where the centre *is* without changing what's selected, so the
+    // positioning has to re-run — but as a jump, not a glide.
+    const layoutKey = String(columns[0].clientHeight);
 
-    if (key === this.#lastTimeScrollKey) {
+    if (
+      valueKey === this.#lastTimeValueKey &&
+      layoutKey === this.#lastTimeLayoutKey
+    ) {
       return;
     }
+
+    const settled =
+      this.#lastTimeValueKey !== '' && layoutKey === this.#lastTimeLayoutKey;
+
+    // Honoured explicitly: unlike a CSS transition, a programmatic smooth
+    // scroll is not suppressed for a reduced-motion preference on its own.
+    const reducedMotion =
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const behavior: ScrollBehavior =
+      settled && !reducedMotion ? 'smooth' : 'auto';
 
     let scrolled = false;
 
@@ -957,19 +1186,46 @@ class DatePicker {
         continue;
       }
 
-      column.scrollTop =
-        selected.offsetTop - (column.clientHeight - selected.offsetHeight) / 2;
+      column.scrollTo({
+        top:
+          selected.offsetTop -
+          (column.clientHeight - selected.offsetHeight) / 2,
+        behavior
+      });
 
       scrolled = true;
     }
 
     if (scrolled) {
-      this.#lastTimeScrollKey = key;
+      this.#lastTimeValueKey = valueKey;
+      this.#lastTimeLayoutKey = layoutKey;
     }
   }
 }
 
 // === local helpers =================================================
+
+// Valid steps are 1 to 60. Anything else falls back to 60, which produces
+// exactly one option, "00" — minutes pinned to the hour. That covers a missing
+// or non-numeric value, zero, a negative, and anything longer than an hour.
+//
+// In particular 120 does *not* mean "every two hours". The time wheels are a
+// product of an hour list and a minute list, so a minute step has no way to
+// filter hours; expressing that would take a separate hour step. Rather than
+// half-honour it, an out-of-range step lands on the coarsest thing this control
+// can actually represent, which is visibly coarse rather than silently wrong.
+//
+// Fractions are truncated (7.5 behaves as 7) — the conventional coercion for a
+// numeric attribute, and friendlier than treating it as invalid.
+//
+// Only divisors of 60 give an even grid across the hour. A non-divisor is still
+// accepted: 25 offers 00 and 25, and the wrap from 25 to the next hour's 00 is
+// simply a shorter gap.
+function normalizeMinuteStep(value: number): number {
+  const step = Math.trunc(value);
+
+  return Number.isFinite(step) && step >= 1 && step <= 60 ? step : 60;
+}
 
 function parseHoursMinutes(
   text: string

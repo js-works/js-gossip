@@ -47,8 +47,10 @@ export const datePickerStyles = [
       --cal-background-color: transparent;
       --cal-border-color: var(--ui-color-neutral-300);
 
-      /* header (month/year title and its prev/next controls) */
-      --cal-header-color: var(--ui-text);
+      /* header (month/year title and its prev/next controls). No
+         --cal-header-color: the core colours the whole header — title and
+         arrows alike — from --cal-nav-color below, so setting it here did
+         nothing. See the note there. */
       --cal-header-background-color: transparent;
       --cal-header-hover-color: var(--ui-text);
       --cal-header-hover-background-color: var(--ui-color-primary-100);
@@ -61,9 +63,17 @@ export const datePickerStyles = [
       --cal-header-accentuated-active-color: var(--ui-color-on-accent);
       --cal-header-accentuated-active-background-color: var(--ui-color-primary-800);
 
-      /* nav arrows */
+      /* nav arrows — and, as it happens, the header title too: the core sets
+         .cal-header's colour from this one token, so the month/year label is
+         muted along with the arrows. Now that the header behind them is
+         transparent rather than a filled bar, the title arguably wants full
+         --ui-text contrast with only the arrows muted; that needs the core to
+         read --cal-header-color for the header and this for .cal-prev/.cal-next.
+         Left alone for now so this doesn't change how the header looks
+         unasked.
+         -active-background-color is gone: it was only ever read as the
+         *resting* header background, which is a bug the core no longer has. */
       --cal-nav-color: var(--ui-color-neutral-600);
-      --cal-nav-active-background-color: var(--ui-color-primary-200);
 
       /* grid cells */
       --cal-cell-hover-color: var(--ui-text);
@@ -72,7 +82,6 @@ export const datePickerStyles = [
       --cal-cell-highlighted-background-color: var(--ui-color-neutral-100);
       --cal-cell-adjacent-color: var(--ui-color-neutral-400);
       --cal-cell-adjacent-disable-color: var(--ui-color-neutral-300);
-      --cal-cell-adjacent-selected-color: var(--ui-color-neutral-800);
       --cal-cell-current-highlighted-color: var(--ui-color-primary-600);
       --cal-cell-selected-color: var(--ui-color-on-accent);
       --cal-cell-selected-background-color: var(--ui-color-primary-500);
@@ -84,10 +93,16 @@ export const datePickerStyles = [
          --cal-slider-* tokens that used to be set here went with the range
          sliders they styled (see the core's #renderTimeSelector). */
 
-      /* buttons (the time view's "back to month" control) */
-      --cal-button-background-color: var(--ui-color-primary-100);
-      --cal-button-hover-background-color: var(--ui-color-primary-200);
-      --cal-button-active-background-color: var(--ui-color-primary-300);
+      /* The tint the inactive From:/To: tab takes on hover. Neutral, not an
+         accent: it signals "interactive" without competing with the accent that
+         marks the selection — the same idiom as ui-button's outlined hover,
+         ui-tab and ui-select's option rows. (Was --cal-button-background-color
+         at primary-100; renamed because this tab hover is the only thing that
+         ever read it.) */
+      --cal-tab-hover-background-color: var(--ui-color-neutral-100);
+
+      /* The one radius the picker rounds everything to: hour/minute options,
+         selected cells, and a selection range's own row ends. */
       --cal-button-border-radius: var(--ui-radius-md);
     }
   `,

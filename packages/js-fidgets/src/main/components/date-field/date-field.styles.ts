@@ -69,7 +69,11 @@ export const dateFieldStyles = [
       cursor: default;
     }
 
-    ui-button {
+    /* Scoped to .wrapper: this is the gap between the input and its trigger
+       button. Unscoped it also hit the popup footer's buttons, indenting Clear
+       by an extra 0.4em and leaving the footer visibly off-centre — 23px from
+       the card's left edge against OK's 17px on the right. */
+    .wrapper ui-button {
       flex: none;
       margin-inline-start: 0.4em;
     }
@@ -109,46 +113,35 @@ export const dateFieldStyles = [
       border: var(--ui-border-thin) solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-md);
       box-shadow: var(--ui-popup-shadow);
+      /* Clips the now-flush picker to the border radius. Safe: nothing inside
+         needs to escape the card — the time columns scroll within themselves,
+         and the shadow is drawn outside the box either way. */
+      overflow: hidden;
       /* Fixed width rather than content-sized: the month/year/decade sheets
          have different natural widths, so without this the popup would resize
          under the cursor as the user drills through the views. em, so it
          tracks the field's own font-size.
-         Sized from the widest content the core actually produces, measured
-         rather than guessed: the month sheet with week numbers shown needs
-         351px, and the time view's sliders 352px. Plus this element's border
-         (2px) and the picker's own --ui-spacing-md padding (2x16px) that comes
-         to 386px, so 25em (400px at the default scale) leaves a little
-         headroom for a locale with wider weekday abbreviations. Anything
-         narrower and the week-number column and the weekend highlight bleed
-         out past the rounded border. */
-      width: 25em;
+         Sized from the widest thing the core actually produces, measured
+         rather than guessed: with this element's border included, the month
+         sheet with week numbers shown wants 299px and the time view 298px.
+         19.5em (312px at the default scale) leaves 13px of headroom. Measured
+         at the same width in all of en-US, en-GB, es-ES, fr-FR, de-DE, it-IT,
+         ar-SA, hu-HU, pl-PL and zh-TW — the cells' own padding sets the width,
+         not the weekday captions, so the locale doesn't move it. Anything
+         narrower and the week-number column and the weekend highlight bleed out
+         past the rounded border; much wider and the flex-grow cells simply
+         spread, which undoes the sheet's density. */
+      width: 19.5em;
     }
 
-    .popup-header {
-      display: flex;
-      align-items: center;
-      gap: var(--ui-spacing-sm);
-      padding: var(--ui-spacing-md);
-      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
-      color: var(--ui-color-neutral-600);
-      font-size: 0.9em;
-    }
-
-    /* The formatted draft selection. Truncates rather than widening the card
-       (which is fixed-width above) — a long range in a verbose locale can
-       easily outrun it. */
-    .popup-title {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--ui-text);
-      font-weight: 600;
-    }
-
+    /* Flush to the card's edges rather than inset: the sheet is already a grid
+       of generously padded cells, so a ring of card padding on top of that read
+       as neither tight nor deliberately airy. overflow: hidden on .popup-card
+       above is what keeps anything that paints to the edge — an accentuated
+       header's fill, the weekend highlight columns — clipped to the rounded
+       corners now that they reach them. */
     .popup-card ui-date-picker {
       display: block;
-      padding: var(--ui-spacing-md);
     }
 
     .popup-footer {
@@ -156,7 +149,6 @@ export const dateFieldStyles = [
       align-items: center;
       gap: var(--ui-spacing-sm);
       padding: var(--ui-spacing-sm) var(--ui-spacing-md) var(--ui-spacing-md);
-      border-top: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* Pushes Cancel/OK to the trailing edge, leaving Clear on its own at the

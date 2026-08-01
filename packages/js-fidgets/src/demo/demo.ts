@@ -1078,6 +1078,7 @@ interface DateFieldDemo {
   mode: DateFieldSelectionMode;
   label: string;
   placeholder: string;
+  minuteStep?: number;
   weekNumbers?: boolean;
   highlightWeekends?: boolean;
   centuryView?: boolean;
@@ -1091,7 +1092,12 @@ const DATE_FIELD_DEMOS: DateFieldDemo[] = [
     weekNumbers: true,
     highlightWeekends: true,
   },
-  { mode: "dateTime", label: "Date and time", placeholder: "Pick a date and time" },
+  {
+    mode: "dateTime",
+    label: "Date and time",
+    placeholder: "Pick a date and time",
+    minuteStep: 15,
+  },
   {
     mode: "dateRange",
     label: "Date range",
@@ -1103,7 +1109,7 @@ const DATE_FIELD_DEMOS: DateFieldDemo[] = [
     label: "Date time range",
     placeholder: "Pick a range",
   },
-  { mode: "time", label: "Time", placeholder: "Pick a time" },
+  { mode: "time", label: "Time", placeholder: "Pick a time", minuteStep: 5 },
   { mode: "timeRange", label: "Time range", placeholder: "Pick a time range" },
   { mode: "week", label: "Week", placeholder: "Pick a week", weekNumbers: true },
   {
@@ -1182,6 +1188,7 @@ function dateFieldsTab() {
                 ?show-week-numbers=${demo.weekNumbers ?? false}
                 ?highlight-weekends=${demo.highlightWeekends ?? false}
                 ?enable-century-view=${demo.centuryView ?? false}
+                minute-step=${demo.minuteStep ?? 1}
                 @change=${(event: Event) => {
                   dateFieldValues[demo.mode] = (
                     event.currentTarget as DateField
@@ -1835,6 +1842,7 @@ const pickerDemo = {
   disableWeekends: false,
   showWeekNumbers: true,
   enableCenturyView: false,
+  minuteStep: 15,
   // ISO yyyy-mm-dd, straight from the two ui-date-fields below.
   minDate: "",
   maxDate: "",
@@ -1886,6 +1894,19 @@ const PICKER_SELECTION_MODES: DatePickerSelectionMode[] = [
   "year",
   "years",
   "yearRange",
+];
+
+// Divisors of 60 (so the grid is even across the hour), plus 60 itself, plus
+// one deliberately invalid entry to show the fallback: anything outside 1-60
+// leaves the minute column offering 00 alone.
+const PICKER_MINUTE_STEPS = [
+  { value: 1, label: "1 — every minute" },
+  { value: 5, label: "5" },
+  { value: 10, label: "10" },
+  { value: 15, label: "15 — quarter hours" },
+  { value: 30, label: "30" },
+  { value: 60, label: "60 — on the hour" },
+  { value: 120, label: "120 — invalid, falls back to 00" },
 ];
 
 const PICKER_LOCALES = [
@@ -1967,6 +1988,7 @@ function datePickerTab() {
             ?disable-weekends=${pickerDemo.disableWeekends}
             ?show-week-numbers=${pickerDemo.showWeekNumbers}
             ?enable-century-view=${pickerDemo.enableCenturyView}
+            minute-step=${pickerDemo.minuteStep}
             .minDate=${isoToLocalDate(pickerDemo.minDate)}
             .maxDate=${isoToLocalDate(pickerDemo.maxDate)}
             @change=${(event: Event) => {
@@ -2020,6 +2042,21 @@ function datePickerTab() {
             ${PICKER_CALENDAR_SIZES.map(
               (size) =>
                 html`<ui-option value=${size.value}>${size.label}</ui-option>`,
+            )}
+          </ui-select>
+          <ui-select
+            label="Minute step"
+            .value=${String(pickerDemo.minuteStep)}
+            @change=${(event: Event) => {
+              pickerDemo.minuteStep = Number((event.currentTarget as Select).value);
+              renderApp();
+            }}
+          >
+            ${PICKER_MINUTE_STEPS.map(
+              (step) =>
+                html`<ui-option value=${String(step.value)}>
+                  ${step.label}
+                </ui-option>`,
             )}
           </ui-select>
           ${renderPickerToggle("accentuateHeader", "accentuate header")}

@@ -7,8 +7,8 @@ export default /*css*/ `
     font-family: var(--cal-font-family);
     font-size: var(--cal-font-size);
     user-select: none;
-    min-width: 20em;
-    min-height: 17em;
+    min-width: 17.5em;
+    min-height: 14.5em;
   }
   
   .cal-base * {
@@ -16,16 +16,16 @@ export default /*css*/ `
   }
 
   .cal-view--month .cal-sheet {
-    min-height: 12em;
+    min-height: 10em;
   }
 
   .cal-view--year .cal-sheet,
   .cal-view--decade .cal-sheet {
-    min-height: 8em;
+    min-height: 7em;
   }
 
   .cal-view--century .cal-sheet {
-    min-height: 12em;
+    min-height: 10em;
   }
 
   /* calendar sheet and sheet header */
@@ -35,7 +35,11 @@ export default /*css*/ `
     grid-template-columns: min-content auto min-content;
     align-items: stretch;
     color: var(--cal-nav-color);
-    background-color: var(--cal-nav-active-background-color);
+    /* --cal-header-background-color, which is what this is for. It used to read
+       --cal-nav-active-background-color — the tint a nav arrow takes while
+       being pressed — so the resting header was permanently painted in it, and
+       --cal-header-background-color was read nowhere at all. */
+    background-color: var(--cal-header-background-color);
   }
 
   .cal-header--accentuated {
@@ -102,7 +106,7 @@ export default /*css*/ `
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 0.25em 0.5em;
+    padding: 0.15em 0.5em;
   }
 
   .cal-prev--disabled,
@@ -119,7 +123,7 @@ export default /*css*/ `
 
   .cal-column-name {
     text-align: center;
-    padding: 0.5em;
+    padding: 0.3em 0.25em;
     font-size: 90%;
     text-transform: capitalize;
   }
@@ -131,7 +135,7 @@ export default /*css*/ `
   .cal-row-name {
     align-self: center;
     text-align: center;
-    min-width: 3em;
+    min-width: 2em;
     font-size: 75%;
     padding: 0.125em;
   }
@@ -141,19 +145,48 @@ export default /*css*/ `
   }
 
   .cal-cell {
+    /* The four corner radii, as custom properties rather than applied here.
+       Custom properties cascade independently of whichever rule ends up reading
+       them, which is what lets .cal-cell--joined-* below zero a corner without
+       having to out-specify the selected / in-range / :hover rules that apply
+       it — those three have wildly different specificities, and the :hover one
+       is the highest. Setting them on .cal-cell itself (rather than applying a
+       radius here) also keeps the weekend column band square: it paints a
+       background but never reads these. */
+    --cal-cell-radius-start-start: var(--cal-button-border-radius);
+    --cal-cell-radius-start-end: var(--cal-button-border-radius);
+    --cal-cell-radius-end-start: var(--cal-button-border-radius);
+    --cal-cell-radius-end-end: var(--cal-button-border-radius);
     display: flex;
     flex-grow: 1;
     justify-content: center;
     align-items: center;
     justify-items: stretch;
-    padding: 0.125em 0.75em;
+    padding: 0.1em 0.45em;
     text-transform: capitalize;
     hyphens: auto;
   }
 
+  /* Rounded to match the selected cell below — the two sit directly against
+     each other in the grid, so a square hover next to a rounded selection reads
+     as two different shape languages. The weekend and selection-range tints are
+     deliberately left square: those are column and row *bands*, not cells, and
+     the range already rounds its own outer ends. */
   .cal-cell:not(.cal-cell--disabled):not(.cal-cell--selected):hover {
     color: var(--cal-cell-hover-color);
     background-color: var(--cal-cell-hover-background-color);
+  }
+
+  /* Everything that paints a fill takes its corners from the four properties
+     above, so all three states round and join identically. */
+  .cal-cell--selected:not(.cal-cell--disabled),
+  .cal-cell--in-selection-range:not(.cal-cell--selected),
+  .cal-cell--in-pending-range:not(.cal-cell--selected),
+  .cal-cell:not(.cal-cell--disabled):not(.cal-cell--selected):hover {
+    border-start-start-radius: var(--cal-cell-radius-start-start);
+    border-start-end-radius: var(--cal-cell-radius-start-end);
+    border-end-start-radius: var(--cal-cell-radius-end-start);
+    border-end-end-radius: var(--cal-cell-radius-end-end);
   }
 
   .cal-cell:not(.cal-cell--disabled) {
@@ -182,10 +215,6 @@ export default /*css*/ `
     color: var(--cal-cell-adjacent-color);
   }
 
-  .cal-cell--adjacent.cal-cell--selected {
-    color: var(--cal-cell-adjacent-selected-color);
-  }
-
   .cal-cell--adjacent.cal-cell--disabled {
     color: var(--cal-cell-adjacent-disable-color);
   }
@@ -198,34 +227,58 @@ export default /*css*/ `
     color: var(--cal-cell-current-highlighted-color, inherit);
   }
 
-  .cal-cell--in-selection-range:not(.cal-cell--selected) {
+  /* Ink follows the fill, not the cell's other roles. Anything wearing the light
+     fill — selection range, the range being proposed, or hover — takes the dark
+     text colour, and anything wearing the dark fill takes the light one (see
+     .cal-cell--selected above, which is now the only rule that colours a
+     selected cell).
+     Without this, an adjacent-month day kept its muted grey and today's date
+     kept its accent blue while sitting on a light blue fill, and a *selected*
+     adjacent day was painted near-black on the dark blue fill.
+     Four selector units deep so these outrank the adjacent and current rules
+     above, which are three, rather than depending on source order to break a
+     tie. Disabled cells are deliberately excluded: their low contrast is what
+     marks them unavailable, and a disabled day can legitimately sit inside a
+     range (disable-weekends plus a range spanning a weekend). */
+  .cal-cell.cal-cell--in-selection-range:not(.cal-cell--selected):not(.cal-cell--disabled),
+  .cal-cell.cal-cell--in-pending-range:not(.cal-cell--selected):not(.cal-cell--disabled),
+  .cal-cell:not(.cal-cell--selected):not(.cal-cell--disabled):hover {
+    color: var(--cal-cell-hover-color);
+  }
+
+  .cal-cell--in-selection-range:not(.cal-cell--selected),
+  .cal-cell--in-pending-range:not(.cal-cell--selected) {
     background-color: var(--cal-cell-selection-range-background-color);
   }
 
-  .cal-cell--first-in-selection-range:not(.cal-cell--last-in-selection-range) {
-    border-top-left-radius: 6px;
-    border-bottom-left-radius: 6px;
-  }
-  
-  .cal-cell--first-in-selection-range ~ .cal-cell--first-in-selection-range {
-    border-top-left-radius: 0; 
-    border-bottom-left-radius: 0;
-  }
-  
-  .cal-cell--last-in-selection-range:not(.cal-cell--first-in-selection-range) {
-    border-top-right-radius: 6px;
-    border-bottom-right-radius: 6px;
+  /* Where a filled cell touches another one, the shared edge is squared off, so
+     a run of them reads as a single region instead of a row of rounded tiles
+     with notches between them. Both axes: horizontally along a week, and
+     vertically between the same weekday in consecutive weeks. Applies to every
+     fill — selected, selection range, and hover.
+     These only set the corner variables; the rules that read them are above.
+     Logical corners (start-start = top-left in LTR, top-right in RTL) so this
+     holds in an RTL sheet, where the previous item in reading order sits to the
+     visual right. */
+  .cal-cell--joined-inline-start {
+    --cal-cell-radius-start-start: 0;
+    --cal-cell-radius-end-start: 0;
   }
 
+  .cal-cell--joined-inline-end {
+    --cal-cell-radius-start-end: 0;
+    --cal-cell-radius-end-end: 0;
+  }
 
-  .cal-cell--before-singleton-selection-range:has(~ .cal-cell):hover ~ .cal-cell--before-singleton-selection-range {
-    background-color: var(--cal-cell-selection-range-background-color) !important;
+  .cal-cell--joined-block-start {
+    --cal-cell-radius-start-start: 0;
+    --cal-cell-radius-start-end: 0;
   }
-  
-  .cal-cell--after-singleton-selection-range:has(~ .cal-cell--after-singleton-selection-range:hover) { 
-    background-color: var(--cal-cell-selection-range-background-color) !important;
+
+  .cal-cell--joined-block-end {
+    --cal-cell-radius-end-start: 0;
+    --cal-cell-radius-end-end: 0;
   }
-  
 
   /* time links */
 
@@ -233,27 +286,24 @@ export default /*css*/ `
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
-    padding: 0 3em;
-    min-height: 2em;
+    padding: 0 1.5em;
+    min-height: 1.6em;
     box-sizing: border-box;
-    margin: 0.5em;
+    margin: 0.25em;
     gap: 0 2em;
     white-space: nowrap;
   }
 
+  /* A link, not a button: no fill of its own, and no border-radius since
+     there's no fill to round. The padding stays — it's the click target, and
+     an invisible one is still worth having. */
   .cal-time-link {
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
-    cursor: pointer;
     text-align: center;
     justify-self: center;
     padding: 0.25em 0.75em;
-    border-radius: 1em;
-  }
-
-  .cal-time-link:hover {
-    background-color: var(--cal-button-background-color);
   }
 
   .cal-time-link--disabled {
@@ -266,24 +316,29 @@ export default /*css*/ `
   .cal-view--time2 {
     display: flex;
     flex-direction: column;
-    gap: 1.5em;
-    padding: 0.5em 1em;
+    gap: 0.5em;
+    padding: 0.25em 0.5em;
+    /* .cal-base's min-height is a floor for the *calendar* sheets, so a short
+       one (year, decade) can't collapse the picker. The time views have their
+       own intrinsic height and don't need it — left applied it padded them out
+       with dead space under the wheels. */
+    min-height: auto;
   }
 
   /* time */
 
   .cal-time {
-    margin: 0.5rem 0 0 0;
+    margin: 0;
   }
 
   .cal-time-header {
     font-size: calc(100% - 1px);
-    margin-bottom: 0.25em;
+    margin-bottom: 0.1em;
     font-weight: 200;
   }
 
   .cal-time-value {
-    font-size: 150%;
+    font-size: 120%;
   }
 
   /* time tabs */
@@ -310,11 +365,18 @@ export default /*css*/ `
     pointer-events: none;
   }
 
+  /* Hovering the *inactive* From:/To: tab — the one you can switch to. A plain
+     neutral tint rather than an accent one: it means "this is interactive", the
+     same signal ui-button's outlined variant, ui-tab and ui-select's option rows
+     all use, and it shouldn't compete with the accent that marks the selection.
+     Fill only — the tab's border is deliberately left alone. It used to be
+     repainted in the fill colour, which erased the divider between the two tabs
+     for as long as the pointer was over one and made the pair's outline flicker
+     on hover. */
   .cal-time-tabs--active-tab-time1 > .cal-time:nth-child(2):hover,
   .cal-time-tabs--active-tab-time2 > .cal-time:first-child:hover {
     cursor: pointer;
-    background-color: var(--cal-button-background-color);
-    border-color: var(--cal-button-background-color);
+    background-color: var(--cal-tab-hover-background-color);
   }
 
   .cal-time-tabs--active-tab-time1 > .cal-time:nth-child(2) {
@@ -323,7 +385,7 @@ export default /*css*/ `
     border: 0 solid var(--cal-border-color);
     border-width: 0 0 1px 1px;
     white-space: nowrap;
-    padding: 1em 2em;
+    padding: 0.4em 1em;
   }
 
   .cal-time-tabs > .cal-time:nth-child(2) {
@@ -339,54 +401,105 @@ export default /*css*/ `
     border: 0 solid var(--cal-border-color);
     border-width: 0 1px 1px 0;
     white-space: nowrap;
-    padding: 1em 2em;
+    padding: 0.4em 1em;
   }
 
   /* back to month link */
 
+  /* inline-flex + align-self rather than the filled, full-width block this
+     was: without a background, a block would leave the whole row clickable
+     including the empty space either side of the text, which a link shouldn't
+     be. The parent (.cal-view--time1/2) is a flex column, so align-self
+     centres it. */
   .cal-back-to-month-link {
-    display: block;
-    padding: 0.5em 2em;
-    text-align: center;
-    background-color: var(--cal-button-background-color);
-    border-radius: var(--cal-button-border-radius, 3px);
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    gap: 0.4em;
+    padding: 0.25em 0.75em;
+  }
+
+  /* --- the shared link look ------------------------------------------- */
+
+  /* No colour of their own: these inherit the normal text colour from
+     .cal-base, so the hover is the only thing that marks them out. No token
+     for it either — there is nothing to configure when the resting state is
+     just "the text colour". */
+  .cal-time-link,
+  .cal-back-to-month-link {
+    text-decoration: none;
     cursor: pointer;
+    /* Suppresses the browser's own grey tap-highlight on touch, which would
+       otherwise put back exactly the background these rules remove. */
+    -webkit-tap-highlight-color: transparent;
   }
 
+  /* The whole hover effect: faux-semibold via stacked zero-offset text-shadow
+     rather than a real font-weight bump, because heavier glyphs are wider and
+     a weight change would reflow the text (and, for .cal-time-links, shift the
+     two links within their grid). A blurred shadow thickens the strokes
+     without touching layout metrics — the same trick ui-link and ui-tab use.
+     There is deliberately no colour shift: at the normal text colour there is
+     nowhere stronger to go. */
+  .cal-time-link:hover,
   .cal-back-to-month-link:hover {
-    background-color: var(--cal-button-hover-background-color);
-  }
-
-  .cal-back-to-month-link:active {
-    background-color: var(--cal-button-active-background-color);
+    text-shadow:
+      0 0 0.5px currentColor,
+      0 0 0.5px currentColor;
   }
 
   /* time selector — hour/minute option columns, see #renderTimeSelector */
 
+  /* The positioning box. Its only job is where the wheels sit; the row itself
+     is .cal-time-wheels below. */
   .cal-time-selector {
     display: flex;
-    /* center, so the separator and the AM/PM control line up with the
-       *selected* option rather than with the top of the columns — the
-       selection always sits at each column's vertical middle
-       (#scrollSelectedTimeIntoView keeps it there), and these two read as part
-       of the current value. --cal-time-label-offset undoes the height the
-       column captions add above the columns, which would otherwise push the
-       shared centre line up by half a caption. */
-    align-items: flex-start;
     justify-content: center;
-    gap: 0.4em;
-    padding-top: 0.25em;
 
     /* The colon and the AM/PM control line up with the *selected* option, not
        with the top of the columns — the selection always sits at each column's
        vertical middle (#scrollSelectedTimeIntoView keeps it there) and both
        read as part of the current value. That alignment is structural: every
-       child of this row is a .cal-time-column-group with an equal-height
-       caption on top (empty for those two, see #renderTimeAside) and a
-       column-height box below it, so there is no offset to compute. */
-    --cal-time-column-height: 9.5em;
+       child of the row is a .cal-time-column-group with an equal-height caption
+       on top (empty for those two, see #renderTimeAside) and a column-height box
+       below it, so there is no offset to compute. */
+    /* 7.5em, not 7: at 7em the 29px options give 3.86 rows, so only three are
+       fully visible; 7.5em clears four for 8px more. A wheel showing one option
+       either side of the selection is hard to scan. */
+    --cal-time-column-height: 7.5em;
     --cal-time-caption-height: 1.25em;
     --cal-time-caption-gap: 0.3em;
+  }
+
+  .cal-time-wheels {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4em;
+  }
+
+  /* With both from:/to: tabs showing, the wheels move under whichever tab is
+     being edited instead of staying centred, so which half of the range you're
+     changing is obvious at a glance.
+     from: is exact — 0.5em is the same leading padding
+     .cal-time-tabs--active-tab-time1 > .cal-time:first-child gives its label, so
+     the wheels start on the label's own left edge.
+     to: is right-aligned rather than left-aligned to its label, and that is a
+     constraint rather than a preference: the wheel row is ~157px wide while half
+     the card's content box is ~147px, so starting it at the to: label would run
+     it ~18px past the card — which ui-date-field's popup clips (overflow: hidden
+     for the rounded corners). Right-aligning puts it as far under the to: tab as
+     actually fits and can never overflow. Making the literal alignment possible
+     would need the card around 23em rather than 19.5em. */
+  .cal-time-selector--time1 {
+    justify-content: flex-start;
+  }
+
+  .cal-time-selector--time1 > .cal-time-wheels {
+    padding-inline-start: 0.5em;
+  }
+
+  .cal-time-selector--time2 {
+    justify-content: flex-end;
   }
 
   .cal-time-column-group {
@@ -419,14 +532,17 @@ export default /*css*/ `
     mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      black 1.6em,
-      black calc(100% - 1.6em),
+      black 1.3em,
+      black calc(100% - 1.3em),
       transparent 100%
     );
     scrollbar-width: none;
     /* Half the column's height above and below the options, so the first and
-       last entry can still reach the vertical centre. */
-    padding: 4em 0;
+       last entry can still reach the vertical centre. Derived from the height
+       rather than written as its own number: any other value both under-serves
+       the ends and, unless it happens to land on whole pixels, leaves the
+       centring maths a fraction out. */
+    padding: calc(var(--cal-time-column-height) / 2) 0;
     box-sizing: border-box;
   }
 
@@ -436,7 +552,7 @@ export default /*css*/ `
 
   .cal-time-option {
     display: block;
-    padding: 0.25em 0.7em;
+    padding: 0.15em 0.55em;
     border-radius: var(--cal-button-border-radius);
     text-align: center;
     font-variant-numeric: tabular-nums;
@@ -461,48 +577,13 @@ export default /*css*/ `
 
   /* The same height as a column, so centring within it lands on the column's
      own centre — which is where the selected option is kept. */
-  .cal-time-separator,
-  .cal-time-meridiem {
+  .cal-time-separator {
     height: var(--cal-time-column-height);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-  }
-
-  .cal-time-separator {
     opacity: 0.5;
   }
 
-  .cal-time-meridiem {
-    gap: 0.25em;
-    margin-inline-start: 0.5em;
-  }
-
-  .cal-time-meridiem-option {
-    padding: 0.25em 0.6em;
-    border: 1px solid var(--cal-border-color);
-    border-radius: var(--cal-button-border-radius);
-    text-align: center;
-    font-size: 0.85em;
-    cursor: pointer;
-    user-select: none;
-    transition:
-      background-color 100ms ease,
-      color 100ms ease,
-      border-color 100ms ease;
-  }
-
-  .cal-time-meridiem-option:hover {
-    background-color: var(--cal-cell-hover-background-color);
-    color: var(--cal-cell-hover-color);
-  }
-
-  .cal-time-meridiem-option--selected,
-  .cal-time-meridiem-option--selected:hover {
-    background-color: var(--cal-cell-selected-background-color);
-    border-color: var(--cal-cell-selected-background-color);
-    color: var(--cal-cell-selected-color);
-    font-weight: 600;
-  }
 `;

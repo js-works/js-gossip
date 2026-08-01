@@ -19,8 +19,8 @@
 //   yearRange       2026,2029
 //
 // Those raw strings stay the component's `value` (locale-independent, stable,
-// what a form submits). This module only produces the human-readable text for
-// the closed field and the popup header.
+// what a form submits). This module only produces the human-readable text the
+// field itself displays.
 //
 // Every parse here builds a *local* Date from the string's parts rather than
 // `new Date(str)`. That matters: the spec parses the bare date forms
@@ -65,11 +65,6 @@ export const DATE_FIELD_SELECTION_MODES: DateFieldSelectionMode[] = [
   "year",
   "yearRange",
 ];
-
-/** True for the modes whose raw value is two comma-joined halves. */
-export function isRangeMode(mode: DateFieldSelectionMode): boolean {
-  return mode.endsWith("Range");
-}
 
 // ---- parsing the core's raw shapes into local Dates ----
 
