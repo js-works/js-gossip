@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 
 export const tabsStyles = [
   defaultTheme,

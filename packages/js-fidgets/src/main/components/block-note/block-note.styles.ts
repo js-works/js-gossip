@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 import { fieldLabelStyles } from "../../shared/field-label/field-label.js";
 
 export const blockNoteStyles = [

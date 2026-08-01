@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 
 export const checkboxStyles = [
   defaultTheme,
@@ -55,7 +55,11 @@ export const checkboxStyles = [
       border: var(--ui-border-thin) solid var(--ui-color-neutral-600);
       border-radius: var(--ui-radius-xs);
       background: var(--ui-bg);
-      color: white;
+      /* The check/dash glyph's color (both SVGs draw in currentColor), set
+         here rather than on .checked/.indeterminate below so it's already in
+         place for the transition — it's only ever visible once one of those
+         has filled the box with primary-500. */
+      color: var(--ui-color-on-accent);
       transition:
         background-color 120ms ease,
         border-color 120ms ease;

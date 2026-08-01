@@ -2,7 +2,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 import { eyeIcon } from "./icons/eye.icon.js";
 import { eyeSlashIcon } from "./icons/eye-slash.icon.js";
 import {

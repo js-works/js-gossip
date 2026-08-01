@@ -5,9 +5,11 @@
    out of sync with whatever theme is active. */
 
 :root {
-  /* --ui-bg/--ui-text are fixed (light-only) values, not a light-dark() pair,
-     so pin the scheme rather than letting it follow the OS preference. */
-  color-scheme: light;
+  /* No color-scheme pin here: the adopted theme sets `light dark` on :root
+     (follow the OS) and the header's Theme picker overrides that on <html>
+     to force one — see theme.ts's own note on why that property, and not a
+     token override, is the light/dark switch. */
+
   /* Reserves the scrollbar's width up front instead of only when a tab's
      content is actually tall enough to scroll — without this, switching to
      a shorter/taller tab makes the viewport's content area jump sideways as
@@ -22,7 +24,14 @@
 body {
   margin: 0;
   padding: 1rem 1.5rem 2.5rem;
-  background: transparent;
+  /* --ui-bg rather than the previous `transparent` (which fell through to the
+     UA's own canvas): in light mode both are white, so nothing changes there,
+     but the UA's *dark* canvas is a browser-specific near-black that no token
+     controls — leaving the page a slightly different shade from the sections
+     painted on it, differently per browser. Painting it from the same token
+     the sections use keeps the two in step; section borders still separate
+     them. */
+  background: var(--ui-bg);
   color: var(--ui-text);
   font-family: var(--ui-font-sans);
   line-height: 1.5;
@@ -79,6 +88,11 @@ ui-select.scale-control {
 ui-select.locale-control {
   flex: none;
   --select-min-width: 5em;
+}
+
+ui-select.theme-control {
+  flex: none;
+  --select-min-width: 6em;
 }
 
 h1 {

@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 
 export const editorStyles = [
   defaultTheme,
@@ -38,6 +38,13 @@ export const editorStyles = [
       --grayText: var(--ui-color-neutral-500);
       --bg-light: var(--ui-color-neutral-50);
       --color-gray-border: var(--ui-color-neutral-200);
+      /* editor.js's own foreground token, mapped so its toolbar/settings
+         glyphs invert along with everything else in dark mode instead of
+         staying at its hard-coded near-black. Everything editor.js renders
+         as plain block text already inherits \`color\` normally (the holder is
+         slotted into .wrapper, and inheritance follows the flat tree), so
+         that half needed nothing. */
+      --color-dark: var(--ui-text);
     }
 
     .wrapper:focus-within {

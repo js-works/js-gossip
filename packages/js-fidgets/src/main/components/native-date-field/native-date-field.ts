@@ -2,7 +2,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { PropertyValues } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 import {
   renderFieldLabel,
   fieldLabelStyles,
@@ -125,10 +125,17 @@ export class NativeDateField extends LitElement {
         border: none;
         background: transparent;
         color: inherit;
-        /* Match the picker-icon/text color to the rest of the field instead
-           of the UA default (usually a fixed dark gray regardless of theme
-           or dark mode). */
-        color-scheme: light dark;
+        /* No color-scheme declaration here on purpose, even though this is
+           the one field whose UA-rendered internals (the picker icon, the
+           date segments' selection highlight, the dropdown calendar) depend
+           on it. An earlier version pinned \`light dark\` locally to stop the
+           icon rendering as a fixed dark gray — but pinning it means this
+           field always follows the *OS* preference and silently ignores a
+           consumer forcing a scheme on <html>. color-scheme is an inherited
+           property that themes/theme.ts deliberately declares only on :root
+           (see its comment there), so leaving it alone is what lets it reach
+           through this shadow boundary and stay in step with everything
+           else. */
       }
 
       input:focus {

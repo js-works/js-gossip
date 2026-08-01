@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 
 export const buttonStyles = [
   defaultTheme,
@@ -32,7 +32,14 @@ export const buttonStyles = [
       --btn-500: var(--ui-color-neutral-600);
       --btn-600: var(--ui-color-neutral-700);
       --btn-700: var(--ui-color-neutral-800);
-      --btn-solid-text: white;
+      /* The neutral tone alone can't use --ui-color-on-accent (the flat white
+         every colored tone below takes): its solid fill is --btn-500 =
+         neutral-600, and unlike a colored ramp's self-mirroring -500 step
+         that one *does* flip across schemes — a dark gray on white, a light
+         gray on black — so its ink has to flip with it. neutral-50 is exactly
+         that flip (near-white in light, near-black in dark) and is
+         indistinguishable from plain white in light mode. */
+      --btn-solid-text: var(--ui-color-neutral-50);
 
       /* size="medium" (the default) — 1em font-size + 0.5em padding on each
          block side adds up to a round 2em button height (line-height: 1 on
@@ -50,7 +57,7 @@ export const buttonStyles = [
       --btn-500: var(--ui-color-primary-500);
       --btn-600: var(--ui-color-primary-600);
       --btn-700: var(--ui-color-primary-700);
-      --btn-solid-text: white;
+      --btn-solid-text: var(--ui-color-on-accent);
     }
 
     :host([tone="danger"]) {
@@ -60,7 +67,7 @@ export const buttonStyles = [
       --btn-500: var(--ui-color-danger-500);
       --btn-600: var(--ui-color-danger-600);
       --btn-700: var(--ui-color-danger-700);
-      --btn-solid-text: white;
+      --btn-solid-text: var(--ui-color-on-accent);
     }
 
     :host([tone="warning"]) {
@@ -70,7 +77,7 @@ export const buttonStyles = [
       --btn-500: var(--ui-color-warn-500);
       --btn-600: var(--ui-color-warn-600);
       --btn-700: var(--ui-color-warn-700);
-      --btn-solid-text: white;
+      --btn-solid-text: var(--ui-color-on-accent);
     }
 
     :host([tone="success"]) {
@@ -80,7 +87,7 @@ export const buttonStyles = [
       --btn-500: var(--ui-color-success-500);
       --btn-600: var(--ui-color-success-600);
       --btn-700: var(--ui-color-success-700);
-      --btn-solid-text: white;
+      --btn-solid-text: var(--ui-color-on-accent);
     }
 
     :host([size="small"]) {

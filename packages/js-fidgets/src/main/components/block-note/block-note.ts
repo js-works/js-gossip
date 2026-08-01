@@ -11,6 +11,7 @@ import { BlockNoteView } from "@blocknote/mantine";
 
 import { blockNoteStyles } from "./block-note.styles.js";
 import { renderGroupLabel } from "../../shared/field-label/field-label.js";
+import { observeColorScheme, resolveColorScheme } from "../../themes/color-scheme.js";
 
 // Reads the file locally (no network call) so the block-based file/image
 // blocks work out of the box with zero configuration — same reasoning, and
@@ -83,6 +84,7 @@ export class BlockNote extends LitElement {
   #root?: Root;
   #editor?: BlockNoteEditor<any, any, any>;
   #lastValue = "";
+  #unobserveColorScheme?: () => void;
 
   @property()
   accessor name = "";
@@ -140,12 +142,23 @@ export class BlockNote extends LitElement {
     }
 
     this.addEventListener("focusout", this.#onFocusOut);
+
+    // BlockNote/Mantine does its own light/dark theming in JavaScript, so
+    // unlike every other component here it can't just follow `color-scheme`
+    // in CSS — it has to be handed the resolved scheme and re-rendered when
+    // it flips. (Left to itself it would follow the OS preference only,
+    // ignoring a consumer forcing a scheme on <html>.)
+    this.#unobserveColorScheme = observeColorScheme(this, () =>
+      this.#renderView(),
+    );
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
 
     this.removeEventListener("focusout", this.#onFocusOut);
+    this.#unobserveColorScheme?.();
+    this.#unobserveColorScheme = undefined;
     this.#root?.unmount();
     this.#root = undefined;
     this.#editor = undefined;
@@ -191,16 +204,28 @@ export class BlockNote extends LitElement {
     this.#editor = BlockNoteEditor.create(options);
 
     this.#root = createRoot(this.#holder!);
+    this.#renderView();
+
+    this.#syncFormValue();
+    this.#syncValidity();
+  }
+
+  // Re-rendered (rather than rendered once at creation) only because `theme`
+  // has to be re-read on a light/dark flip — see connectedCallback. The other
+  // props are still effectively write-once: `editable` changes go through
+  // `editor.isEditable` in `updated()` instead, and both `editor` and
+  // `onChange` are stable for this element's lifetime.
+  #renderView() {
+    if (!this.#root || !this.#editor) return;
+
     this.#root.render(
       createElement(BlockNoteView, {
         editor: this.#editor,
         editable: !(this.disabled || this.readonly),
+        theme: resolveColorScheme(this),
         onChange: () => this.#onEditorChange(),
       }),
     );
-
-    this.#syncFormValue();
-    this.#syncValidity();
   }
 
   #loadValue(value: string) {

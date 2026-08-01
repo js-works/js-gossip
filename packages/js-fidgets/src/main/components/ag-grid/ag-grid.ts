@@ -72,7 +72,7 @@ ModuleRegistry.registerModules([
 ]);
 
 // Maps AG Grid's Theming API onto this library's own --ui-* tokens (see
-// theming/theme.ts) so ui-ag-grid reads as part of the same design system as
+// themes/theme.ts) so ui-ag-grid reads as part of the same design system as
 // every other component here rather than an embedded third-party widget.
 // `fontFamily` is given a plain CSS value (not `{ googleFont: … }`, themeQuartz's
 // own default) so the grid never triggers AG Grid's default network fetch of a

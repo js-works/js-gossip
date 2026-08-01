@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 import { MENU_CLOSE_MS, MENU_TRANSITION_MS } from "./menu-core.js";
 
 // Shared by ui-menu-button and ui-split-button — appended to each of their

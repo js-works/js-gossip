@@ -1,6 +1,6 @@
 import { html, nothing, render } from "lit";
 
-import { defaultTheme } from "../main/theming/theme.js";
+import { defaultTheme } from "../main/themes/theme.js";
 import "../main/components/heading/heading.js";
 import "../main/components/text/text.js";
 import "../main/components/link/link.js";
@@ -1677,6 +1677,12 @@ window.addEventListener("hashchange", () => {
 // the chosen value instead of snapping back to their defaults.
 let uiScale = "1";
 let uiLocale = "en-US";
+// The `color-scheme` value the Theme picker last wrote to <html> — the two
+// keywords together mean "follow the OS", which is also what the adopted
+// theme's own :root rule says, so this starts out matching it. Held as the
+// literal CSS value rather than a light/dark/system enum: it *is* what gets
+// assigned, and there's nothing else to derive.
+let uiColorScheme = "light dark";
 
 function renderApp(): void {
   render(
@@ -1723,6 +1729,27 @@ function renderApp(): void {
             >
               <ui-option value="en-US">en-US</ui-option>
               <ui-option value="de-DE">de-DE</ui-option>
+            </ui-select>
+            <ui-select
+              class="theme-control"
+              label="Theme"
+              size="small"
+              .value=${uiColorScheme}
+              @change=${(event: Event) => {
+                uiColorScheme = (event.currentTarget as Select).value;
+                // An inline style on <html>, which outranks the `color-scheme:
+                // light dark` the adopted theme declares on :root. This is the
+                // whole switch — no token is overridden and nothing is
+                // re-rendered, because every --ui-* color is a light-dark()
+                // pair resolved against this property (see theme.ts). The one
+                // exception is ui-block-note, which themes itself in
+                // JavaScript and watches this attribute to keep up.
+                document.documentElement.style.colorScheme = uiColorScheme;
+              }}
+            >
+              <ui-option value="light dark">System</ui-option>
+              <ui-option value="light">Light</ui-option>
+              <ui-option value="dark">Dark</ui-option>
             </ui-select>
           </div>
         </header>

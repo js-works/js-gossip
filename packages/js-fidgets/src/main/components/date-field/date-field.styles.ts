@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { defaultTheme } from "../../theming/theme.js";
+import { defaultTheme } from "../../themes/theme.js";
 import { fieldLabelStyles } from "../../shared/field-label/field-label.js";
 
 export const dateFieldStyles = [
@@ -337,7 +337,7 @@ export const dateFieldStyles = [
 
     .datepicker-cell.selected {
       background: var(--ui-color-primary-500);
-      color: white;
+      color: var(--ui-color-on-accent);
     }
 
     .datepicker-footer {
