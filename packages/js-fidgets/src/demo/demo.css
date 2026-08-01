@@ -22,7 +22,7 @@
 body {
   margin: 0;
   padding: 1rem 1.5rem 2.5rem;
-  background: var(--ui-color-neutral-100);
+  background: transparent;
   color: var(--ui-text);
   font-family: var(--ui-font-sans);
   line-height: 1.5;

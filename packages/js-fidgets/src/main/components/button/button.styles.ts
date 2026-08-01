@@ -168,8 +168,12 @@ export const buttonStyles = [
       color: var(--btn-600);
     }
 
+    /* A neutral gray, not a tone-tinted --btn-50 — an outlined button's
+       hover is meant to read as "this is now interactive", the same
+       feedback regardless of tone, matching the plain neutral hover used
+       elsewhere (e.g. ui-tab, ui-select's option rows). */
     :host([variant="outlined"]) .button:hover {
-      background: var(--btn-50);
+      background: var(--ui-color-neutral-100);
     }
 
     /* An explicit tinted press state — relying only on the generic brightness
@@ -208,8 +212,17 @@ export const buttonStyles = [
       color: var(--btn-600);
     }
 
+    /* Faux-bold via stacked zero-offset text-shadow rather than a further
+       font-weight bump: a heavier weight than the base 600 would widen the
+       glyphs and reflow surrounding inline text the instant this is
+       hovered. A blurred shadow thickens the strokes without touching
+       layout metrics — same trick as ui-tab's [selected] state
+       (tab.styles.ts) and ui-link's own :hover (link.styles.ts). */
     :host([variant="link"]) .button:hover {
       color: var(--btn-700);
+      text-shadow:
+        0 0 0.5px currentColor,
+        0 0 0.5px currentColor;
     }
 
     :host([variant="link"]) .button:focus-visible {

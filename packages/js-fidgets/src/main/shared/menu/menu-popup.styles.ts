@@ -194,7 +194,7 @@ export const menuPopupStyles = [
       display: flex;
       align-items: center;
       gap: var(--ui-spacing-sm);
-      padding-block: 0.45em;
+      padding-block: calc(3px * var(--ui-scale));
       padding-inline-start: calc(var(--ui-spacing-sm) * 2);
       padding-inline-end: var(--ui-spacing-sm);
       /* Transparent by default (rather than only added on .active) so the

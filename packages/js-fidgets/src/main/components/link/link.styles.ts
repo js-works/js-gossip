@@ -71,8 +71,17 @@ export const linkStyles = [
       transition: color 120ms ease;
     }
 
+    /* Faux-semibold via stacked zero-offset text-shadow rather than a
+       font-weight bump on hover: real bold glyphs are wider than regular
+       ones, so a font-weight increase here would resize the link (and
+       reflow surrounding inline text) the instant it's hovered. A blurred
+       shadow thickens the glyph strokes without touching layout metrics —
+       same trick as ui-tab's [selected] state (tab.styles.ts). */
     .link:hover {
       color: var(--link-700);
+      text-shadow:
+        0 0 0.5px currentColor,
+        0 0 0.5px currentColor;
     }
 
     .link:active {
