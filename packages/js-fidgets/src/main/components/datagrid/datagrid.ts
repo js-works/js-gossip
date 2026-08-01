@@ -275,7 +275,7 @@ export class DataGrid<T = unknown> extends LitElement {
   accessor rowActions: DataGridRowAction<T>[] = [];
 
   @property({ attribute: "row-actions-header" })
-  accessor rowActionsHeader = "Actions";
+  accessor rowActionsHeader = "";
 
   // reflect: true — datagrid.styles.ts's zebra striping is a plain
   // :host([stripes]) CSS rule, so the live property value needs mirroring
@@ -743,6 +743,36 @@ export class DataGrid<T = unknown> extends LitElement {
       this.expandedRows.has(row),
     );
 
+    // Rendered once, then placed in whichever row is vertically level with
+    // the actual filter controls — the header row itself when there's no
+    // filter row, otherwise the filter row, so the "select all"
+    // checkbox/"expand all" toggle always sit at the same height as the
+    // filter inputs beside them rather than up in the column-title row.
+    const selectAllCheckbox = html`
+      <ui-checkbox
+        .checked=${allVisibleSelected}
+        .indeterminate=${someVisibleSelected && !allVisibleSelected}
+        ?disabled=${this.rows.length === 0}
+        @change=${(event: Event) =>
+          this.#setVisibleRowsSelected((event.target as Checkbox).checked)}
+      ></ui-checkbox>
+    `;
+    const expandAllToggle =
+      expandableRows.length > 0
+        ? html`<ui-button
+            variant="link"
+            class="expander-toggle ${anyRowDetailsExpanded ? "expanded" : ""}"
+            aria-expanded=${anyRowDetailsExpanded}
+            aria-label=${anyRowDetailsExpanded
+              ? "Collapse all row details"
+              : "Expand all row details"}
+            @click=${() =>
+              this.#toggleAllRowDetails(expandableRows, anyRowDetailsExpanded)}
+          >
+            ${expanderChevronIcon}
+          </ui-button>`
+        : nothing;
+
     const pageSize = this.#effectivePageSize();
     const pageCount = Math.max(1, Math.ceil(this.rowCount / pageSize));
     // Drives the nav buttons' own enabled/disabled state and +/-1 arithmetic
@@ -819,15 +849,7 @@ export class DataGrid<T = unknown> extends LitElement {
                       class="cell select-cell"
                       style="grid-column: ${checkboxCol}; grid-row: 2"
                     >
-                      <ui-checkbox
-                        .checked=${allVisibleSelected}
-                        .indeterminate=${someVisibleSelected && !allVisibleSelected}
-                        ?disabled=${this.rows.length === 0}
-                        @change=${(event: Event) =>
-                          this.#setVisibleRowsSelected(
-                            (event.target as Checkbox).checked,
-                          )}
-                      ></ui-checkbox>
+                      ${hasFilters ? nothing : selectAllCheckbox}
                     </div>`
                   : nothing}
                 ${expanderCol
@@ -835,25 +857,7 @@ export class DataGrid<T = unknown> extends LitElement {
                       class="cell expander-cell"
                       style="grid-column: ${expanderCol}; grid-row: 2"
                     >
-                      ${expandableRows.length > 0
-                        ? html`<ui-button
-                            variant="link"
-                            class="expander-toggle ${anyRowDetailsExpanded
-                              ? "expanded"
-                              : ""}"
-                            aria-expanded=${anyRowDetailsExpanded}
-                            aria-label=${anyRowDetailsExpanded
-                              ? "Collapse all row details"
-                              : "Expand all row details"}
-                            @click=${() =>
-                              this.#toggleAllRowDetails(
-                                expandableRows,
-                                anyRowDetailsExpanded,
-                              )}
-                          >
-                            ${expanderChevronIcon}
-                          </ui-button>`
-                        : nothing}
+                      ${hasFilters ? nothing : expandAllToggle}
                     </div>`
                   : nothing}
                 ${headerEntries.map((entry) => {
@@ -941,10 +945,14 @@ export class DataGrid<T = unknown> extends LitElement {
                     style="grid-template-columns: ${gridTemplateColumns}"
                   >
                     ${this.selectionMode === "multi"
-                      ? html`<div class="cell"></div>`
+                      ? html`<div class="cell select-cell">
+                          ${selectAllCheckbox}
+                        </div>`
                       : nothing}
                     ${hasRowDetails
-                      ? html`<div class="cell"></div>`
+                      ? html`<div class="cell expander-cell">
+                          ${expandAllToggle}
+                        </div>`
                       : nothing}
                     ${leafColumns.map((column) => {
                       return html`

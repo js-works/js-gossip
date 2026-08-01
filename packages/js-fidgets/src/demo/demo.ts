@@ -1507,8 +1507,8 @@ const demoPages: DemoPage[] = [
   },
   { id: "input-fields", label: "Input Fields", content: inputFieldsTab },
   { id: "upload", label: "Upload", content: uploadTab },
-  { id: "editor", label: "Editor", content: editorTab },
-  { id: "block-note", label: "Block note", content: blockNoteTab },
+  { id: "editor", label: "Editor.js", content: editorTab },
+  { id: "block-note", label: "BlockNote", content: blockNoteTab },
   { id: "tabs", label: "Tabs", content: tabsTab },
   { id: "ag-grid", label: "AG Grid", content: agGridTab },
   {
@@ -1574,7 +1574,9 @@ function renderApp(): void {
               }}
             >
               <ui-option value="0.75">75%</ui-option>
+              <ui-option value="0.9">90%</ui-option>
               <ui-option value="1">100%</ui-option>
+              <ui-option value="1.1">110%</ui-option>
               <ui-option value="1.25">125%</ui-option>
               <ui-option value="1.5">150%</ui-option>
             </ui-select>

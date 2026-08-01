@@ -116,12 +116,26 @@ export const datagridStyles = [
 
     .header-row {
       flex: none;
-      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
       font-weight: var(--ui-font-weight-semibold);
     }
 
     .header-row .cell {
       position: relative;
+    }
+
+    /* Marks the header/filter (or header/body, when there's no filter row)
+       boundary — per leaf cell rather than one edge-to-edge border on
+       \`.header-row\` itself, so every cell (select/expander gutters, and
+       \`.actions-header-cell\` via its own \`.header-cell\` class, included)
+       draws its own segment and the line still reads as one continuous span
+       across the whole row, with no gaps over the "non-data" columns.
+       \`.group-header-cell\` (row 1, spanning several leaf columns) is
+       excluded: its own boundary with the leaf headers below it is the
+       inset \`::before\` line above, not this one. */
+    .header-row .select-cell,
+    .header-row .expander-cell,
+    .header-row .header-cell:not(.group-header-cell) {
+      border-bottom: var(--ui-border-thin) solid var(--ui-color-neutral-200);
     }
 
     /* Explicitly transparent (not the \`.thead\` neutral-50 tint some other
@@ -131,6 +145,19 @@ export const datagridStyles = [
     .header-row .expander-cell,
     .header-row .actions-header-cell {
       background: transparent;
+    }
+
+    /* Overrides \`.select-cell\`/\`.expander-cell\`'s own \`align-items: center\`
+       (further below) for the header only — bottom-aligned instead, flush
+       with the boundary just below (the filter row when shown, otherwise
+       the table body's own top edge), rather than centered in whatever
+       height the header happens to be (taller with a group header's own
+       row above, per \`grid-row: 2\` — see datagrid.ts). The body's own
+       per-row checkbox/chevron are unaffected, still centered in their own
+       single-line row. */
+    .header-row .select-cell,
+    .header-row .expander-cell {
+      align-items: flex-end;
     }
 
     .header-cell {
@@ -550,6 +577,37 @@ export const datagridStyles = [
        only reliably wins the tie by coming later in the file. */
     .row-details.selected:last-child {
       border-bottom: var(--ui-border-thin) solid color-mix(in srgb, var(--datagrid-row-accent) 45%, var(--ui-bg));
+    }
+
+    /* An expanded panel's own fill while selected/hovered — the exact same
+       mix (against --ui-bg, not the plain --ui-color-neutral-50 base above)
+       as .body-row's own selected/hovered background, so a selected or
+       hovered row and its own expanded panel read as one continuously-tinted
+       surface rather than two visibly different shades. Only .expanded
+       matters — a collapsed panel has no visible height for a background to
+       show through. */
+    .row-details.expanded.selected {
+      background: color-mix(in srgb, var(--datagrid-row-accent) 12%, var(--ui-bg));
+    }
+
+    /* Same tint, for a hovered row's own expanded panel — both directions,
+       same rationale as the border rules above: hovering the collapsed
+       \`.body-row\` reaches its trailing sibling panel directly; hovering the
+       panel itself is covered on its own. */
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row:hover
+      + .row-details.expanded,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .row-details.expanded:hover {
+      background: color-mix(in srgb, var(--datagrid-row-accent) 6%, var(--ui-bg));
+    }
+
+    /* Selected *and* hovered — same extra bump as .body-row.selected:hover. */
+    .row-details.expanded.selected:hover,
+    :host(:is([selection-mode="single"], [selection-mode="multi"]))
+      .body-row.selected:hover
+      + .row-details.expanded {
+      background: color-mix(in srgb, var(--datagrid-row-accent) 16%, var(--ui-bg));
     }
 
     .row-details-content {
