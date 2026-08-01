@@ -125,6 +125,9 @@ export class DatePicker extends LitElement {
     super.disconnectedCallback();
     this.#localeObserver?.();
     this.#localeObserver = undefined;
+    // Releases the core's own DOM attachments (the time columns'
+    // ResizeObserver); a later reconnect re-renders and re-attaches.
+    this.#picker.destroy();
   }
 
   /** Returns the view to the month containing today. */

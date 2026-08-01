@@ -79,16 +79,10 @@ export const datePickerStyles = [
       --cal-cell-selected-hover-background-color: var(--ui-color-primary-600);
       --cal-cell-selection-range-background-color: var(--ui-color-primary-100);
 
-      /* time sliders */
-      --cal-slider-thumb-background-color: var(--ui-bg);
-      --cal-slider-thumb-border-color: var(--ui-color-neutral-400);
-      --cal-slider-thumb-border-width: var(--ui-border-thin);
-      --cal-slider-thumb-border-radius: var(--ui-radius-sm);
-      --cal-slider-thumb-hover-background-color: var(--ui-bg);
-      --cal-slider-thumb-hover-border-color: var(--ui-color-neutral-700);
-      --cal-slider-thumb-focus-background-color: var(--ui-color-primary-600);
-      --cal-slider-thumb-focus-border-color: var(--ui-color-primary-600);
-      --cal-slider-track-color: var(--ui-color-neutral-400);
+      /* time selector — the hour/minute option columns read the cell and
+         button tokens above rather than having any of their own. The nine
+         --cal-slider-* tokens that used to be set here went with the range
+         sliders they styled (see the core's #renderTimeSelector). */
 
       /* buttons (the time view's "back to month" control) */
       --cal-button-background-color: var(--ui-color-primary-100);

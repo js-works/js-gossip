@@ -361,84 +361,148 @@ export default /*css*/ `
     background-color: var(--cal-button-active-background-color);
   }
 
-  /* time sliders */
+  /* time selector — hour/minute option columns, see #renderTimeSelector */
 
-  .cal-time-sliders {
-    display: grid;
-    grid-template-columns: min-content auto;
-    gap: 0.5em 1em;
+  .cal-time-selector {
+    display: flex;
+    /* center, so the separator and the AM/PM control line up with the
+       *selected* option rather than with the top of the columns — the
+       selection always sits at each column's vertical middle
+       (#scrollSelectedTimeIntoView keeps it there), and these two read as part
+       of the current value. --cal-time-label-offset undoes the height the
+       column captions add above the columns, which would otherwise push the
+       shared centre line up by half a caption. */
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.4em;
+    padding-top: 0.25em;
+
+    /* The colon and the AM/PM control line up with the *selected* option, not
+       with the top of the columns — the selection always sits at each column's
+       vertical middle (#scrollSelectedTimeIntoView keeps it there) and both
+       read as part of the current value. That alignment is structural: every
+       child of this row is a .cal-time-column-group with an equal-height
+       caption on top (empty for those two, see #renderTimeAside) and a
+       column-height box below it, so there is no offset to compute. */
+    --cal-time-column-height: 9.5em;
+    --cal-time-caption-height: 1.25em;
+    --cal-time-caption-gap: 0.3em;
   }
 
-  /* time slider */
+  .cal-time-column-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--cal-time-caption-gap);
+  }
 
-  .cal-time-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    outline: none;
-    height: 0.75px;
-    width: 100%;
-    margin: 1em 0;
+  .cal-time-column-label {
+    height: var(--cal-time-caption-height);
+    /* line-height pinned to the same value so the caption box is exactly the
+       declared height regardless of the font's own metrics — the offset below
+       is derived from it. */
+    line-height: var(--cal-time-caption-height);
+    text-align: center;
+    font-size: 0.8em;
+    opacity: 0.65;
+  }
 
-    background-image: linear-gradient(
-      var(--cal-slider-track-color),
-      var(--cal-slider-track-color)
+  .cal-time-column {
+    /* position: relative so the options' offsetTop is measured against this
+       box — that is what #scrollSelectedTimeIntoView does its centring maths
+       with. */
+    position: relative;
+    height: var(--cal-time-column-height);
+    overflow-y: auto;
+    /* Fades the clipped options at both ends rather than cutting them dead,
+       so it reads as a list that continues past the frame. */
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      black 1.6em,
+      black calc(100% - 1.6em),
+      transparent 100%
     );
-
-    background-position: 0 50%;
-    background-size: 100% 1px;
-    background-repeat: no-repeat;
+    scrollbar-width: none;
+    /* Half the column's height above and below the options, so the first and
+       last entry can still reach the vertical centre. */
+    padding: 4em 0;
     box-sizing: border-box;
+  }
+
+  .cal-time-column::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cal-time-option {
+    display: block;
+    padding: 0.25em 0.7em;
+    border-radius: var(--cal-button-border-radius);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
-    background-color: var(--cal-background-color);
+    user-select: none;
+    transition:
+      background-color 100ms ease,
+      color 100ms ease;
   }
 
-  .cal-time-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 1.25em;
-    width: 1.25em;
-    border-radius: var(--cal-slider-thumb-border-radius);
-    background-color: var(--cal-slider-thumb-background-color);
-    border: var(--cal-slider-thumb-border-width) solid
-      var(--cal-slider-thumb-border-color);
+  .cal-time-option:hover {
+    background-color: var(--cal-cell-hover-background-color);
+    color: var(--cal-cell-hover-color);
   }
 
-  .cal-time-slider::-moz-range-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 1.25em;
-    width: 1.25em;
-    border-radius: var(--cal-slider-thumb-border-radius);
-    background-color: var(--cal-slider-thumb-background-color);
-    border: var(--cal-slider-thumb-border-width) solid
-      var(--cal-slider-thumb-border-color);
+  .cal-time-option--selected,
+  .cal-time-option--selected:hover {
+    background-color: var(--cal-cell-selected-background-color);
+    color: var(--cal-cell-selected-color);
+    font-weight: 600;
   }
 
-  .cal-time-slider::-webkit-slider-thumb:hover {
-    background-color: var(--cal-slider-thumb-hover-background-color);
-    border-color: var(--cal-slider-thumb-hover-border-color);
+  /* The same height as a column, so centring within it lands on the column's
+     own centre — which is where the selected option is kept. */
+  .cal-time-separator,
+  .cal-time-meridiem {
+    height: var(--cal-time-column-height);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
 
-  .cal-time-slider::-moz-range-thumb:hover {
-    background-color: var(--cal-slider-thumb-hover-background-color);
-    border-color: var(--cal-slider-thumb-hover-border-color);
+  .cal-time-separator {
+    opacity: 0.5;
   }
 
-  .cal-time-slider:focus::-webkit-slider-thumb {
-    background-color: var(--cal-slider-thumb-focus-background-color);
-    border-color: var(--cal-slider-thumb-focus-border-color);
+  .cal-time-meridiem {
+    gap: 0.25em;
+    margin-inline-start: 0.5em;
   }
 
-  .cal-time-slider:focus::-moz-range-thumb {
-    background-color: var(--cal-slider-thumb-focus-background-color);
-    border-color: var(--cal-slider-thumb-focus-border-color);
+  .cal-time-meridiem-option {
+    padding: 0.25em 0.6em;
+    border: 1px solid var(--cal-border-color);
+    border-radius: var(--cal-button-border-radius);
+    text-align: center;
+    font-size: 0.85em;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 100ms ease,
+      color 100ms ease,
+      border-color 100ms ease;
   }
 
-  .cal-time-slider::-webkit-slider-runnable-track,
-  .cal-time-slider::-moz-range-track {
-    -webkit-appearance: none;
-    box-shadow: none;
-    border: none;
-    background-color: transparent;
+  .cal-time-meridiem-option:hover {
+    background-color: var(--cal-cell-hover-background-color);
+    color: var(--cal-cell-hover-color);
+  }
+
+  .cal-time-meridiem-option--selected,
+  .cal-time-meridiem-option--selected:hover {
+    background-color: var(--cal-cell-selected-background-color);
+    border-color: var(--cal-cell-selected-background-color);
+    color: var(--cal-cell-selected-color);
+    font-weight: 600;
   }
 `;

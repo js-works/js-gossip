@@ -47,7 +47,6 @@ type Time = Readonly<{ hours: number; minutes: number }>;
 
 const a = h.bind(null, 'a');
 const div = h.bind(null, 'div');
-const input = h.bind(null, 'input');
 
 // === exported classes ==============================================
 
@@ -55,6 +54,7 @@ class DatePicker {
   static styles = datePickerBaseStyles;
 
   #calendar: Calendar;
+  #getLocale: () => string;
   #getProps: () => DatePicker.Props;
   #requestUpdate: () => void;
   #onChange: () => void;
@@ -68,6 +68,10 @@ class DatePicker {
   #selectionMode: SelectionMode = 'date';
   #view: View = 'month';
   #sheet: Calendar.Sheet | null = null;
+  #lastTimeScrollKey = '';
+  #renderTarget?: HTMLElement;
+  #timeColumnResizeObserver?: ResizeObserver;
+  #observedTimeColumn?: Element;
 
   constructor(params: {
     calendar: Calendar;
@@ -78,6 +82,7 @@ class DatePicker {
     onChange: () => void;
   }) {
     this.#calendar = params.calendar;
+    this.#getLocale = params.getLocale;
     const today = this.#calendar.today();
     this.#year = today.year;
     this.#month = today.month;
@@ -87,7 +92,22 @@ class DatePicker {
   }
 
   render(target: HTMLElement) {
+    this.#renderTarget = target;
     render(this.#renderDatePicker(), target);
+    this.#scrollSelectedTimeIntoView(target);
+    this.#observeTimeColumnResize(target);
+  }
+
+  /**
+   * Releases what `render` attached to the DOM — currently the time columns'
+   * ResizeObserver. Call it when the rendered output is discarded for good;
+   * the picker is reusable afterwards (a further `render` re-attaches).
+   */
+  destroy() {
+    this.#timeColumnResizeObserver?.disconnect();
+    this.#timeColumnResizeObserver = undefined;
+    this.#observedTimeColumn = undefined;
+    this.#renderTarget = undefined;
   }
 
   renderToString(): string {
@@ -140,11 +160,51 @@ class DatePicker {
   setValue(value: string) {
     this.#selection.clear();
 
-    if (value) {
-      // TODO!!!!!!!!!!!!!!!!!!
-      value.split(',').forEach((item) => {
-        this.#selection.add(item);
+    if (!value) {
+      this.#requestUpdate();
+      return;
+    }
+
+    const { kind } = selectionModeMeta[this.#selectionMode];
+    const items = value.split(',');
+
+    // Routed by kind, because a time doesn't live in #selection: the clock
+    // half of the value is held in #time1/#time2 and only reassembled by
+    // getValue. Restoring therefore has to split the two apart again.
+    //
+    // Every item used to go into #selection verbatim, which meant a "14:30"
+    // landed where #renderTime expected a date key and its own date
+    // formatting threw RangeError on the way past ("Invalid time value") —
+    // reachable from ui-date-field, which hands its value back to the picker
+    // whenever the popup reopens.
+    if (kind === 'time') {
+      items.slice(0, 2).forEach((item, index) => {
+        const time = parseHoursMinutes(item);
+
+        if (time) {
+          this.#setTime(index === 0 ? 'time1' : 'time2', time.hours, time.minutes);
+        }
       });
+    } else if (kind === 'calendar+time') {
+      items.slice(0, 2).forEach((item, index) => {
+        const [datePart, timePart] = item.split('T');
+
+        if (datePart) {
+          this.#selection.add(datePart);
+        }
+
+        const time = timePart ? parseHoursMinutes(timePart) : null;
+
+        if (time) {
+          this.#setTime(index === 0 ? 'time1' : 'time2', time.hours, time.minutes);
+        }
+      });
+    } else {
+      // Still unvalidated (the calendar kinds' own keys are several different
+      // shapes — a day, a week, a quarter — and there's no parser for them
+      // yet), so an unparseable key here is simply carried until something
+      // downstream ignores it. That part of the original TODO stands.
+      items.forEach((item) => this.#selection.add(item));
     }
 
     this.#requestUpdate();
@@ -359,7 +419,7 @@ class DatePicker {
         class: 'cal-base cal-view--' + this.#view
       },
       this.#renderTimeTabs(this.#view === 'time2' ? 'time2' : 'time1', props),
-      this.#renderTimeSliders(this.#view == 'time2' ? 'time2' : 'time1', props),
+      this.#renderTimeSelector(this.#view == 'time2' ? 'time2' : 'time1'),
 
       kind !== 'calendar+time'
         ? null
@@ -588,12 +648,19 @@ class DatePicker {
     const { kind, selectType } = selectionModeMeta[this.#selectionMode];
     const time = this.#getTime(type);
 
-    const items = [...this.#selection].sort().map((it) =>
-      it
-        .split('T')[0]
-        .split('-')
-        .map((s) => parseInt(s, 10))
-    );
+    // Only well-formed year-month-day keys, so a malformed entry yields no
+    // header instead of reaching formatDate and throwing on an Invalid Date.
+    const items = [...this.#selection]
+      .sort()
+      .map((it) =>
+        it
+          .split('T')[0]
+          .split('-')
+          .map((part) => parseInt(part, 10))
+      )
+      .filter(
+        (parts) => parts.length === 3 && parts.every((n) => Number.isFinite(n))
+      );
 
     const formattedDate =
       type === 'time1' && items.length > 0
@@ -667,50 +734,290 @@ class DatePicker {
     );
   }
 
-  // --- time sliders ------------------------------------------------
+  // --- time selector -----------------------------------------------
 
-  #renderTimeSliders(type: 'time1' | 'time2', _props: DatePicker.Props) {
+  // Two scrollable option columns (hour, minute) plus an AM/PM control where
+  // the locale uses a 12-hour clock — replacing the pair of range sliders this
+  // used to be. Sliders were the wrong control for the job: dragging a 0..23
+  // track to land on one hour is imprecise, the value only became visible in
+  // the header above, and the minute slider was stepped to 5 so two thirds of
+  // the minutes in an hour simply weren't reachable. Every minute is
+  // selectable here, and the current value is a highlighted option you can
+  // see in place.
+  //
+  // Positionally diffed like everything else in this vdom (no keys), so the
+  // option counts must stay constant for a given mode — they do: 12 or 24
+  // hours, always 60 minutes. Patching a click therefore only rewrites the two
+  // affected class attributes.
+  #renderTimeSelector(type: 'time1' | 'time2') {
     const time = this.#getTime(type);
+    const twelveHour = uses12HourClock(this.#getLocale());
+
+    const setHours = (hours: number) => {
+      this.#setTime(type, hours, null);
+      this.#requestUpdate();
+      this.#onChange?.();
+    };
+
+    // In 12-hour mode the options read 12, 1, 2 … 11 and carry the active
+    // meridiem, so clicking "3" in the afternoon means 15:00, not 03:00.
+    const hourOptions = twelveHour
+      ? Array.from({ length: 12 }, (_, i) => {
+          const clockHour = i === 0 ? 12 : i;
+          return {
+            label: String(clockHour),
+            selected: time.hours % 12 === i,
+            onSelect: () => setHours(time.hours < 12 ? i : i + 12)
+          };
+        })
+      : Array.from({ length: 24 }, (_, hours) => ({
+          label: twoDigits(hours),
+          selected: time.hours === hours,
+          onSelect: () => setHours(hours)
+        }));
+
+    const minuteOptions = Array.from({ length: 60 }, (_, minutes) => ({
+      label: twoDigits(minutes),
+      selected: time.minutes === minutes,
+      onSelect: () => {
+        this.#setTime(type, null, minutes);
+        this.#requestUpdate();
+        this.#onChange?.();
+      }
+    }));
 
     return div(
-      null,
+      { class: 'cal-time-selector' },
+      this.#renderTimeColumn('Hour', hourOptions),
+      // The colon and the AM/PM control are wrapped in the same
+      // group-plus-caption shape as a column, with the caption left empty. It
+      // isn't decoration: it is what makes them line up with the *selected*
+      // option rather than with the top of the columns, structurally, with no
+      // offset arithmetic to get wrong. (An earlier version did compute the
+      // offset from a caption-height token — and got it wrong by exactly the
+      // caption's own font-size, since `em` inside the 0.8em caption resolves
+      // differently than it does beside it.)
+      this.#renderTimeAside(div({ class: 'cal-time-separator' }, ':')),
+      this.#renderTimeColumn('Minute', minuteOptions),
+      !twelveHour
+        ? null
+        : this.#renderTimeAside(
+            div(
+            { class: 'cal-time-meridiem' },
+            ...(['AM', 'PM'] as const).map((label, index) =>
+              a(
+                {
+                  class: classMap({
+                    'cal-time-meridiem-option': true,
+                    'cal-time-meridiem-option--selected':
+                      (time.hours >= 12 ? 1 : 0) === index
+                  }),
+                  role: 'option',
+                  'aria-selected': (time.hours >= 12 ? 1 : 0) === index,
+                  onclick: () => setHours((time.hours % 12) + index * 12)
+                },
+                label
+              )
+            )
+          )
+          )
+    );
+  }
+
+  // Wraps a non-column child of the time selector so it shares the columns'
+  // group structure — see the note at the call site.
+  #renderTimeAside(content: VNode) {
+    return div(
+      { class: 'cal-time-column-group' },
+      div({ class: 'cal-time-column-label', 'aria-hidden': 'true' }),
+      content
+    );
+  }
+
+  #renderTimeColumn(
+    label: string,
+    options: { label: string; selected: boolean; onSelect: () => void }[]
+  ) {
+    return div(
+      { class: 'cal-time-column-group' },
+      div({ class: 'cal-time-column-label' }, label),
       div(
-        { class: 'cal-time-sliders' },
-        div({ class: 'cal-time-slider-headline' }, 'Hours'),
-        input({
-          type: 'range',
-          class: 'cal-time-slider',
-          value: time.hours,
-          min: 0,
-          max: 23,
-          oninput: (ev: Event) => {
-            const hours = (ev.target as HTMLInputElement).valueAsNumber;
-            this.#setTime(type, hours, null);
-            this.#requestUpdate();
-            this.#onChange?.();
-          }
-        }),
-        div({ class: 'cal-time-slider-headline' }, 'Minutes'),
-        input({
-          type: 'range',
-          class: 'cal-time-slider',
-          value: time.minutes,
-          min: 0,
-          max: 55,
-          step: 5,
-          oninput: (ev: Event) => {
-            const minutes = (ev.target as HTMLInputElement).valueAsNumber;
-            this.#setTime(type, null, minutes);
-            this.#requestUpdate();
-            this.#onChange?.();
-          }
-        })
+        // The scroll container. Kept scrollable rather than showing all 60
+        // minutes at once so the time view stays roughly as tall as the month
+        // sheet and the popup doesn't resize when switching between them;
+        // #scrollSelectedTimeIntoView centres the current value in it.
+        { class: 'cal-time-column', role: 'listbox', 'aria-label': label },
+        ...options.map((option) =>
+          a(
+            {
+              class: classMap({
+                'cal-time-option': true,
+                'cal-time-option--selected': option.selected
+              }),
+              role: 'option',
+              'aria-selected': option.selected,
+              onclick: option.onSelect
+            },
+            option.label
+          )
+        )
       )
     );
+  }
+
+  // A resize moves where a column's centre *is* without changing what's
+  // selected, so it can't be caught by re-rendering — nothing re-renders. The
+  // case that reaches this in practice is a consumer changing --ui-scale or an
+  // inherited font-size while a time view is open: every em-based measurement
+  // here rescales, and the scroll offset that centred the old layout no longer
+  // centres the new one.
+  //
+  // Observed once per set of columns rather than on every render: the vdom
+  // patches these elements in place, so while the view stays a time view the
+  // same nodes persist and re-observing would only re-fire the callback for
+  // nothing. Switching away removes them, which disconnects.
+  #observeTimeColumnResize(target: HTMLElement) {
+    // Absent in a non-DOM runtime; renderToString never gets here anyway.
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const columns = target.querySelectorAll('.cal-time-column');
+
+    if (columns[0] === this.#observedTimeColumn) {
+      return;
+    }
+
+    this.#timeColumnResizeObserver?.disconnect();
+    this.#observedTimeColumn = columns[0];
+
+    if (!columns.length) {
+      return;
+    }
+
+    this.#timeColumnResizeObserver ??= new ResizeObserver(() => {
+      // Drop the cached key, or the re-centring below would decide the value
+      // hadn't moved and skip.
+      this.#lastTimeScrollKey = '';
+
+      if (this.#renderTarget) {
+        this.#scrollSelectedTimeIntoView(this.#renderTarget);
+      }
+    });
+
+    for (const column of columns) {
+      this.#timeColumnResizeObserver.observe(column);
+    }
+  }
+
+  // Centres the selected option in each column after a patch. Runs from
+  // render() rather than from the click handlers so it also covers the value
+  // being set from outside (setValue) and the view being switched to.
+  //
+  // Guarded by what it last scrolled for, so a user free-scrolling a column
+  // without picking anything isn't yanked back to the selection on the next
+  // unrelated re-render. Skipped entirely while a column has no layout
+  // (clientHeight 0 — the picker sits inside a closed popover in
+  // ui-date-field), leaving #lastTimeScrollKey unset so the next render, once
+  // it is visible, does the scrolling.
+  #scrollSelectedTimeIntoView(target: HTMLElement) {
+    if (this.#view !== 'time1' && this.#view !== 'time2') {
+      this.#lastTimeScrollKey = '';
+      return;
+    }
+
+    const columns = target.querySelectorAll<HTMLElement>('.cal-time-column');
+
+    if (!columns.length) {
+      this.#lastTimeScrollKey = '';
+      return;
+    }
+
+    // The column's own height is part of the key, not just the value: a
+    // relayout moves where the centre *is* without changing what's selected, so
+    // a value-only key would leave the selection stranded at its previous
+    // offset. That happens for a change of --ui-scale or inherited font-size,
+    // and for the popover in ui-date-field going from hidden (height 0) to
+    // shown.
+    const time = this.#getTime(this.#view);
+    const key = `${this.#view}:${time.hours}:${time.minutes}:${columns[0].clientHeight}`;
+
+    if (key === this.#lastTimeScrollKey) {
+      return;
+    }
+
+    let scrolled = false;
+
+    for (const column of columns) {
+      const selected = column.querySelector<HTMLElement>(
+        '.cal-time-option--selected'
+      );
+
+      if (!selected || !column.clientHeight) {
+        continue;
+      }
+
+      column.scrollTop =
+        selected.offsetTop - (column.clientHeight - selected.offsetHeight) / 2;
+
+      scrolled = true;
+    }
+
+    if (scrolled) {
+      this.#lastTimeScrollKey = key;
+    }
   }
 }
 
 // === local helpers =================================================
+
+function parseHoursMinutes(
+  text: string
+): { hours: number; minutes: number } | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(text.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  return hours > 23 || minutes > 59 ? null : { hours, minutes };
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+// Whether the locale writes times on a 12-hour clock, and so whether the hour
+// column should read 12,1..11 with an AM/PM control beside it or 00..23 on its
+// own. Read off Intl's own resolution rather than guessed from the region, so
+// an explicit override in the tag (e.g. "en-GB-u-hc-h12") is honoured.
+// Memoized: this is consulted on every render of the time view.
+const twelveHourByLocale = new Map<string, boolean>();
+
+function uses12HourClock(locale: string): boolean {
+  let result = twelveHourByLocale.get(locale);
+
+  if (result === undefined) {
+    try {
+      const { hourCycle } = new Intl.DateTimeFormat(locale, {
+        hour: 'numeric'
+      }).resolvedOptions();
+
+      result = hourCycle === 'h11' || hourCycle === 'h12';
+    } catch {
+      // An invalid language tag — fall back to the 24-hour layout, which needs
+      // no meridiem control and so can't render a half-broken one.
+      result = false;
+    }
+
+    twelveHourByLocale.set(locale, result);
+  }
+
+  return result;
+}
 
 function getSelectionKey(
   item: Calendar.Item,
