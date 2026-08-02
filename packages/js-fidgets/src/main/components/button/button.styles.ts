@@ -175,12 +175,24 @@ export const buttonStyles = [
       color: var(--btn-600);
     }
 
-    /* A neutral gray, not a tone-tinted --btn-50 — an outlined button's
-       hover is meant to read as "this is now interactive", the same
-       feedback regardless of tone, matching the plain neutral hover used
-       elsewhere (e.g. ui-tab, ui-select's option rows). */
-    :host([variant="outlined"]) .button:hover {
+    /* Neutral outlined: a plain gray, matching the neutral hover used
+       elsewhere (ui-tab, ui-select's option rows). Neutral has no tone of its
+       own to tint with, so this is the one that can't follow the rule below.
+
+       Two selectors because tone is not reflected while it still holds its
+       "neutral" default: an untouched button carries no tone attribute at all,
+       so [tone="neutral"] alone would miss the common case. */
+    :host([variant="outlined"]:not([tone])) .button:hover,
+    :host([variant="outlined"][tone="neutral"]) .button:hover {
       background: var(--ui-color-neutral-100);
+    }
+
+    /* Toned outlined: the tone's own lightest tint, not the gray above — a
+       gray wash over a colored outline fights the tone instead of supporting
+       it. --btn-50 for hover and --btn-100 for the press below: the two
+       lightest rungs of the ramp, straight from the tokens. */
+    :host([variant="outlined"][tone]:not([tone="neutral"])) .button:hover {
+      background: var(--btn-50);
     }
 
     /* An explicit tinted press state — relying only on the generic brightness
@@ -188,6 +200,16 @@ export const buttonStyles = [
        visible effect, leaving whatever gray default the browser/OS supplies
        (e.g. a touch tap-highlight) as the only feedback. */
     :host([variant="outlined"]) .button:active:not(:disabled) {
+      background: var(--btn-100);
+    }
+
+    /* Same --btn-100 as the rule above, restated only to outrank the toned
+       hover: that selector is (0,6,0) against this one's (0,7,0), and the
+       generic press rule is only (0,5,0). Without this, a press — which is
+       also a hover — would keep the lighter hover fill and pressed would look
+       identical to hovered. */
+    :host([variant="outlined"][tone]:not([tone="neutral"]))
+      .button:active:not(:disabled) {
       background: var(--btn-100);
     }
 

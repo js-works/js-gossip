@@ -745,19 +745,31 @@ function buttonsTab() {
       </p>
       <div class="row">
         <ui-menu-button
-          appearance="primary"
+          tone="primary"
           .items=${SAMPLE_MENU_ITEMS}
           @menu-select=${onSelect}
         >
           Actions
         </ui-menu-button>
-        <ui-menu-button variant="outlined" .items=${SAMPLE_MENU_ITEMS} @menu-select=${onSelect}>
+        <ui-menu-button
+          tone="neutral"
+          variant="outlined"
+          .items=${SAMPLE_MENU_ITEMS}
+          @menu-select=${onSelect}
+        >
           Outlined
         </ui-menu-button>
-        <ui-menu-button variant="subtle" .items=${SAMPLE_MENU_ITEMS} @menu-select=${onSelect}>
+        <ui-menu-button
+          tone="primary"
+          variant="subtle"
+          .items=${SAMPLE_MENU_ITEMS}
+          @menu-select=${onSelect}
+        >
           Subtle
         </ui-menu-button>
-        <ui-menu-button disabled .items=${SAMPLE_MENU_ITEMS}>Disabled</ui-menu-button>
+        <ui-menu-button tone="primary" disabled .items=${SAMPLE_MENU_ITEMS}>
+          Disabled
+        </ui-menu-button>
       </div>
       <div class="row">
         <ui-menu-button size="small" .items=${SAMPLE_MENU_ITEMS} @menu-select=${onSelect}>
@@ -781,7 +793,7 @@ function buttonsTab() {
       </p>
       <div class="row">
         <ui-split-button
-          appearance="primary"
+          tone="primary"
           .items=${SAMPLE_MENU_ITEMS}
           @click=${() => console.log("Save clicked")}
           @menu-select=${onSelect}
@@ -789,7 +801,7 @@ function buttonsTab() {
           Save
         </ui-split-button>
         <ui-split-button
-          appearance="danger"
+          tone="danger"
           variant="outlined"
           menu-label="More delete options"
           .items=${SAMPLE_MENU_ITEMS}
@@ -798,7 +810,9 @@ function buttonsTab() {
         >
           Delete
         </ui-split-button>
-        <ui-split-button disabled .items=${SAMPLE_MENU_ITEMS}>Disabled</ui-split-button>
+        <ui-split-button tone="primary" disabled .items=${SAMPLE_MENU_ITEMS}>
+          Disabled
+        </ui-split-button>
       </div>
       <div class="row">
         <ui-split-button size="small" .items=${SAMPLE_MENU_ITEMS} @menu-select=${onSelect}>
