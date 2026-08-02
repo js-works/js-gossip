@@ -542,6 +542,13 @@ export default /*css*/ `
     justify-content: flex-end;
   }
 
+  /* See #renderTimeSelector: set on the renders where the wheels jump instead
+     of gliding, so the selection lands fully painted rather than fading up
+     underneath a wheel that has already arrived. */
+  .cal-time-selector--instant .cal-time-option {
+    transition: none;
+  }
+
   .cal-time-column-group {
     display: flex;
     flex-direction: column;
@@ -586,8 +593,24 @@ export default /*css*/ `
     box-sizing: border-box;
   }
 
+  /* A looping column needs no end padding: there is always another copy above
+     and below, so the first and last value can reach the centre on their own. */
+  .cal-time-column--looping {
+    padding: 0;
+  }
+
   .cal-time-column::-webkit-scrollbar {
     display: none;
+  }
+
+  /* The column is what takes focus (see #renderTimeColumn), so the ring goes
+     here rather than on an option. Width and offset are literals: the core has
+     no token for them and they're the same 2px/1px the rest of this library
+     uses, but the colour is themeable because it has to sit against whatever
+     surface the picker is dropped onto. */
+  .cal-time-column:focus-visible {
+    outline: 2px solid var(--cal-focus-ring-color);
+    outline-offset: 1px;
   }
 
   .cal-time-option {

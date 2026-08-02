@@ -72,6 +72,9 @@ export class DateField extends LitElement {
   // never reaches the form or fires `change`.
   #draft = "";
 
+  // Whether the <ui-date-picker> is currently rendered at all — see render().
+  #popupOpen = false;
+
   @property()
   accessor name = "";
 
@@ -237,12 +240,17 @@ export class DateField extends LitElement {
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
 
-  #openPopup() {
+  async #openPopup() {
     if (this.disabled || this.readonly) return;
     // Start each session from the committed value, so a previous Cancel can't
     // leak its abandoned draft into the next one.
     this.#draft = this.value;
+    this.#popupOpen = true;
     this.requestUpdate();
+    // The picker is created by this update (render() below), so the popover
+    // can only be shown once it has landed — otherwise the card would open
+    // empty and grow a frame later.
+    await this.updateComplete;
     this.#popup?.showPopover();
   }
 
@@ -251,11 +259,43 @@ export class DateField extends LitElement {
     this.#input?.focus();
   }
 
+  // Whether the popup was open when the pointer went down on a trigger — see
+  // #onTriggerPointerDown.
+  #wasOpenAtPointerDown = false;
+
+  // A popover="auto" light-dismisses on *pointerup*, which is before the click
+  // that follows it. So by the time #onTriggerClick runs, clicking the trigger
+  // to close has already closed the popup — and a toggle that reads
+  // `:popover-open` there sees `false` and dutifully re-opens what the user
+  // just asked to dismiss. (Traced: pointerdown open=true, pointerup
+  // open=false, click open=false. The intervening close doesn't even surface
+  // as a `toggle` event: the reopen lands before the queued event dispatches,
+  // and the two coalesce.)
+  //
+  // Sampling at pointerdown is the state the user was actually looking at when
+  // they pressed.
+  #onTriggerPointerDown = () => {
+    this.#wasOpenAtPointerDown = this.#popup?.matches(":popover-open") ?? false;
+  };
+
+  // Dragging off the trigger means no click will arrive to consume the sample,
+  // so drop it — otherwise it sits stale and eats the next *keyboard*
+  // activation, which has no pointerdown of its own to refresh it.
+  #onTriggerPointerLeave = () => {
+    this.#wasOpenAtPointerDown = false;
+  };
+
   // ui-button isn't a native button, so a declarative `popovertarget` on it
   // wouldn't do anything — the browser only honors that attribute on the form
   // elements it's defined for. Toggled by hand instead.
   #onTriggerClick = () => {
-    if (this.#popup?.matches(":popover-open")) {
+    // `:popover-open` still carries the keyboard case, where nothing was
+    // light-dismissed and no pointerdown ever ran.
+    const open = this.#wasOpenAtPointerDown || this.#popup?.matches(":popover-open");
+
+    this.#wasOpenAtPointerDown = false;
+
+    if (open) {
       this.#closePopup();
     } else {
       this.#openPopup();
@@ -286,13 +326,18 @@ export class DateField extends LitElement {
     this.#closePopup();
   };
 
-  // Light-dismiss (click outside, Escape) bypasses the footer buttons
-  // entirely, so treat it as Cancel — otherwise the abandoned draft would sit
-  // there waiting to be picked up by the next open.
+  // Every way the popup can close funnels through here — the footer buttons,
+  // light-dismiss (click outside, Escape), and the trigger toggle — which is
+  // why the teardown lives here rather than in #closePopup.
+  //
+  // Light-dismiss in particular bypasses the footer entirely, so it's treated
+  // as Cancel: the abandoned draft is dropped instead of sitting there waiting
+  // to be picked up by the next open.
   #onPopupToggle = (event: Event) => {
-    if ((event as ToggleEvent).newState === "closed") {
-      this.#draft = this.value;
-    }
+    if ((event as ToggleEvent).newState !== "closed") return;
+    this.#draft = this.value;
+    this.#popupOpen = false;
+    this.requestUpdate();
   };
 
   render() {
@@ -310,6 +355,8 @@ export class DateField extends LitElement {
           spellcheck="false"
           ?disabled=${this.disabled}
           ?required=${this.required}
+          @pointerdown=${this.#onTriggerPointerDown}
+          @pointerleave=${this.#onTriggerPointerLeave}
           @click=${this.#onTriggerClick}
         />
         <ui-button
@@ -317,6 +364,8 @@ export class DateField extends LitElement {
           size=${this.size}
           aria-label="Open picker"
           ?disabled=${this.disabled || this.readonly}
+          @pointerdown=${this.#onTriggerPointerDown}
+          @pointerleave=${this.#onTriggerPointerLeave}
           @click=${this.#onTriggerClick}
         >
           ${this.#icon}
@@ -329,21 +378,41 @@ export class DateField extends LitElement {
         @toggle=${this.#onPopupToggle}
       >
         <div class="popup-card">
-          <ui-date-picker
-            .value=${this.#draft}
-            selection-mode=${this.selectionMode}
-            calendar-size=${this.calendarSize}
-            ?show-week-numbers=${this.showWeekNumbers}
-            ?accentuate-header=${this.accentuateHeader}
-            ?highlight-current=${this.highlightCurrent}
-            ?highlight-weekends=${this.highlightWeekends}
-            ?disable-weekends=${this.disableWeekends}
-            ?enable-century-view=${this.enableCenturyView}
-            minute-step=${this.minuteStep}
-            .minDate=${parseIsoDay(this.min ?? "")}
-            .maxDate=${parseIsoDay(this.max ?? "")}
-            @change=${this.#onPickerChange}
-          ></ui-date-picker>
+          <!--
+            Rendered only while the popup is open, so closing it destroys the
+            picker and every scrap of state it holds: which view you drilled
+            into (year/decade/century, the time sheets), which month is on
+            screen, a half-picked range, the hovered cell, the time wheels'
+            scroll positions. Each session therefore starts from the committed
+            value and nothing else — reopening can't drop you back into the
+            decade view you happened to leave behind.
+
+            A reset method on the picker would have to enumerate that state and
+            would go stale the moment the core grows more; not existing is the
+            only version that can't miss a field. The element's own
+            disconnectedCallback destroys the core (releasing the time columns'
+            ResizeObserver), and building a fresh one is cheap — a month sheet
+            costs ~0.2ms.
+          -->
+          ${this.#popupOpen
+            ? html`
+                <ui-date-picker
+                  .value=${this.#draft}
+                  selection-mode=${this.selectionMode}
+                  calendar-size=${this.calendarSize}
+                  ?show-week-numbers=${this.showWeekNumbers}
+                  ?accentuate-header=${this.accentuateHeader}
+                  ?highlight-current=${this.highlightCurrent}
+                  ?highlight-weekends=${this.highlightWeekends}
+                  ?disable-weekends=${this.disableWeekends}
+                  ?enable-century-view=${this.enableCenturyView}
+                  minute-step=${this.minuteStep}
+                  .minDate=${parseIsoDay(this.min ?? "")}
+                  .maxDate=${parseIsoDay(this.max ?? "")}
+                  @change=${this.#onPickerChange}
+                ></ui-date-picker>
+              `
+            : null}
           <div class="popup-footer">
             <ui-button variant="subtle" @click=${this.#onClearClick}>
               Clear

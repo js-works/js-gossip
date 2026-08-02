@@ -13,9 +13,10 @@
 // once filled, a formatted value.
 //
 // What's left is the one thing worth signalling — what kind of popup opens: a
-// calendar grid, or time sliders.
+// calendar grid, or the time wheels.
 //
-// All three are sized in em, not px, so they scale with the field's font-size.
+// All three are Bootstrap Icons glyphs, filled, sized in em rather than px so
+// they scale with the field's font-size.
 
 import { html } from "lit";
 import type { TemplateResult } from "lit";
@@ -36,56 +37,42 @@ export const calendarIcon = html`
   </svg>
 `;
 
-// Stroked rather than filled, unlike every other icon here — and drawn fresh
-// rather than taken from Bootstrap Icons, whose "clock" was the previous glyph
-// (and the only clock in either the upstream icon set or the picker core: all
-// three copies were the same paths).
-//
-// The reason is legibility at 16px. Bootstrap's clock draws its ring as a
-// filled band one viewBox unit thick and its hands thinner still, which at
-// 16px is sub-pixel and greys out into an indistinct blob. A stroke gives
-// direct control of that weight: 1.4 units renders as a crisp ~1.4px ring,
-// which sits closest to the calendar glyph above without out-weighing it.
-// (Compared 1.1 / 1.4 / 1.7 side by side at 16/20/24px before settling here;
-// 1.1 was still too faint, 1.7 noticeably heavier than the calendar.)
-const CLOCK_STROKE = 1.4;
-// r + stroke/2 = 7.45, so the glyph still sits inside the 16x16 viewBox and,
-// unlike the calendar, needs no overflow escape.
-const CLOCK_RADIUS = 6.75;
-
+/**
+ * Bootstrap Icons' "clock". Filled, like `calendarIcon` and `timeRangeIcon`, so
+ * all three glyphs share one drawing style — and the same dial and hands as
+ * `timeRangeIcon`, so the two clocks read as a pair whose only difference is
+ * the dotted stretch that marks a span.
+ *
+ * Supplied as finished artwork; left byte-for-byte as given.
+ *
+ * overflow="visible" for the same reason as `calendarIcon`: the outer circle is
+ * r=8 about (8,8), so it touches all four edges of the 16x16 viewBox, and the
+ * UA's default style clips a root <svg> to its viewBox at small rendered sizes.
+ */
 export const clockIcon = html`
-  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 16 16">
-    <g
-      fill="none"
-      stroke="currentColor"
-      stroke-width=${CLOCK_STROKE}
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <circle cx="8" cy="8" r=${CLOCK_RADIUS} />
-      <path d="M8 4.3V8l2.9 1.9" />
-    </g>
+  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16" overflow="visible">
+    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
   </svg>
 `;
 
 /**
- * The same clock face with a filled quadrant instead of hands — a swept span
- * rather than an instant. Deliberately the same ring weight as `clockIcon` so
- * the pair reads as one family; a filled wedge is one of the few interior
- * details that does still register at 16px, because it's a solid mass rather
- * than a thin line.
+ * A clock whose dial is part solid, part dotted — the dotted stretch reading as
+ * the span between two times rather than one instant. Filled paths, like
+ * `calendarIcon`, so the two of them share a drawing style.
+ *
+ * Supplied as finished artwork; the three paths are the dotted arc, the solid
+ * remainder of the dial, and the hands. Left byte-for-byte as given.
+ *
+ * overflow="visible" for the same reason as `calendarIcon`: the dotted arc runs
+ * to the very edge of the 16x16 viewBox (there's a point at y=0), and the UA's
+ * default style clips a root <svg> to its viewBox at small rendered sizes.
  */
 export const timeRangeIcon = html`
-  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 16 16">
-    <circle
-      cx="8"
-      cy="8"
-      r=${CLOCK_RADIUS}
-      fill="none"
-      stroke="currentColor"
-      stroke-width=${CLOCK_STROKE}
-    />
-    <path d="M8 8V2.2A5.8 5.8 0 0 1 13.8 8z" fill="currentColor" />
+  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16" overflow="visible">
+    <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/>
+    <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/>
+    <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/>
   </svg>
 `;
 

@@ -75,6 +75,9 @@ export const datePickerStyles = [
          *resting* header background, which is a bug the core no longer has. */
       --cal-nav-color: var(--ui-color-neutral-600);
 
+      /* the keyboard focus ring on a time column */
+      --cal-focus-ring-color: var(--ui-color-primary-500);
+
       /* grid cells */
       --cal-cell-hover-color: var(--ui-text);
       --cal-cell-hover-background-color: var(--ui-color-primary-100);

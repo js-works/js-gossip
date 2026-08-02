@@ -63,6 +63,18 @@ type SelectionBounds = Readonly<{
 
 // === local VDOM factories ==========================================
 
+// A wheel loops once it has more than three values — below that the copies
+// would be close enough together to show the same value twice at once. Three
+// copies is enough for the seam to stay off-screen: the scroll sits in the
+// middle one and jumps a whole copy-length when it drifts out, which is
+// invisible because every copy is identical.
+const LOOP_MIN_OPTIONS = 4;
+const LOOP_COPIES = 3;
+
+// How long after a programmatic scroll the loop-jump stays out of the way, so
+// it can't teleport the column mid-animation.
+const AUTO_SCROLL_SETTLE_MS = 900;
+
 const a = h.bind(null, 'a');
 const div = h.bind(null, 'div');
 
@@ -99,7 +111,14 @@ class DatePicker {
   #hoveredIndex: number | null = null;
   #lastTimeValueKey = '';
   #lastTimeLayoutKey = '';
+  // Which time sheet the wheels were last positioned for. Tracked apart from
+  // the value key so switching From:/To: can be told from editing the time
+  // that's already showing — see #scrollSelectedTimeIntoView.
+  #lastTimeView = '';
   #renderTarget?: HTMLElement;
+  // Columns currently being scrolled by us rather than by the user, with the
+  // time the animation should be done by.
+  #autoScrollUntil = new WeakMap<Element, number>();
   #timeColumnResizeObserver?: ResizeObserver;
   #observedTimeColumn?: Element;
 
@@ -507,7 +526,7 @@ class DatePicker {
             // the fonts this library specifies, so it rendered as a tofu box.
             // It was also a *rightwards* arrow on a "back" link.
             arrowLeftIcon,
-            'Back to month'
+            'Back to calendar'
           )
     );
   }
@@ -1041,16 +1060,26 @@ class DatePicker {
         // they stay centred.
         class: classMap({
           'cal-time-selector': true,
-          [`cal-time-selector--${type}`]: twoTabs
+          [`cal-time-selector--${type}`]: twoTabs,
+          // Kills the options' colour transition for exactly the renders where
+          // the wheels jump rather than glide — the first paint of a sheet, and
+          // switching from:/to:. Without it the wheels arrive instantly but the
+          // selected pill still fades up over its 100ms, so the switch is only
+          // *almost* not animated.
+          //
+          // #lastTimeView is the same flag #scrollSelectedTimeIntoView decides
+          // the scroll behaviour from, read here before that runs (it's updated
+          // after the patch), so the two can't disagree about which this is.
+          'cal-time-selector--instant': this.#lastTimeView !== this.#view
         })
       },
       div(
       { class: 'cal-time-wheels' },
-      this.#renderTimeColumn('Hour', 'Hour', hourOptions),
+      this.#renderTimeColumn('hour', 'Hour', 'Hour', hourOptions),
       // The colon is the one child that isn't a column, so it borrows the
       // columns' group shape to line up with them — see #renderTimeAside.
       this.#renderTimeAside(div({ class: 'cal-time-separator' }, ':')),
-      this.#renderTimeColumn('Minute', 'Minute', minuteOptions),
+      this.#renderTimeColumn('minute', 'Minute', 'Minute', minuteOptions),
       // Deliberately a third column rather than the pair of buttons it started
       // as: two options is few enough that buttons were tempting, but they put
       // a second visual language (bordered chips) next to two borderless
@@ -1062,7 +1091,7 @@ class DatePicker {
       // three columns level.
       !twelveHour
         ? null
-        : this.#renderTimeColumn('', 'AM/PM', meridiemOptions)
+        : this.#renderTimeColumn('meridiem', '', 'AM/PM', meridiemOptions)
       )
     );
   }
@@ -1078,10 +1107,25 @@ class DatePicker {
   }
 
   #renderTimeColumn(
+    name: string,
     caption: string,
     ariaLabel: string,
     options: { label: string; selected: boolean; onSelect: () => void }[]
   ) {
+    const selectedIndex = Math.max(
+      0,
+      options.findIndex((option) => option.selected)
+    );
+
+    const optionId = (index: number) => `cal-time-${name}-${index}`;
+
+    const looping = options.length >= LOOP_MIN_OPTIONS;
+    const copies = looping ? LOOP_COPIES : 1;
+    // The middle copy is the real one: it carries the ids the listbox points at
+    // and is the only copy exposed to assistive tech. The outer copies exist
+    // purely so there is always something above and below to scroll onto.
+    const primaryCopy = looping ? (LOOP_COPIES - 1) / 2 : 0;
+
     return div(
       { class: 'cal-time-column-group' },
       caption
@@ -1092,23 +1136,125 @@ class DatePicker {
         // minutes at once so the time view stays roughly as tall as the month
         // sheet and the popup doesn't resize when switching between them;
         // #scrollSelectedTimeIntoView centres the current value in it.
-        { class: 'cal-time-column', role: 'listbox', 'aria-label': ariaLabel },
-        ...options.map((option) =>
-          a(
-            {
-              class: classMap({
-                'cal-time-option': true,
-                'cal-time-option--selected': option.selected
-              }),
-              role: 'option',
-              'aria-selected': option.selected,
-              onclick: option.onSelect
-            },
-            option.label
-          )
-        )
+        //
+        // Keyboard: focus sits on the column and aria-activedescendant points at
+        // the current option, rather than a roving tabindex across the options.
+        // The whole view re-renders on every value change, so keeping focus on a
+        // node that doesn't move means there is no focus to lose and restore
+        // around the patch.
+        {
+          class: classMap({
+            'cal-time-column': true,
+            // Drops the half-column padding a non-looping wheel needs so its
+            // first and last entry can still reach the centre — a looping one
+            // always has neighbours on both sides.
+            'cal-time-column--looping': looping
+          }),
+          role: 'listbox',
+          'aria-label': ariaLabel,
+          tabindex: 0,
+          'aria-activedescendant': optionId(selectedIndex),
+          onkeydown: (ev: Event) =>
+            this.#onTimeColumnKeyDown(ev as KeyboardEvent, options, selectedIndex),
+          onscroll: !looping
+            ? null
+            : (ev: Event) => this.#onTimeColumnScroll(ev.currentTarget as HTMLElement, copies)
+        },
+        ...Array.from({ length: copies }, (_, copy) =>
+          options.map((option, index) => {
+            const primary = copy === primaryCopy;
+
+            return a(
+              {
+                // Only the real copy is addressable or announced; the rest are
+                // scenery, hidden from assistive tech so the listbox reports the
+                // values once rather than three times.
+                id: primary ? optionId(index) : null,
+                'aria-hidden': primary ? null : 'true',
+                role: primary ? 'option' : null,
+                'aria-selected': primary ? option.selected : null,
+                class: classMap({
+                  'cal-time-option': true,
+                  'cal-time-option--selected': option.selected
+                }),
+                onclick: option.onSelect
+              },
+              option.label
+            );
+          })
+        ).flat()
       )
     );
+  }
+
+  // Keeps the scroll inside the middle copy. Every copy is identical, so
+  // shifting by exactly one copy-length puts the same values under the pointer
+  // and the jump can't be seen — the wheel just never reaches an end.
+  #onTimeColumnScroll(column: HTMLElement, copies: number) {
+    // Not while we're animating the column ourselves: teleporting mid-flight
+    // would abort the glide and land somewhere arbitrary.
+    const busyUntil = this.#autoScrollUntil.get(column) ?? 0;
+
+    if (performance.now() < busyUntil) {
+      return;
+    }
+
+    const copyLength = column.scrollHeight / copies;
+
+    if (copyLength <= 0) {
+      return;
+    }
+
+    // Recentre once the scroll strays more than half a copy from the middle
+    // one, which leaves a full half-copy of slack either side before the seam
+    // could come into view.
+    const middle = copyLength * ((copies - 1) / 2);
+    const drift = column.scrollTop - middle;
+
+    if (Math.abs(drift) > copyLength / 2) {
+      const shift = Math.round(drift / copyLength) * copyLength;
+      column.scrollTop -= shift;
+    }
+  }
+
+  // Arrow keys move the value directly rather than moving a focus ring that
+  // then needs confirming: on a wheel the highlighted option *is* the value, so
+  // there is no separate "focused but not chosen" state to represent.
+  #onTimeColumnKeyDown(
+    ev: KeyboardEvent,
+    options: { selected: boolean; onSelect: () => void }[],
+    selectedIndex: number
+  ) {
+    if (!options.length || ev.altKey || ev.ctrlKey || ev.metaKey) {
+      return;
+    }
+
+    const last = options.length - 1;
+    let next: number;
+
+    switch (ev.key) {
+      // Wrapping at both ends is the point of doing this: stepping down from
+      // 23 lands on 00 instead of stopping dead, which is the boundary these
+      // columns are otherwise slowest to cross.
+      case 'ArrowDown':
+        next = selectedIndex === last ? 0 : selectedIndex + 1;
+        break;
+      case 'ArrowUp':
+        next = selectedIndex === 0 ? last : selectedIndex - 1;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = last;
+        break;
+      default:
+        return;
+    }
+
+    // Otherwise the arrow keys scroll the column (and the page) as well.
+    ev.preventDefault();
+    options[next].onSelect();
   }
 
   // A resize moves where a column's centre *is* without changing what's
@@ -1182,6 +1328,7 @@ class DatePicker {
     if (this.#view !== 'time1' && this.#view !== 'time2') {
       this.#lastTimeValueKey = '';
       this.#lastTimeLayoutKey = '';
+      this.#lastTimeView = '';
       return;
     }
 
@@ -1190,6 +1337,7 @@ class DatePicker {
     if (!columns.length) {
       this.#lastTimeValueKey = '';
       this.#lastTimeLayoutKey = '';
+      this.#lastTimeView = '';
       return;
     }
 
@@ -1207,8 +1355,18 @@ class DatePicker {
       return;
     }
 
+    // Only a change *within* one time sheet glides. Two things are pointedly
+    // not that, and jump instead:
+    //
+    //   - the first positioning after the sheet appears (nothing to glide from)
+    //   - switching From: to To: or back, which is a change of subject, not an
+    //     adjustment of the value on screen. Gliding there animates the wheels
+    //     from one time to an unrelated one, which reads as though the value
+    //     the user just left is being edited.
     const settled =
-      this.#lastTimeValueKey !== '' && layoutKey === this.#lastTimeLayoutKey;
+      this.#lastTimeValueKey !== '' &&
+      layoutKey === this.#lastTimeLayoutKey &&
+      this.#view === this.#lastTimeView;
 
     // Honoured explicitly: unlike a CSS transition, a programmatic smooth
     // scroll is not suppressed for a reduced-motion preference on its own.
@@ -1222,20 +1380,58 @@ class DatePicker {
     let scrolled = false;
 
     for (const column of columns) {
-      const selected = column.querySelector<HTMLElement>(
-        '.cal-time-option--selected'
-      );
+      const instances = [
+        ...column.querySelectorAll<HTMLElement>('.cal-time-option--selected')
+      ];
 
-      if (!selected || !column.clientHeight) {
+      if (!instances.length || !column.clientHeight) {
         continue;
       }
 
-      column.scrollTo({
-        top:
-          selected.offsetTop -
-          (column.clientHeight - selected.offsetHeight) / 2,
-        behavior
-      });
+      const centreOn = (el: HTMLElement) =>
+        el.offsetTop - (column.clientHeight - el.offsetHeight) / 2;
+
+      // Gliding to whichever copy of the value is *nearest* is what makes a
+      // wrap read as a single step: 23 -> 00 moves one row rather than
+      // rewinding the whole list. So the distance to travel comes from that
+      // one...
+      const nearest = instances.reduce(
+        (best, el) =>
+          Math.abs(centreOn(el) - column.scrollTop) <
+          Math.abs(centreOn(best) - column.scrollTop)
+            ? el
+            : best,
+        instances[0]
+      );
+
+      const travel = centreOn(nearest) - column.scrollTop;
+
+      // ...but the place it comes to rest is always the *middle* copy, so the
+      // wheel keeps a full copy of runway on either side. Landing on whichever
+      // copy happened to be nearest instead lets the resting position drift one
+      // copy per pick, and once it reaches copy 0 the wheel is clamped at the
+      // top with nothing above it — an infinite scroller that won't scroll up.
+      // (The scroll handler's own recentring can't save it: that only runs when
+      // the *user* scrolls, not when we do.)
+      //
+      // Every copy is identical, so shifting the start by the same whole number
+      // of copies is invisible; the animation covers the same distance either
+      // way.
+      const destination = centreOn(instances[(instances.length - 1) / 2]);
+      const start = destination - travel;
+
+      if (start !== column.scrollTop) {
+        column.scrollTop = start;
+      }
+
+      // Hold the loop-jump off until this scroll has finished, or it would
+      // teleport the column out from under the animation.
+      this.#autoScrollUntil.set(
+        column,
+        performance.now() + (behavior === 'smooth' ? AUTO_SCROLL_SETTLE_MS : 50)
+      );
+
+      column.scrollTo({ top: destination, behavior });
 
       scrolled = true;
     }
@@ -1243,6 +1439,7 @@ class DatePicker {
     if (scrolled) {
       this.#lastTimeValueKey = valueKey;
       this.#lastTimeLayoutKey = layoutKey;
+      this.#lastTimeView = this.#view;
     }
   }
 }
