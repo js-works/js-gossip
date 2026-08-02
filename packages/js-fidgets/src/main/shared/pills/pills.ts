@@ -91,7 +91,15 @@ const pillsStyles = css`
     padding-block: calc(1px * var(--ui-scale));
     padding-inline-start: calc(6px * var(--ui-scale));
     padding-inline-end: var(--ui-spacing-sm);
-    font-size: var(--ui-font-size-sm);
+    /* 0.875em (of the host control's own font-size), not the flat
+       --ui-font-size-sm token this used to be: at the default size="medium"
+       the two are the exact same 14px, but a size="small"/"large" control now
+       gets proportionally smaller/larger pills instead of one fixed pill size
+       for all three. A pill's height is what floors the trigger's own height
+       (see each component's .content min-height, derived from this) — with a
+       fixed pill size that floor was identical across all three sizes and
+       flattened the size progression to just the trigger's padding. */
+    font-size: 0.875em;
     line-height: 1;
   }
 

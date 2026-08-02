@@ -50,7 +50,9 @@ export const autocompleteStyles = [
 
     :host([size="large"]) {
       font-size: var(--ui-font-size-lg);
-      --autocomplete-padding-block: calc(5px * var(--ui-scale));
+      /* 4px, down from 5px, now that .content's pill-height floor grows with
+         this size's own font — same retune as ui-select's copy. */
+      --autocomplete-padding-block: calc(4px * var(--ui-scale));
       --autocomplete-padding-inline: calc(12px * var(--ui-scale));
     }
 
@@ -87,8 +89,9 @@ export const autocompleteStyles = [
          + 1px border × 2, and .pill-remove's 1.4em/line-height:1 as the
          tallest child — same formula as ui-select's own .content, kept in
          sync by hand) so the empty and "has pills" states render the same
-         height. */
-      min-height: calc(1.4 * var(--ui-font-size-sm) + var(--ui-spacing-sm));
+         height. em-based (1.4em of the pill's own 0.875em) so the floor scales
+         with \`size\` — see ui-select's own copy for the full derivation. */
+      min-height: calc(1.4 * 0.875em + var(--ui-spacing-sm));
       /* Breathing room around the pills themselves — .wrapper's own
          padding-block (above) is intentionally near-zero to keep the plain
          (no pills) state compact, so this is the pills' own vertical margin

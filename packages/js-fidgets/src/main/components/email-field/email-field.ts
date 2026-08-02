@@ -8,6 +8,7 @@ import {
   renderFieldLabel,
   fieldLabelStyles,
 } from "../../shared/field-label/field-label.js";
+import { focusOnLabelClick } from "../../shared/label-focus/label-focus.js";
 
 @customElement("ui-email-field")
 export class EmailField extends LitElement {
@@ -58,6 +59,9 @@ export class EmailField extends LitElement {
   constructor() {
     super();
     this.#internals = this.attachInternals();
+    // <label for> support — see the helper for what the platform does
+    // and doesn't do for a form-associated custom element.
+    focusOnLabelClick(this);
   }
 
   connectedCallback() {

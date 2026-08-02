@@ -108,5 +108,21 @@ export const datePickerStyles = [
          selected cells, and a selection range's own row ends. */
       --cal-button-border-radius: var(--ui-radius-md);
     }
+
+    /* Breathing room between the month/year header row and the sheet below it,
+       which the core leaves flush (.cal-base is a plain flex column with no
+       gap). A margin on the header alone rather than a gap on .cal-base: the
+       core puts other things in that same column — the time links under a
+       sheet in calendar+time mode, and the From:/To: tabs above the time
+       selector in the time views — and none of those asked for extra spacing.
+
+       em, so it tracks the picker's own font-size (--cal-font-size, mapped to
+       --ui-font-size-md above) and therefore --ui-scale, like the core's own
+       em-based sizing. This is a design-system decision, so it lives in the
+       bridge: the core is never edited to suit this wrapper (see the
+       file comment above). */
+    .cal-header {
+      margin-block-end: 0.0625em;
+    }
   `,
 ];

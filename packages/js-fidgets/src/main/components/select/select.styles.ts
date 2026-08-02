@@ -27,7 +27,10 @@ export const selectStyles = [
          overall height on ui-text-field/ui-number-field/etc.'s own natural
          height at the same size — not a round token, since matching an
          unrelated component's height is the actual goal here, not the
-         spacing scale. */
+         spacing scale. Small lands ~1px over its field counterpart rather
+         than exactly on it: .content's pill-height floor below already
+         exceeds a small field's height on its own, and padding-block can't
+         go below 0 to compensate. */
       font-size: var(--ui-font-size-md);
       /* Was 0px (same as small below) at one point — collapsed medium and
          small to the same overall height, which read as broken rather than
@@ -51,7 +54,11 @@ export const selectStyles = [
 
     :host([size="large"]) {
       font-size: var(--ui-font-size-lg);
-      --select-padding-block: calc(5px * var(--ui-scale));
+      /* 4px, down from 5px, since .content's pill-height floor became
+         size-relative (it grows with the font here now, where it used to be
+         the same fixed height at every size) — 5px on top of that overshot a
+         large field's height by ~1.5px. */
+      --select-padding-block: calc(4px * var(--ui-scale));
       --select-padding-inline: calc(12px * var(--ui-scale));
     }
 
@@ -111,8 +118,15 @@ export const selectStyles = [
          a pill's own height instead (pills.ts's .pill: 1px padding-block × 2
          + 1px border × 2, and .pill-remove's 1.4em/line-height:1 as the
          tallest child) so the empty and "has pills" states render the same
-         height. */
-      min-height: calc(1.4 * var(--ui-font-size-sm) + var(--ui-spacing-sm));
+         height.
+
+         em, not the flat --ui-font-size-sm token this was written against:
+         1.4em of the pill's own font-size, which is itself 0.875em of this
+         control's (see pills.ts), so the floor now scales with \`size\` instead
+         of pinning all three sizes to the same height. The +--ui-spacing-sm
+         is the px part of the same derivation — the pill's own border+padding
+         plus this element's padding-block below, 4px + 4px at scale 1. */
+      min-height: calc(1.4 * 0.875em + var(--ui-spacing-sm));
       /* Breathing room around the pills themselves — .trigger's own
          padding-block (above) is intentionally near-zero to keep the plain
          (no pills) state compact, so this is the pills' own vertical margin

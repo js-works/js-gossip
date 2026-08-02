@@ -29,12 +29,46 @@ export const buttonStyles = [
       --btn-50: var(--ui-color-neutral-50);
       --btn-100: var(--ui-color-neutral-100);
       --btn-200: var(--ui-color-neutral-200);
-      --btn-500: var(--ui-color-neutral-600);
-      --btn-600: var(--ui-color-neutral-700);
-      --btn-700: var(--ui-color-neutral-800);
+      /* light-dark() per step — the one tone that can't just name a ramp
+         token, and the only place in this file that reaches for it.
+
+         In light mode these are one step darker than the -600/-700/-800 they
+         used to be: the colored tones' solid fill is their ramp's -500 step, a
+         real accent, and neutral-600 read washed-out beside them — lighter
+         than solid's place in the hierarchy (it is the high-emphasis variant).
+         Not darker than -700, though: neutral solid is the secondary action
+         standing next to a primary CTA, and past that its contrast against a
+         light page overtakes primary-500's, inverting the emphasis order.
+
+         Dark mode deliberately keeps the old -600/-700/-800. Every neutral
+         step flips across schemes (a dark gray on white, a light gray on
+         black), so a uniform shift toward "darker" reads as *brighter* on a
+         dark page — the same one-step move that fixes light mode made the
+         neutral solid the loudest thing on the dark page, brighter than the
+         primary blue. The two schemes genuinely want opposite steps here,
+         which is what a plain var() can't express.
+
+         Each step still keeps the relationships the variants below rely on
+         within its own scheme: solid moves by exactly one ramp step on hover
+         (-500 → -600), and filled's ink (-700) sits one step past that. The
+         light steps (-50/-100/-200, the filled/subtle backgrounds) are the
+         same tokens as every tone and need none of this. */
+      --btn-500: light-dark(
+        var(--ui-color-neutral-700),
+        var(--ui-color-neutral-600)
+      );
+      --btn-600: light-dark(
+        var(--ui-color-neutral-800),
+        var(--ui-color-neutral-700)
+      );
+      --btn-700: light-dark(
+        var(--ui-color-neutral-900),
+        var(--ui-color-neutral-800)
+      );
       /* The neutral tone alone can't use --ui-color-on-accent (the flat white
          every colored tone below takes): its solid fill is --btn-500 =
-         neutral-600, and unlike a colored ramp's self-mirroring -500 step
+         neutral-700 light / -600 dark, and unlike a colored ramp's
+         self-mirroring -500 step
          that one *does* flip across schemes — a dark gray on white, a light
          gray on black — so its ink has to flip with it. neutral-50 is exactly
          that flip (near-white in light, near-black in dark) and is

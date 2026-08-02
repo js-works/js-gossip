@@ -1107,8 +1107,33 @@ export class DataGrid<T = unknown> extends LitElement {
                 >${rangeStart} to ${rangeEnd} of ${this.rowCount}</span
               >
               <div class="page-size-group">
-                <span class="page-label">Page Size:</span>
+                <!--
+                  A real <label for>, not a bare <span>: ui-select is a
+                  form-associated custom element (static formAssociated), which
+                  makes it a labelable element, so the association is a real one
+                  the platform honors (label.control resolves to the ui-select)
+                  and the picker gets its accessible name from this text — which
+                  a plain span next to it never gave it.
+
+                  What this does NOT buy, despite being a proper label:
+                  click-the-label-to-focus/open. Label activation does forward a
+                  click to the host, but ui-select's own handler sits on the
+                  .trigger inside its shadow root (select.ts's render()), and a
+                  host-targeted click doesn't reach into a shadow tree. Verified,
+                  not assumed. Making that work is ui-select's call to make (a
+                  host-level click/focus handler), not something to fake here.
+
+                  The literal id is safe unqualified: every grid is its own
+                  shadow root, so it can't collide with a page's own ids or
+                  another grid's.
+
+                  Not ui-select's own \`label\` property (which renders this same
+                  markup inside the component): that one stacks the label above
+                  the control, and this footer needs it inline beside it.
+                -->
+                <label class="page-label" for="page-size">Page Size:</label>
                 <ui-select
+                  id="page-size"
                   class="page-size"
                   size="small"
                   .value=${String(this.pageSize)}
@@ -1147,8 +1172,17 @@ export class DataGrid<T = unknown> extends LitElement {
                 >
                   ${chevronLeftIcon}
                 </ui-button>
-                <span class="page-label">Page</span>
+                <!--
+                  Same as the Page Size label above: a real <label for>, so the
+                  page input gets its accessible name from this word and clicking
+                  it focuses the input (ui-number-field is form-associated, and
+                  wires up shared/label-focus for the focus half). The trailing
+                  "of N" beside it stays a plain span — that one is prose about
+                  the input, not a name for it.
+                -->
+                <label class="page-label" for="page-input">Page</label>
                 <ui-number-field
+                  id="page-input"
                   class="page-input"
                   size="small"
                   hide-stepper

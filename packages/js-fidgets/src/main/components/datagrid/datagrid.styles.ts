@@ -689,6 +689,15 @@ export const datagridStyles = [
       gap: var(--ui-spacing-sm);
     }
 
+    /* Twice the bar's own -sm gap between "Page Size:" and its picker. The
+       shared rule above is what the nav's row of chevron buttons wants (they
+       read as one cluster and shouldn't drift apart), but a label sitting right
+       against the control it names reads as crowded rather than grouped. */
+    .page-size-group {
+      gap: calc(var(--ui-spacing-sm) * 2);
+    }
+
+
     /* Same idea as the header's own column divider — a fixed 1.25em, 2px
        line, not a full-height border. An extra 1.75em margin (on top of the
        bar's own \`gap\`) gives a full 1.75em of breathing room on each side
@@ -737,6 +746,13 @@ export const datagridStyles = [
 
     .page-input {
       width: 3em;
+      /* Breathing room on both sides of the page number, as its own margin
+         rather than a wider .page-nav gap: that gap also spaces the four
+         chevron buttons from each other, and only this number — flanked by the
+         "Page" label and the "of N" text — needs pulling away from its
+         neighbours. Adds to the inherited gap, so each side ends up at 2× -sm,
+         matching .page-size-group's own gap. */
+      margin-inline: var(--ui-spacing-sm);
     }
   `,
 ];

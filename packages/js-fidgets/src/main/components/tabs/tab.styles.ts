@@ -62,9 +62,25 @@ export const tabStyles = [
       justify-content: flex-end;
     }
 
+    /* A translucent tint of the text color, not the opaque
+       --ui-color-neutral-100 this was: an opaque light gray only reads as
+       "tinted" while the surface underneath happens to be --ui-bg's white.
+       Put a tablist on any other surface — a card, a panel, a page with its
+       own background (the demo's own gray page is exactly this) — and an
+       opaque neutral-100 either matches that surface and vanishes, or reads
+       as an unrelated color patch. A tint darkens (in dark mode: lightens)
+       whatever is actually behind it, so hover/selected stay visible on any
+       surface. 4%: over white that composites to #f5f5f5 — the exact shade
+       neutral-100 used to paint there, so the light-mode-on-white case this
+       was originally tuned for is unchanged — and it still reads on a tinted
+       surface (#ebebeb on the demo's own #f5f5f5 page). Dark mode is the
+       weakest case at this strength (~#0f0f0f over --ui-bg's #050505, where
+       the old opaque neutral-100 was #171717); if it ever reads too faint
+       there, the fix is a per-scheme strength via light-dark(), not a single
+       higher number that would overpower light mode. */
     :host(:hover:not([disabled])) {
       color: var(--ui-text);
-      background: var(--ui-color-neutral-100);
+      background: color-mix(in srgb, var(--ui-text) 4%, transparent);
     }
 
     :host([selected]) {
@@ -84,7 +100,11 @@ export const tabStyles = [
 
     :host([orientation="vertical"][selected]) {
       border-inline-end-color: var(--ui-color-primary-500);
-      background: var(--ui-color-neutral-100);
+      /* Same tint as the hover rule above (deliberately the same strength —
+         a selected vertical tab and a hovered one have always shared this
+         fill; the accent border and the label color are what tell them
+         apart). */
+      background: color-mix(in srgb, var(--ui-text) 4%, transparent);
     }
 
     :host([disabled]) {

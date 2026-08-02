@@ -10,6 +10,7 @@ import { closestLang, observeLocale } from "../../shared/locale.js";
 import "../date-picker/date-picker.js";
 import type { DatePicker } from "../date-picker/date-picker.js";
 import "../button/button.js";
+import { focusOnLabelClick } from "../../shared/label-focus/label-focus.js";
 
 export type { DateFieldSelectionMode };
 
@@ -150,6 +151,9 @@ export class DateField extends LitElement {
   constructor() {
     super();
     this.#internals = this.attachInternals();
+    // <label for> support — see the helper for what the platform does
+    // and doesn't do for a form-associated custom element.
+    focusOnLabelClick(this);
   }
 
   connectedCallback() {
@@ -257,6 +261,20 @@ export class DateField extends LitElement {
   #closePopup() {
     this.#popup?.hidePopover();
     this.#input?.focus();
+  }
+
+  // The readonly display input is this component's focusable control (it is
+  // also the popup's trigger — see render()), so host focus delegates there,
+  // the same as every other field here. Needed as a real override rather than
+  // inheriting HTMLElement.focus(): the host itself carries no tabindex, so
+  // the inherited version would be a no-op — including for the <label for>
+  // path wired up in the constructor.
+  focus(options?: FocusOptions) {
+    this.#input?.focus(options);
+  }
+
+  blur() {
+    this.#input?.blur();
   }
 
   // Whether the popup was open when the pointer went down on a trigger — see

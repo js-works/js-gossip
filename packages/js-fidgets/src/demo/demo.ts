@@ -2195,13 +2195,7 @@ function renderApp(): void {
     html`
       <main class="page">
         <header>
-          <div>
-            <h1>Component demo</h1>
-            <p class="tagline">
-              A living catalogue of every component in this library — buttons,
-              fields, menus, grids, and more.
-            </p>
-          </div>
+          <ui-heading level="1" class="page-title">Component demo</ui-heading>
           <div class="header-controls">
             <ui-select
               class="scale-control"

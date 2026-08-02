@@ -24,14 +24,21 @@
 body {
   margin: 0;
   padding: 1rem 1.5rem 2.5rem;
-  /* --ui-bg rather than the previous `transparent` (which fell through to the
-     UA's own canvas): in light mode both are white, so nothing changes there,
-     but the UA's *dark* canvas is a browser-specific near-black that no token
-     controls — leaving the page a slightly different shade from the sections
-     painted on it, differently per browser. Painting it from the same token
-     the sections use keeps the two in step; section borders still separate
-     them. */
-  background: var(--ui-bg);
+  /* A light gray page in light mode (not --ui-bg's white, which the sections
+     themselves are painted with) so each section reads as a card sitting on
+     the page rather than as bordered regions of one continuous white sheet.
+     Only light mode: --ui-bg is already #050505 in dark, and nothing in the
+     neutral ramp goes darker than that, so a "one step off the surface"
+     page-vs-card contrast can only be had in one direction here — dark keeps
+     the sections and the page in step, which is what the whole page did
+     before this.
+
+     Either way it's --ui-bg-derived rather than the `transparent` this once
+     was (which fell through to the UA's own canvas): the UA's *dark* canvas
+     is a browser-specific near-black no token controls, leaving the page a
+     slightly different shade from the sections painted on it, differently per
+     browser. */
+  background: light-dark(var(--ui-color-neutral-100), var(--ui-bg));
   color: var(--ui-text);
   font-family: var(--ui-font-sans);
   line-height: 1.5;
@@ -95,17 +102,11 @@ ui-select.theme-control {
   --select-min-width: 6em;
 }
 
-h1 {
-  margin: 0 0 0.3rem;
-  font-size: 2rem;
-  font-weight: 600;
+/* Size and weight come from ui-heading itself (level="1"); the display-face
+   letter-spacing is the one piece of demo styling left. ui-heading's :host
+   already sets margin: 0, so nothing here has to cancel one. */
+.page-title {
   letter-spacing: -0.02em;
-}
-
-.tagline {
-  margin: 0;
-  color: var(--ui-color-neutral-600);
-  font-size: 0.95rem;
 }
 
 section {
@@ -129,9 +130,18 @@ h2 {
   margin: 0 0 1rem;
 }
 
+/* align-items: flex-start, not flex's default `stretch` — stretch made every
+   control in a row as tall as the tallest one, which silently erased the very
+   difference some rows exist to show: a size="small" field next to a
+   size="large" one got stretched to the large one's height (fields let this
+   through by design — ui-text-field's .wrapper is `flex-grow: 1` inside the
+   host's own column layout, so a host stretched from outside grows the input
+   box with it, which is what makes a field fill e.g. a grid cell). Each
+   control now keeps its own intrinsic height. */
 .row {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 

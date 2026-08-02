@@ -13,6 +13,7 @@ import { renderFieldLabel } from "../../shared/field-label/field-label.js";
 import "../select/select.js";
 import type { Select } from "../select/select.js";
 import "../button/button.js";
+import { focusOnLabelClick } from "../../shared/label-focus/label-focus.js";
 
 // One option per quarter hour, "00:00".."23:45" — the fixed set ui-date-field2
 // offers in its time popup (see `type: "datetime"` below). Generated once at
@@ -219,6 +220,9 @@ export class DateField2 extends LitElement {
   constructor() {
     super();
     this.#internals = this.attachInternals();
+    // <label for> support — see the helper for what the platform does
+    // and doesn't do for a form-associated custom element.
+    focusOnLabelClick(this);
   }
 
   connectedCallback() {

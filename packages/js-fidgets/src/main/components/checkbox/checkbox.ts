@@ -5,6 +5,7 @@ import type { PropertyValues } from "lit";
 import { checkboxStyles } from "./checkbox.styles.js";
 import { checkIcon } from "./icons/check.icon.js";
 import { dashIcon } from "./icons/dash.icon.js";
+import { focusOnLabelClick } from "../../shared/label-focus/label-focus.js";
 
 /**
  * A tri-state checkbox (checked / unchecked / indeterminate), form-associated like
@@ -61,6 +62,25 @@ export class Checkbox extends LitElement {
   constructor() {
     super();
     this.#internals = this.attachInternals();
+    // <label for> support. Unlike every other control wired up through this
+    // helper, a checkbox's label click *toggles* it rather than only focusing
+    // it — that's what a native <input type="checkbox"> does — so the click is
+    // forwarded to the real inner input instead. That gets the state change,
+    // the change/input events and the focus in one step, all through the same
+    // path a direct click on the box takes, rather than reimplementing the
+    // toggle here.
+    //
+    // Note ui-checkbox's own `label` property is the usual way to label one
+    // (it renders a real <label> inside the shadow root, wrapping the input);
+    // this is for the case where the label lives outside the component.
+    // Focus first, then click: a programmatic click() toggles the input and
+    // fires its events but does not move focus, which a real label click on a
+    // native checkbox does (verified — without the focus() the box toggled with
+    // no focus ring anywhere).
+    focusOnLabelClick(this, () => {
+      this.focus({ focusVisible: true });
+      this.#input?.click();
+    });
   }
 
   static styles = checkboxStyles;

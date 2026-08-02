@@ -9,6 +9,7 @@ import "./option-group.js";
 import type { Option } from "./option.js";
 import { trackPopupLayout } from "../../shared/popup-layout/popup-layout.js";
 import { scrollIntoListboxView } from "../../shared/scroll-into-listbox-view.js";
+import { focusOnLabelClick } from "../../shared/label-focus/label-focus.js";
 import {
   renderPills,
   togglePillValue,
@@ -126,6 +127,12 @@ export class Select extends LitElement {
   constructor() {
     super();
     this.#internals = this.attachInternals();
+    // <label for> support — see the helper for what the platform does and
+    // doesn't do for a form-associated custom element. Focus only, deliberately
+    // not open: a label click says "put me in this control", and pressing
+    // Enter/Space/ArrowDown — or clicking the trigger — is what says "show me
+    // the options", same as a native <select>.
+    focusOnLabelClick(this);
   }
 
   static styles = selectStyles;

@@ -9,6 +9,7 @@ import {
   renderFieldLabel,
   fieldLabelStyles,
 } from "../../shared/field-label/field-label.js";
+import { focusOnLabelClick } from "../../shared/label-focus/label-focus.js";
 
 @customElement("ui-password-field")
 export class PasswordField extends LitElement {
@@ -61,6 +62,9 @@ export class PasswordField extends LitElement {
     super();
 
     this.#internals = this.attachInternals();
+    // <label for> support — see the helper for what the platform does
+    // and doesn't do for a form-associated custom element.
+    focusOnLabelClick(this);
   }
 
   connectedCallback() {

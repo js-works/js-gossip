@@ -128,19 +128,33 @@ export const dateFieldStyles = [
       overflow: hidden;
       /* Fixed width rather than content-sized: the month/year/decade sheets
          have different natural widths, so without this the popup would resize
-         under the cursor as the user drills through the views. em, so it
-         tracks the field's own font-size.
+         under the cursor as the user drills through the views.
+
          Sized from the widest thing the core actually produces, measured
          rather than guessed: with this element's border and the picker's own
          inset included, the month sheet with week numbers shown wants 311px and
-         the time view 310px. 20.25em (324px at the default scale) leaves 13px of
-         headroom. Measured at the same width in all of en-US, en-GB, es-ES,
-         fr-FR, de-DE, it-IT, ar-SA, hu-HU, pl-PL and zh-TW — the cells' own
-         padding sets the width, not the weekday captions, so the locale doesn't
-         move it. Anything narrower and the week-number column and the weekend
-         highlight bleed out past the rounded border; much wider and the
-         flex-grow cells simply spread, which undoes the sheet's density. */
-      width: 20.25em;
+         the time view 310px. 20.25 × the md font size (324px at the default
+         scale) leaves 13px of headroom. Measured at the same width in all of
+         en-US, en-GB, es-ES, fr-FR, de-DE, it-IT, ar-SA, hu-HU, pl-PL and
+         zh-TW — the cells' own padding sets the width, not the weekday
+         captions, so the locale doesn't move it. Anything narrower and the
+         week-number column and the weekend highlight bleed out past the
+         rounded border; much wider and the flex-grow cells simply spread,
+         which undoes the sheet's density.
+
+         Multiplied against --ui-font-size-md, NOT written as a plain \`em\`
+         (which resolves against the *field's* font-size): the picker inside is
+         not sized by this field at all — date-picker.styles.ts maps its
+         --cal-font-size to --ui-font-size-md unconditionally — so its content
+         is the same ~311px whatever \`size\` the field is. An em here made the
+         card the one thing that tracked the field: size="small" gave a 283.5px
+         card around 311px of calendar (the sheet hit its own
+         min-width: 17.5em floor and the week-number column bled), and
+         size="large" gave 364.5px, 54px of dead space with the cells spread
+         thin. Both symptoms the paragraph above warns about, caused by the
+         unit rather than the number. Still --ui-scale-tracking, since
+         --ui-font-size-md is itself calc(1rem * var(--ui-scale)). */
+      width: calc(20.25 * var(--ui-font-size-md));
     }
 
     /* A small inset. The scale has no step between -sm (4px) and -md (16px) —
@@ -158,11 +172,15 @@ export const dateFieldStyles = [
       display: flex;
       align-items: center;
       gap: var(--ui-spacing-sm);
-      /* A little more above than -sm gave, so the row isn't tight under the
-         last calendar row. Matches the picker's own inset above it; the
-         buttons' own padding sits inside this. */
-      padding: calc(var(--ui-spacing-sm) * 1.5) var(--ui-spacing-md)
-        var(--ui-spacing-md);
+      /* A tight, symmetric block inset — the buttons carry their own padding,
+         so the footer only has to separate them from the calendar above and
+         the card edge below, not pad them a second time. The last date row
+         still clears the buttons by more than this alone: the picker's own
+         bottom inset (.popup-card ui-date-picker above) sits on top of it.
+         Bottom used to be --ui-spacing-md, four times the top, which left the
+         card visibly bottom-heavy. Inline stays -md: it's what keeps Clear and
+         OK off the card's rounded corners. */
+      padding: var(--ui-spacing-sm) var(--ui-spacing-md);
     }
 
     /* Pushes Cancel/OK to the trailing edge, leaving Clear on its own at the
