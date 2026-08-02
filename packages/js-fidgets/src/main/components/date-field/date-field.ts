@@ -345,19 +345,14 @@ export class DateField extends LitElement {
             @change=${this.#onPickerChange}
           ></ui-date-picker>
           <div class="popup-footer">
-            <ui-button variant="link" size="small" @click=${this.#onClearClick}>
+            <ui-button variant="subtle" @click=${this.#onClearClick}>
               Clear
             </ui-button>
             <span class="popup-footer-spacer"></span>
-            <ui-button variant="link" size="small" @click=${this.#onCancelClick}>
+            <ui-button variant="subtle" @click=${this.#onCancelClick}>
               Cancel
             </ui-button>
-            <ui-button
-              variant="subtle"
-              tone="primary"
-              size="small"
-              @click=${this.#onOkClick}
-            >
+            <ui-button variant="subtle" @click=${this.#onOkClick}>
               OK
             </ui-button>
           </div>

@@ -90,6 +90,12 @@ class DatePicker {
   // Tracked because a hovered cell paints a fill like a selected one does, so it
   // has to take part in the joined-edge adjacency (see #isFilledCell) — and
   // "the cell one row up is hovered" is not something CSS can express.
+  // Whether a range selection has both of its ends. Not derivable from the
+  // selection's size: a one-day range is a single key, so {A} means "start
+  // chosen, waiting for the end" before the second click and "the range A..A"
+  // after it. Everything that needs to know a range is finished asks this
+  // rather than counting.
+  #rangeComplete = false;
   #hoveredIndex: number | null = null;
   #lastTimeValueKey = '';
   #lastTimeLayoutKey = '';
@@ -147,7 +153,12 @@ class DatePicker {
     }
 
     if (kind === 'calendar') {
-      return items.join(',');
+      // A complete range always reports both ends, so a one-day range reads
+      // "A,A" — telling a finished range apart from a start still waiting for
+      // its end, which are the same single key internally.
+      return this.#rangeComplete && items.length === 1
+        ? items[0] + ',' + items[0]
+        : items.join(',');
     }
 
     if (kind === 'calendar+time') {
@@ -159,9 +170,9 @@ class DatePicker {
           getHourMinuteString(this.#time1.hours, this.#time1.minutes)
       );
 
-      if (items.length > 1) {
+      if (this.#rangeComplete) {
         items2.push(
-          items[1] +
+          items[items.length - 1] +
             'T' +
             getHourMinuteString(this.#time2.hours, this.#time2.minutes)
         );
@@ -183,13 +194,14 @@ class DatePicker {
 
   setValue(value: string) {
     this.#selection.clear();
+    this.#rangeComplete = false;
 
     if (!value) {
       this.#requestUpdate();
       return;
     }
 
-    const { kind } = selectionModeMeta[this.#selectionMode];
+    const { kind, selectType } = selectionModeMeta[this.#selectionMode];
     const items = value.split(',');
 
     // Routed by kind, because a time doesn't live in #selection: the clock
@@ -229,6 +241,12 @@ class DatePicker {
       // yet), so an unparseable key here is simply carried until something
       // downstream ignores it. That part of the original TODO stands.
       items.forEach((item) => this.#selection.add(item));
+    }
+
+    // Two comma-separated halves mean a finished range, even when they name the
+    // same day — that's how getValue writes a one-day range back out.
+    if (selectType === 'range') {
+      this.#rangeComplete = items.length > 1;
     }
 
     this.#requestUpdate();
@@ -341,13 +359,27 @@ class DatePicker {
       } else {
         this.#selection.add(selectionKey);
       }
-    } else if (selected) {
-      this.#selection.delete(selectionKey);
-    } else if (this.#selection.size > 1) {
+    } else if (this.#rangeComplete) {
+      // A finished range. Clicking the one day a one-day range spans clears it
+      // — that's the second click on an already-complete A..A. Any other click
+      // starts a fresh range from the date clicked.
+      const clearsOneDayRange = selected && this.#selection.size === 1;
+
       this.#selection.clear();
+      this.#rangeComplete = false;
+
+      if (!clearsOneDayRange) {
+        this.#selection.add(selectionKey);
+      }
+    } else if (this.#selection.size === 0) {
       this.#selection.add(selectionKey);
     } else {
+      // The second click closes the range — including on the start date itself,
+      // which makes a one-day range. It used to delete the start instead, so a
+      // range covering a single day was impossible to express: the click that
+      // should have completed it cancelled it.
       this.#selection.add(selectionKey);
+      this.#rangeComplete = true;
     }
 
     this.#requestUpdate();
@@ -381,6 +413,8 @@ class DatePicker {
         this.#selection.clear();
         this.#onChange?.();
       }
+
+      this.#rangeComplete = false;
 
       this.#view = selectionModeMeta[props.selectionMode].initialView;
       this.#setTime('time1', 0, 0);
@@ -611,7 +645,7 @@ class DatePicker {
     let pendingStart: string | null = null;
     let pendingEnd: string | null = null;
 
-    if (hasRange && sorted.length === 1 && this.#hoveredIndex !== null) {
+    if (hasRange && !this.#rangeComplete && this.#hoveredIndex !== null) {
       const hovered = sheet.items[this.#hoveredIndex];
 
       // A minimal-size placeholder can't be hovered (it has no handlers), so
@@ -742,22 +776,32 @@ class DatePicker {
   // --- time links ------------------------------------------------
 
   #renderTimeLinks() {
-    const selectionSize = this.#selection.size;
+    // Both links whenever the mode picks a range, not just once both ends are
+    // chosen. The pair is what tells you the mode *has* a from and a to; showing
+    // only "from" until the second date lands made a range mode look like a
+    // single-date one at the moment you were deciding. The "to" link stays
+    // disabled until there is an end date to attach a time to — see
+    // #renderTimeLink.
+    const { selectType } = selectionModeMeta[this.#selectionMode];
 
     return div(
       { class: 'cal-time-links' },
       this.#renderTimeLink('time1'),
-      selectionSize > 1 ? this.#renderTimeLink('time2') : null
+      selectType === 'range' ? this.#renderTimeLink('time2') : null
     );
   }
 
   #renderTimeLink(type: 'time1' | 'time2') {
     const time = this.#getTime(type);
 
-    let timeString =
-      this.#selection.size > 0 //
-        ? this.#calendar.formatTime(time)
-        : '';
+    // Each link needs its own date before it means anything: "from" once the
+    // first is chosen, "to" only once the second is. Until then it reads --:--
+    // and is inert, which also keeps it from opening a time2 view while the
+    // tabs above still show a single tab.
+    const hasDate =
+      type === 'time1' ? this.#selection.size > 0 : this.#rangeComplete;
+
+    let timeString = hasDate ? this.#calendar.formatTime(time) : '';
 
     return a(
       {
@@ -802,11 +846,11 @@ class DatePicker {
             month: items[0][1],
             day: items[0][2]
           })
-        : type === 'time2' && items.length > 1
+        : type === 'time2' && this.#rangeComplete && items.length > 0
         ? this.#calendar.formatDate({
-            year: items[1][0],
-            month: items[1][1],
-            day: items[1][2]
+            year: items[items.length - 1][0],
+            month: items[items.length - 1][1],
+            day: items[items.length - 1][2]
           })
         : '';
 
@@ -815,7 +859,7 @@ class DatePicker {
 
     if (formattedDate) {
       const fromOrToLabel =
-        selectType === 'range' && this.#selection.size > 1
+        selectType === 'range' && this.#rangeComplete
           ? (type === 'time1' ? 'From:' : 'To:') + '\u00a0\u00a0'
           : '';
 
@@ -825,7 +869,7 @@ class DatePicker {
         formattedDate
       );
     } else if (
-      this.#selection.size > 1 ||
+      this.#rangeComplete ||
       (kind === 'time' && selectType === 'range')
     ) {
       timeHeader = div(
@@ -851,7 +895,7 @@ class DatePicker {
 
   #renderTimeTabs(type: 'time1' | 'time2', props: DatePicker.Props) {
     const { kind, selectType } = selectionModeMeta[props.selectionMode];
-    const showsTwoTabs = kind === 'time' || this.#selection.size > 1;
+    const showsTwoTabs = kind === 'time' || this.#rangeComplete;
 
     return div(
       {
@@ -861,7 +905,7 @@ class DatePicker {
         })
       },
       this.#renderTime('time1', props),
-      (kind === 'time' && selectType === 'range') || this.#selection.size > 1
+      (kind === 'time' && selectType === 'range') || this.#rangeComplete
         ? this.#renderTime('time2', props)
         : null
     );
@@ -986,7 +1030,7 @@ class DatePicker {
     // #renderTimeTabs uses to decide whether to render the second one.
     const { kind, selectType } = selectionModeMeta[props.selectionMode];
     const twoTabs =
-      (kind === 'time' && selectType === 'range') || this.#selection.size > 1;
+      (kind === 'time' && selectType === 'range') || this.#rangeComplete;
 
     return div(
       {

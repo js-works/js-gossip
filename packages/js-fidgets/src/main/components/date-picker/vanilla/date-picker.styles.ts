@@ -53,6 +53,22 @@ export default /*css*/ `
     cursor: pointer;
   }
 
+  /* The picker's usual radius, so the hover and pressed fills below read as
+     rounded chips like everything else here rather than square blocks. Set
+     unconditionally rather than inside :hover — a radius with no background is
+     invisible, and this way it covers the pressed state too, including the
+     touch and keyboard cases where :active fires without :hover.
+     Only the non-accentuated header: there the fills sit on a plain background,
+     whereas an accentuated header is itself a filled bar edge to edge. */
+  .cal-header:not(.cal-header--accentuated)
+    > :where(
+      .cal-title:not(.cal-title--disabled),
+      .cal-prev:not(.cal-prev--disabled),
+      .cal-next:not(.cal-next--disabled)
+    ) {
+    border-radius: var(--cal-button-border-radius);
+  }
+
   .cal-header:not(.cal-header--accentuated)
     > :where(
       .cal-title:not(.cal-title--disabled),
@@ -157,6 +173,8 @@ export default /*css*/ `
     --cal-cell-radius-start-end: var(--cal-button-border-radius);
     --cal-cell-radius-end-start: var(--cal-button-border-radius);
     --cal-cell-radius-end-end: var(--cal-button-border-radius);
+    /* Positioning context for the fill layer below. */
+    position: relative;
     display: flex;
     flex-grow: 1;
     justify-content: center;
@@ -174,19 +192,38 @@ export default /*css*/ `
      the range already rounds its own outer ends. */
   .cal-cell:not(.cal-cell--disabled):not(.cal-cell--selected):hover {
     color: var(--cal-cell-hover-color);
+  }
+
+  .cal-cell:not(.cal-cell--disabled):not(.cal-cell--selected):hover::before {
     background-color: var(--cal-cell-hover-background-color);
   }
 
-  /* Everything that paints a fill takes its corners from the four properties
-     above, so all three states round and join identically. */
-  .cal-cell--selected:not(.cal-cell--disabled),
-  .cal-cell--in-selection-range:not(.cal-cell--selected),
-  .cal-cell--in-pending-range:not(.cal-cell--selected),
-  .cal-cell:not(.cal-cell--disabled):not(.cal-cell--selected):hover {
+  /* The selection/hover fill is painted by this layer rather than by the cell's
+     own background, because the two need different shapes: the weekend column
+     tint is a full-bleed square that must run edge to edge, while the fill is a
+     rounded chip. One element can't do both — border-radius clips every one of
+     an element's background layers identically — so the tint stays on the cell
+     and the fill sits on top of it here.
+     Before this, a filled cell in a weekend column simply replaced the grey with
+     blue, and the rounded corners then showed whatever was behind the cell: the
+     card's white, not the column's grey.
+     Inherits the corner properties from the cell, so it rounds and joins
+     exactly as the joined-edge rules dictate. */
+  .cal-cell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
     border-start-start-radius: var(--cal-cell-radius-start-start);
     border-start-end-radius: var(--cal-cell-radius-start-end);
     border-end-start-radius: var(--cal-cell-radius-end-start);
     border-end-end-radius: var(--cal-cell-radius-end-end);
+  }
+
+  /* Above the fill layer. Both are positioned with z-index auto, so paint order
+     is DOM order and ::before comes first — but the text needs a position for
+     that to apply to it at all. */
+  .cal-cell-text {
+    position: relative;
   }
 
   .cal-cell:not(.cal-cell--disabled) {
@@ -195,10 +232,13 @@ export default /*css*/ `
 
   .cal-cell--selected:not(.cal-cell--disabled) {
     color: var(--cal-cell-selected-color);
+  }
+
+  .cal-cell--selected:not(.cal-cell--disabled)::before {
     background-color: var(--cal-cell-selected-background-color);
   }
 
-  .cal-cell--selected:not(.cal-cell--disabled):hover {
+  .cal-cell--selected:not(.cal-cell--disabled):hover::before {
     background-color: var(--cal-cell-selected-hover-background-color);
   }
 
@@ -246,8 +286,8 @@ export default /*css*/ `
     color: var(--cal-cell-hover-color);
   }
 
-  .cal-cell--in-selection-range:not(.cal-cell--selected),
-  .cal-cell--in-pending-range:not(.cal-cell--selected) {
+  .cal-cell--in-selection-range:not(.cal-cell--selected)::before,
+  .cal-cell--in-pending-range:not(.cal-cell--selected)::before {
     background-color: var(--cal-cell-selection-range-background-color);
   }
 

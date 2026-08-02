@@ -87,6 +87,13 @@ export const dateFieldStyles = [
     .picker-popup {
       position: fixed;
       position-anchor: --ui-date-field-anchor;
+      /* Clears the UA's own \`[popover] { inset: 0 }\` before the two insets that
+         matter are set. Without it right/bottom stay at 0, so all four insets
+         are specified — and position-try-fallbacks flips *inset properties*, so
+         flip-block swapped that 0 into \`top\` and pinned the popup to the top of
+         the viewport instead of above the field. Only visible once a field sat
+         low enough that the popup didn't fit below it. */
+      inset: auto;
       top: calc(anchor(bottom) + 0.25rem);
       left: anchor(left);
       /* Flips above the field when there isn't room below. */
@@ -113,42 +120,49 @@ export const dateFieldStyles = [
       border: var(--ui-border-thin) solid var(--ui-popup-border-color);
       border-radius: var(--ui-radius-md);
       box-shadow: var(--ui-popup-shadow);
-      /* Clips the now-flush picker to the border radius. Safe: nothing inside
-         needs to escape the card — the time columns scroll within themselves,
-         and the shadow is drawn outside the box either way. */
+      /* Kept from when the picker was flush to these edges: the padding above
+         now keeps content off the corners on its own, so this is only a
+         guarantee that nothing can ever spill past the radius. Safe either way
+         — the time columns scroll within themselves, and the shadow is drawn
+         outside the box. */
       overflow: hidden;
       /* Fixed width rather than content-sized: the month/year/decade sheets
          have different natural widths, so without this the popup would resize
          under the cursor as the user drills through the views. em, so it
          tracks the field's own font-size.
          Sized from the widest thing the core actually produces, measured
-         rather than guessed: with this element's border included, the month
-         sheet with week numbers shown wants 299px and the time view 298px.
-         19.5em (312px at the default scale) leaves 13px of headroom. Measured
-         at the same width in all of en-US, en-GB, es-ES, fr-FR, de-DE, it-IT,
-         ar-SA, hu-HU, pl-PL and zh-TW — the cells' own padding sets the width,
-         not the weekday captions, so the locale doesn't move it. Anything
-         narrower and the week-number column and the weekend highlight bleed out
-         past the rounded border; much wider and the flex-grow cells simply
-         spread, which undoes the sheet's density. */
-      width: 19.5em;
+         rather than guessed: with this element's border and the picker's own
+         inset included, the month sheet with week numbers shown wants 311px and
+         the time view 310px. 20.25em (324px at the default scale) leaves 13px of
+         headroom. Measured at the same width in all of en-US, en-GB, es-ES,
+         fr-FR, de-DE, it-IT, ar-SA, hu-HU, pl-PL and zh-TW — the cells' own
+         padding sets the width, not the weekday captions, so the locale doesn't
+         move it. Anything narrower and the week-number column and the weekend
+         highlight bleed out past the rounded border; much wider and the
+         flex-grow cells simply spread, which undoes the sheet's density. */
+      width: 20.25em;
     }
 
-    /* Flush to the card's edges rather than inset: the sheet is already a grid
-       of generously padded cells, so a ring of card padding on top of that read
-       as neither tight nor deliberately airy. overflow: hidden on .popup-card
-       above is what keeps anything that paints to the edge — an accentuated
-       header's fill, the weekend highlight columns — clipped to the rounded
-       corners now that they reach them. */
+    /* A small inset. The scale has no step between -sm (4px) and -md (16px) —
+       16 was the original and read too airy, flush-to-the-edge too tight — so
+       it's derived from -sm rather than written as a literal, and stays on the
+       --ui-scale dial.
+       Bottom included: below it sits .popup-footer's own top padding, so the
+       last row of dates clears the buttons by that plus this. */
     .popup-card ui-date-picker {
       display: block;
+      padding: calc(var(--ui-spacing-sm) * 1.5);
     }
 
     .popup-footer {
       display: flex;
       align-items: center;
       gap: var(--ui-spacing-sm);
-      padding: var(--ui-spacing-sm) var(--ui-spacing-md) var(--ui-spacing-md);
+      /* A little more above than -sm gave, so the row isn't tight under the
+         last calendar row. Matches the picker's own inset above it; the
+         buttons' own padding sits inside this. */
+      padding: calc(var(--ui-spacing-sm) * 1.5) var(--ui-spacing-md)
+        var(--ui-spacing-md);
     }
 
     /* Pushes Cancel/OK to the trailing edge, leaving Clear on its own at the
